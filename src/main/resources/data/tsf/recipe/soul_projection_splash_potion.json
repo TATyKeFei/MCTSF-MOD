@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "tsf:soul_projection_potion",
+    "minecraft:gunpowder"
+  ],
+  "result": {
+    "id": "tsf:soul_projection_splash_potion",
+    "count": 1
+  }
+}

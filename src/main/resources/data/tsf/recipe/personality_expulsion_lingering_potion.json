@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "tsf:personality_expulsion_splash_potion",
+    "minecraft:dragon_breath"
+  ],
+  "result": {
+    "id": "tsf:personality_expulsion_lingering_potion",
+    "count": 1
+  }
+}

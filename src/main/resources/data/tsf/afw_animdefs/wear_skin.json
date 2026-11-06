@@ -1,0 +1,29 @@
+{
+  "display_name": "TSF · 穿皮",
+  "animators": [
+    "TATyKeFei"
+  ],
+  "actors": [
+    {
+      "label": "player",
+      "entity_types": [
+        "minecraft:player"
+      ],
+      "activity": "passive"
+    }
+  ],
+  "attack_eligible": false,
+  "system_tags": [],
+  "content_tags": [],
+  "liquid_gain_multiplier": 0,
+  "stages": [
+    {
+      "stage": 1,
+      "loop": false,
+      "cycle_seconds": 2,
+      "allow_join": false,
+      "escapable": false,
+      "stage_seconds": 2
+    }
+  ]
+}

@@ -1,0 +1,1939 @@
+package icu.tatyrealms.tatykefei.state;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.mojang.serialization.JsonOps;
+import icu.tatyrealms.tatykefei.TSF;
+import icu.tatyrealms.tatykefei.TSFServerConfig;
+import icu.tatyrealms.tatykefei.compat.TrinketsCompat;
+import icu.tatyrealms.tatykefei.compat.NeedsOfNatureCompat;
+import icu.tatyrealms.tatykefei.compat.NeedsOfNatureTanks;
+import icu.tatyrealms.tatykefei.item.TSFItems;
+import icu.tatyrealms.tatykefei.mixin.MannequinAccessor;
+import icu.tatyrealms.tatykefei.network.Action;
+import icu.tatyrealms.tatykefei.network.ActionPayload;
+import icu.tatyrealms.tatykefei.network.AnimationPayload;
+import icu.tatyrealms.tatykefei.network.BodyAnimation;
+import icu.tatyrealms.tatykefei.network.StatePayload;
+import icu.tatyrealms.tatykefei.network.VisualState;
+import icu.tatyrealms.tatykefei.network.ObserverInventory;
+import icu.tatyrealms.tatykefei.network.ObserverPayload;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
+import net.minecraft.network.protocol.game.ClientboundSetHeldSlotPacket;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Prediction;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.decoration.Mannequin;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Abilities;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.item.component.CustomData;
+import net.minecraft.world.item.component.ResolvableProfile;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.storage.LevelResource;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.gamerules.GameRules;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+
+public final class BodyManager {
+    public static final String BODY_TAG = "tsf_empty_body";
+    public static final String SKIN_TAG = "tsf_folded_skin";
+    public static final EntityDimensions BODY_DIMENSIONS = EntityDimensions.fixed(1.0F, 0.275F).withEyeHeight(0.1375F);
+    public static final EntityDimensions SKIN_DIMENSIONS = EntityDimensions.fixed(1.0F, 0.375F).withEyeHeight(0.1875F);
+    public static final EntityDimensions SLIME_DIMENSIONS = EntityDimensions.fixed(0.52F, 0.52F).withEyeHeight(0.36F);
+    public static final EntityDimensions CROUCHING_SLIME_DIMENSIONS = EntityDimensions.fixed(0.86F, 0.312F).withEyeHeight(0.215F);
+    private static final Gson GSON = new Gson();
+    private static BodyManager instance;
+    private final MinecraftServer server;
+    private final Path path;
+    private final StateStore store;
+    private final Map<UUID, Long> cooldowns = new HashMap<>();
+    private final Map<UUID, List<UUID>> lastSkinLayers = new HashMap<>();
+    private final Set<UUID> pendingProjections = new HashSet<>();
+    private final Map<UUID, ItemEntity> skinDrops = new HashMap<>();
+    private final Map<UUID, Entity> bodyEntities = new HashMap<>();
+    private final Map<UUID, Integer> lastSkinRecoverySeconds = new HashMap<>();
+    private final Map<UUID, String> observerInventories = new HashMap<>();
+    private boolean visualsDirty;
+    private int ticks;
+
+    public BodyManager(MinecraftServer server) {
+        this.server = server;
+        this.path = server.getWorldPath(LevelResource.ROOT).resolve("tsf/state.json");
+        try {
+            this.store = StateStore.load(path);
+        } catch (IOException exception) {
+            throw new IllegalStateException("TSF 存档读取失败，请检查 " + path, exception);
+        }
+        instance = this;
+    }
+
+    public static BodyManager get() {
+        return instance;
+    }
+
+    public static void clear() {
+        instance = null;
+    }
+
+    public static Form form(Player player) {
+        return ((FormHolder) player).tsf$getForm();
+    }
+
+    public static boolean hypnotized(Player player) {
+        return ((FormHolder) player).tsf$isHypnotized();
+    }
+
+    public static boolean emptyBody(Entity entity) {
+        return entity instanceof EmptyBodyHolder holder && holder.tsf$isEmptyBody();
+    }
+
+    public static boolean foldedSkin(Entity entity) {
+        return entity instanceof EmptyBodyHolder holder && holder.tsf$isFoldedSkin();
+    }
+
+    public static void message(ServerPlayer player, String key, Object... arguments) {
+        player.sendSystemMessage(Component.translatable("message.tsf." + key, arguments));
+    }
+
+    private PlayerState state(ServerPlayer player) {
+        return store.players.computeIfAbsent(player.getUUID(), ignored -> {
+            PlayerState state = new PlayerState();
+            state.body = player.getUUID();
+            return state;
+        });
+    }
+
+    private Body nativeBody(ServerPlayer player) {
+        PlayerState state = state(player);
+        if (state.homeBody == null) {
+            state.homeBody = player.getUUID();
+        }
+        return store.bodies.computeIfAbsent(state.homeBody, id -> {
+            Body body = new Body();
+            body.id = id;
+            body.owner = player.getUUID();
+            body.name = player.getGameProfile().name();
+            body.profile = ResolvableProfile.CODEC.encodeStart(JsonOps.INSTANCE, player.getProfile()).getOrThrow();
+            if (state.form == Form.HUMAN && id.equals(state.body)) {
+                body.occupant = player.getUUID();
+            }
+            locate(body, player);
+            return body;
+        });
+    }
+
+    public void joined(ServerPlayer player) {
+        PlayerState state = state(player);
+        nativeBody(player);
+        if (state.form == Form.HUMAN) {
+            Body body = store.bodies.get(state.body);
+            if (body == null || !player.getUUID().equals(body.occupant)) {
+                state.form = Form.SLIME;
+                state.body = null;
+                message(player, "body_unavailable");
+            }
+        }
+        if (state.form == Form.HUMAN && state.zipperReturnForm == Form.HUMAN) {
+            storeZipperBody(player, state.zipperReturnBody);
+        }
+        Body current = store.bodies.get(state.body);
+        if (state.form == Form.HUMAN && current != null) {
+            if (current.natureTank == null) {
+                captureTank(current, player);
+            } else {
+                NeedsOfNatureTanks.restore(player, current.natureTank);
+            }
+        } else {
+            Body observed = store.bodies.get(state.observedBody);
+            if (state.form == Form.OBSERVER && observed != null && observed.natureTank == null) {
+                captureTank(observed, player);
+            }
+            NeedsOfNatureTanks.restore(player, null);
+        }
+        clearHypnosis(player);
+        applyForm(player);
+        lastSkinLayers.put(player.getUUID(), layers(player).stream().map(layer -> layer.body.id).toList());
+        visualsDirty = true;
+        save();
+    }
+
+    public void left(ServerPlayer player) {
+        PlayerState state = state(player);
+        NeedsOfNatureCompat.endSession(player);
+        placeWornSkins(player);
+        Body occupied = store.bodies.get(state.body);
+        if (player.isAlive() && state.form == Form.HUMAN && occupied != null
+                && (!player.getUUID().equals(occupied.owner) || state.zipperReturnForm != null)) {
+            if (state.zipperReturnForm != null) {
+                leaveZipper(player, false);
+            }
+            occupied = store.bodies.get(state.body);
+            if (occupied != null && !player.getUUID().equals(occupied.owner)) {
+                detach(player, Form.SLIME);
+                Body home = nativeBody(player);
+                if (home.occupant == null && home.zipperCarrier == null && !home.skinned && home.packedToken == null) {
+                    Vec3 destination = safePosition(level(home.dimension), new Vec3(home.x, home.y, home.z));
+                    if (destination != null) {
+                        enter(player, home, destination);
+                    }
+                }
+            }
+        }
+        if (state.body != null && store.bodies.containsKey(state.body)) {
+            locate(store.bodies.get(state.body), player);
+        }
+        clearHypnosis(player);
+        for (ServerPlayer other : server.getPlayerList().getPlayers()) {
+            if (player.getUUID().equals(state(other).hypnotist)) {
+                clearHypnosis(other);
+            }
+        }
+        cooldowns.remove(player.getUUID());
+        pendingProjections.remove(player.getUUID());
+        lastSkinLayers.remove(player.getUUID());
+        lastSkinRecoverySeconds.remove(player.getUUID());
+        observerInventories.remove(player.getUUID());
+        for (ServerPlayer other : server.getPlayerList().getPlayers()) {
+            if (other != player) {
+                updateObserver(other);
+            }
+        }
+        visualsDirty = true;
+        save();
+    }
+
+    private void placeWornSkins(ServerPlayer player) {
+        List<SkinLayer> worn = List.copyOf(layers(player));
+        for (SkinLayer layer : worn) {
+            layer.remove.run();
+            Body skin = layer.body;
+            skin.skinToken = UUID.randomUUID();
+            skin.skinDropEntity = null;
+            skin.skinPlaced = true;
+            skin.skinRecoveryAt = server.overworld().getGameTime() + 600;
+            locate(skin, player);
+            spawnBody(skin);
+        }
+        if (!worn.isEmpty()) {
+            Body body = store.bodies.get(state(player).body);
+            if (body != null) {
+                body.skinOrder.clear();
+            }
+            refreshInventory(player);
+        }
+    }
+
+    public void openPhone(ServerPlayer player) {
+        if (hypnotized(player)) {
+            message(player, "hypnotized");
+            return;
+        }
+        if (!hasPhoneAccess(player)) {
+            message(player, "need_phone");
+            return;
+        }
+        synchronize(player, true);
+    }
+
+    private boolean hasPhoneAccess(ServerPlayer player) {
+        PlayerState state = state(player);
+        Body body = store.bodies.get(state.body);
+        return state.form != Form.HUMAN || state.zipperReturnForm != null || body != null && !player.getUUID().equals(body.owner)
+                || !layers(player).isEmpty()
+                || player.getInventory().contains(stack -> stack.is(TSFItems.PHONE));
+    }
+
+    public void handle(ServerPlayer player, ActionPayload payload) {
+        if (!player.isAlive()) {
+            return;
+        }
+        if (payload.action() == Action.OPEN) {
+            if (ready(player)) {
+                openPhone(player);
+            }
+            return;
+        }
+        if (!ready(player) || hypnotized(player)) {
+            return;
+        }
+        if (state(player).form == Form.OBSERVER && payload.action() != Action.RETURN && payload.action() != Action.RESTORE_SKIN) {
+            message(player, "observing");
+            return;
+        }
+        if (!hasPhoneAccess(player)) {
+            message(player, "need_phone");
+            return;
+        }
+        ServerPlayer target = target(payload.target());
+        switch (payload.action()) {
+            case SLIME_COLOR -> colorSlime(player, payload.target());
+            case RESTORE_SKIN -> restoreOwnSkin(player);
+            case HYPNOTIZE -> hypnotize(player, target);
+            case RELEASE -> release(player, target);
+            case PROJECT -> message(player, "use_projection_potion");
+            case EXPEL_SELF -> message(player, "use_expulsion_potion");
+            case LEAVE_ZIPPER -> {
+                if (state(player).form == Form.HUMAN && state(player).zipperReturnForm != null) {
+                    depart(player, Form.SLIME);
+                }
+            }
+            case EXPEL_TARGET -> {
+                if (near(player, target, 16) && player.getUUID().equals(state(target).hypnotist)
+                        && NeedsOfNatureCompat.canChangeBody(target)) {
+                    detach(target, Form.SLIME);
+                    message(target, "expelled");
+                    changed();
+                } else {
+                    message(player, "hypnotize_first");
+                }
+            }
+            case POSSESS -> possess(player, target);
+            case RETURN -> returnToBody(player);
+            case UNDRESS -> undress(player);
+            default -> {
+            }
+        }
+    }
+
+    private boolean ready(ServerPlayer player) {
+        long now = server.overworld().getGameTime();
+        Long previous = cooldowns.get(player.getUUID());
+        if (previous != null && now - previous < 8) {
+            return false;
+        }
+        cooldowns.put(player.getUUID(), now);
+        return true;
+    }
+
+    private ServerPlayer target(String uuid) {
+        try {
+            return uuid.isEmpty() ? null : server.getPlayerList().getPlayer(UUID.fromString(uuid));
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+    }
+
+    private boolean near(ServerPlayer actor, ServerPlayer target, double distance) {
+        return target != null && actor != target && target.isAlive() && actor.level() == target.level()
+                && actor.distanceToSqr(target) <= distance * distance && actor.hasLineOfSight(target);
+    }
+
+    private void hypnotize(ServerPlayer player, ServerPlayer target) {
+        if (state(player).form != Form.HUMAN || !near(player, target, 16) || state(target).form != Form.HUMAN
+                || target.isSpectator()) {
+            message(player, "invalid_target");
+            return;
+        }
+        PlayerState state = state(target);
+        if (state.hypnotist != null && !player.getUUID().equals(state.hypnotist)) {
+            message(player, "already_hypnotized");
+            return;
+        }
+        target.closeContainer();
+        target.stopRiding();
+        target.stopUsingItem();
+        state.hypnotist = player.getUUID();
+        state.hypnosisUntil = server.overworld().getGameTime() + 1200;
+        state.anchorDimension = target.level().dimension().identifier().toString();
+        state.anchorX = target.getX();
+        state.anchorY = target.getY();
+        state.anchorZ = target.getZ();
+        ((FormHolder) target).tsf$setHypnotized(true);
+        message(player, "hypnosis_success", target.getDisplayName());
+        message(target, "hypnosis_received", player.getDisplayName());
+        changed();
+    }
+
+    private void release(ServerPlayer player, ServerPlayer target) {
+        if (target != null && player.getUUID().equals(state(target).hypnotist)) {
+            clearHypnosis(target);
+            message(target, "hypnosis_released");
+            changed();
+        } else {
+            message(player, "invalid_target");
+        }
+    }
+
+    private void clearHypnosis(ServerPlayer player) {
+        PlayerState state = state(player);
+        state.hypnotist = null;
+        state.hypnosisUntil = 0;
+        ((FormHolder) player).tsf$setHypnotized(false);
+    }
+
+    public boolean canProject(ServerPlayer player) {
+        return canDrinkBodyPotion(player, false);
+    }
+
+    public boolean canDrinkBodyPotion(ServerPlayer player, boolean expulsion) {
+        if (!player.isAlive() || hypnotized(player) || player.isSpectator() || state(player).form != Form.HUMAN) {
+            message(player, expulsion ? "expulsion_human_only" : "projection_human_only");
+            return false;
+        }
+        if (state(player).expulsionAt != 0) {
+            message(player, "expulsion_pending");
+            return false;
+        }
+        return NeedsOfNatureCompat.canChangeBody(player);
+    }
+
+    public void queueProjection(ServerPlayer player) {
+        pendingProjections.add(player.getUUID());
+    }
+
+    public void applyBodyPotion(ServerPlayer player, boolean expulsion) {
+        if (!player.isAlive() || player.isSpectator() || hypnotized(player) || state(player).form != Form.HUMAN
+                || state(player).expulsionAt != 0 || NeedsOfNatureCompat.isAnimating(player)) {
+            return;
+        }
+        if (expulsion) {
+            queueExpulsion(player);
+        } else {
+            queueProjection(player);
+        }
+    }
+
+    public void queueExpulsion(ServerPlayer player) {
+        PlayerState state = state(player);
+        state.expulsionAt = server.overworld().getGameTime() + TSFServerConfig.get().expulsionDelaySeconds * 20L;
+        state.expulsionBody = state.body;
+        message(player, "expulsion_scheduled", TSFServerConfig.get().expulsionDelaySeconds);
+        save();
+    }
+
+    public void colorSlime(ServerPlayer player, String value) {
+        if (state(player).form != Form.SLIME || player.isSpectator() || !player.isAlive() || hypnotized(player)) {
+            message(player, "slime_color_only");
+            return;
+        }
+        String hex = value.startsWith("#") ? value.substring(1) : value;
+        if (value.equalsIgnoreCase("reset")) {
+            state(player).slimeColor = null;
+            message(player, "slime_color_reset");
+        } else if (hex.matches("[0-9a-fA-F]{6}")) {
+            state(player).slimeColor = Integer.parseInt(hex, 16);
+            message(player, "slime_colored", "#" + hex.toUpperCase(java.util.Locale.ROOT));
+        } else {
+            message(player, "slime_color_invalid");
+            return;
+        }
+        changed();
+    }
+
+    public boolean dyeSlime(ServerPlayer player, ServerPlayer target, ItemStack stack) {
+        DyeColor dye = stack.get(DataComponents.DYE);
+        if (dye == null || state(target).form != Form.SLIME) {
+            return false;
+        }
+        if (stack.isEmpty() || player.isSpectator() || state(player).form == Form.SPIRIT
+                || state(player).form == Form.OBSERVER || hypnotized(player) || hypnotized(target)
+                || !target.isAlive() || player.level() != target.level() || player.distanceToSqr(target) > 25
+                || !player.hasLineOfSight(target)) {
+            return true;
+        }
+        int color = dye.getTextureDiffuseColor() & 0xFFFFFF;
+        if (!java.util.Objects.equals(state(target).slimeColor, color)) {
+            state(target).slimeColor = color;
+            if (!player.hasInfiniteMaterials()) {
+                stack.shrink(1);
+            }
+            player.level().playSound(null, target, SoundEvents.DYE_USE, SoundSource.PLAYERS, 1.0F, 1.0F);
+            refreshInventory(player);
+            message(target, "slime_colored", String.format(java.util.Locale.ROOT, "#%06X", color));
+            changed();
+        }
+        return true;
+    }
+
+    public void equipZipper(ServerPlayer player, ItemStack stack) {
+        if (!stack.is(TSFItems.ZIPPER) || stack.isEmpty() || hypnotized(player)
+                || player.isSpectator() || state(player).form != Form.HUMAN) {
+            message(player, "zipper_human_only");
+            return;
+        }
+        if (!NeedsOfNatureCompat.canChangeBody(player)) {
+            return;
+        }
+        if (!TrinketsCompat.equipNecklace(player, stack)) {
+            message(player, "zipper_no_slot");
+            return;
+        }
+        stack.shrink(1);
+        refreshInventory(player);
+        message(player, "zipper_equipped");
+        changed();
+    }
+
+    public boolean wearingZipper(ServerPlayer player) {
+        return player != null && state(player).form == Form.HUMAN && TrinketsCompat.slots(player).stream()
+                .anyMatch(slot -> slot.name().startsWith("chest/necklace/") && slot.stack().is(TSFItems.ZIPPER));
+    }
+
+    public boolean enterZipper(ServerPlayer player, ServerPlayer target) {
+        if (!wearingZipper(target)) {
+            return false;
+        }
+        if (hypnotized(player) || !ready(player) || player.isSpectator() || state(player).form == Form.OBSERVER) {
+            return true;
+        }
+        if (!near(player, target, 5) || target.isSpectator() || state(target).form != Form.HUMAN) {
+            message(player, "invalid_target");
+            return true;
+        }
+        if (!NeedsOfNatureCompat.canChangeBody(player) || !NeedsOfNatureCompat.canChangeBody(target)) {
+            return true;
+        }
+        Body body = store.bodies.get(state(target).body);
+        Vec3 destination = body == null ? null : safePosition(target.level(), target.position());
+        if (destination == null) {
+            message(player, "no_space");
+            return true;
+        }
+        PlayerState state = state(player);
+        UUID returnBody = state.zipperReturnForm == null ? state.body : state.zipperReturnBody;
+        Form returnForm = state.zipperReturnForm == null ? state.form : state.zipperReturnForm;
+        if (state.form == Form.HUMAN) {
+            detach(player, Form.SPIRIT);
+        }
+        if (returnForm == Form.HUMAN) {
+            storeZipperBody(player, returnBody);
+        }
+        transferControl(player, target, body, destination);
+        state(player).zipperReturnBody = returnBody;
+        state(player).zipperReturnForm = returnForm;
+        message(player, "zipper_entered", body.name);
+        changed();
+        playAnimation(player, BodyAnimation.WEAR_SKIN);
+        return true;
+    }
+
+    private void leaveZipper(ServerPlayer player) {
+        leaveZipper(player, true);
+    }
+
+    private void leaveZipper(ServerPlayer player, boolean animate) {
+        Vec3 exit = safePosition(player.level(), player.position(), true);
+        if (exit == null) {
+            message(player, "no_space");
+            return;
+        }
+        UUID returnBody = state(player).zipperReturnBody;
+        Form returnForm = state(player).zipperReturnForm;
+        detach(player, returnForm == Form.SPIRIT ? Form.SPIRIT : Form.SLIME);
+        player.teleportTo(player.level(), exit.x, exit.y, exit.z, Set.of(), player.getYRot(), player.getXRot(), false);
+        boolean returned = returnFromZipper(player, returnBody, returnForm);
+        changed();
+        if (returned && animate) {
+            playAnimation(player, BodyAnimation.POSSESS);
+        }
+    }
+
+    private void storeZipperBody(ServerPlayer player, UUID returnBody) {
+        Body previous = store.bodies.get(returnBody);
+        if (previous != null && previous.occupant == null && !previous.skinned && previous.packedToken == null
+                && (previous.zipperCarrier == null || player.getUUID().equals(previous.zipperCarrier))) {
+            removeBodyEntity(previous);
+            previous.zipperCarrier = player.getUUID();
+        }
+    }
+
+    private void releaseZipperBody(ServerPlayer player) {
+        Body previous = store.bodies.get(state(player).zipperReturnBody);
+        if (previous != null && player.getUUID().equals(previous.zipperCarrier)) {
+            previous.zipperCarrier = null;
+            locate(previous, player);
+            Vec3 destination = safePosition(player.level(), player.position(), true);
+            if (destination != null) {
+                previous.x = destination.x;
+                previous.y = destination.y;
+                previous.z = destination.z;
+            }
+            spawnBody(previous);
+        }
+    }
+
+    private boolean returnFromZipper(ServerPlayer player, UUID returnBody, Form returnForm) {
+        Body previous = store.bodies.get(returnBody);
+        Vec3 destination = previous != null && previous.occupant == null && previous.zipperCarrier == null
+                && !previous.skinned && previous.packedToken == null
+                ? safePosition(level(previous.dimension), new Vec3(previous.x, previous.y, previous.z)) : null;
+        if (destination != null) {
+            enter(player, previous, destination);
+            message(player, "zipper_returned");
+        } else {
+            message(player, returnForm == Form.SPIRIT ? "projected" : "expelled");
+        }
+        return destination != null;
+    }
+
+    public void depart(ServerPlayer player, Form form) {
+        if (hypnotized(player) || state(player).form == Form.OBSERVER || !NeedsOfNatureCompat.canChangeBody(player)) {
+            return;
+        }
+        if (form == Form.SLIME && state(player).form == Form.HUMAN && state(player).zipperReturnForm != null) {
+            leaveZipper(player);
+            return;
+        }
+        if (state(player).form == form) {
+            message(player, "already_form");
+            return;
+        }
+        detach(player, form);
+        message(player, form == Form.SPIRIT ? "projected" : "expelled");
+        changed();
+    }
+
+    private void detach(ServerPlayer player, Form form) {
+        PlayerState state = state(player);
+        releaseZipperBody(player);
+        state.zipperReturnBody = null;
+        state.zipperReturnForm = null;
+        state.expulsionAt = 0;
+        state.expulsionBody = null;
+        player.closeContainer();
+        player.stopRiding();
+        player.stopUsingItem();
+        if (state.form == Form.HUMAN) {
+            saveAbilities(player, state);
+            Body body = store.bodies.get(state.body);
+            if (body == null) {
+                body = nativeBody(player);
+            }
+            captureTank(body, player);
+            NeedsOfNatureTanks.restore(player, null);
+            body.skinnableHypnotized = hypnotized(player);
+            body.skinnableDowned = NeedsOfNatureCompat.isDowned(player);
+            layers(player);
+            for (TrinketsCompat.Slot slot : TrinketsCompat.slots(player)) {
+                if (skinBody(slot.stack()) != null) {
+                    body.skinLayers.add(encodeItem(slot.stack()));
+                    slot.clear();
+                } else if (slot.name().startsWith("chest/necklace/") && slot.stack().is(TSFItems.ZIPPER)) {
+                    body.accessories.put(slot.name(), encodeItem(slot.stack()));
+                    slot.clear();
+                }
+            }
+            captureInventory(body, player);
+            body.health = Math.max(1, player.getHealth());
+            body.food = player.getFoodData().getFoodLevel();
+            body.saturation = player.getFoodData().getSaturationLevel();
+            locate(body, player);
+            body.occupant = null;
+            player.getInventory().clearContent();
+            spawnBody(body);
+            player.setHealth(Math.min(8, player.getMaxHealth()));
+            player.getFoodData().setFoodLevel(20);
+            refreshInventory(player);
+        }
+        restoreAbilities(player, state);
+        state.body = null;
+        state.form = form;
+        lastSkinLayers.put(player.getUUID(), List.of());
+        clearHypnosis(player);
+        applyForm(player);
+        player.teleportTo(player.level(), player.getX(), player.getY() + 0.15, player.getZ(), Set.of(),
+                player.getYRot(), player.getXRot(), false);
+    }
+
+    private void saveAbilities(ServerPlayer player, PlayerState state) {
+        state.savedGameMode = player.gameMode().getName();
+        Abilities abilities = player.getAbilities();
+        state.savedMayFly = abilities.mayfly;
+        state.savedFlying = abilities.flying;
+        state.savedInvulnerable = abilities.invulnerable;
+        state.savedNoGravity = player.isNoGravity();
+    }
+
+    private void restoreAbilities(ServerPlayer player, PlayerState state) {
+        Abilities abilities = player.getAbilities();
+        abilities.mayfly = state.savedMayFly;
+        abilities.flying = state.savedFlying;
+        abilities.invulnerable = state.savedInvulnerable;
+        player.setNoGravity(state.savedNoGravity);
+        player.noPhysics = player.isSpectator();
+        player.onUpdateAbilities();
+    }
+
+    private void applyForm(ServerPlayer player) {
+        PlayerState state = state(player);
+        ((FormHolder) player).tsf$setForm(state.form);
+        if (state.form == Form.OBSERVER && !player.isSpectator()) {
+            player.setGameMode(GameType.SPECTATOR);
+        }
+        if (state.form == Form.SPIRIT) {
+            player.getAbilities().mayfly = true;
+            player.getAbilities().flying = true;
+            player.getAbilities().invulnerable = true;
+            player.setNoGravity(true);
+            player.noPhysics = true;
+            player.onUpdateAbilities();
+        }
+        player.fallDistance = 0;
+    }
+
+    public void possess(ServerPlayer player, ServerPlayer target) {
+        if ((state(player).form != Form.SPIRIT && state(player).form != Form.SLIME) || player.isSpectator()) {
+            message(player, "leave_first");
+            return;
+        }
+        if (!near(player, target, 5) || state(target).form != Form.HUMAN || target.isSpectator()) {
+            message(player, "invalid_target");
+            return;
+        }
+        if (!NeedsOfNatureCompat.canChangeBody(player) || !NeedsOfNatureCompat.canChangeBody(target)) {
+            return;
+        }
+        Body body = store.bodies.get(state(target).body);
+        Vec3 destination = body == null ? null : safePosition(target.level(), target.position());
+        if (destination == null) {
+            message(player, "no_space");
+            return;
+        }
+        BodyAnimation animation = state(player).form == Form.SLIME ? BodyAnimation.TAKEOVER : BodyAnimation.POSSESS;
+        transferControl(player, target, body, destination);
+        changed();
+        playAnimation(player, animation);
+    }
+
+    private void transferControl(ServerPlayer player, ServerPlayer target, Body body, Vec3 destination) {
+        UUID returnBody = state(target).zipperReturnBody;
+        Form returnForm = state(target).zipperReturnForm;
+        detach(target, returnForm == null ? Form.OBSERVER : returnForm == Form.SPIRIT ? Form.SPIRIT : Form.SLIME);
+        enter(player, body, destination);
+        if (returnForm == null) {
+            state(target).observedBody = body.id;
+            state(target).observerFallback = player.getUUID();
+            message(target, "body_stolen", player.getDisplayName());
+        } else {
+            returnFromZipper(target, returnBody, returnForm);
+        }
+        message(player, "possessed", body.name);
+    }
+
+    public boolean interactBody(ServerPlayer player, Entity entity) {
+        if (!emptyBody(entity)) {
+            return false;
+        }
+        if (hypnotized(player) || state(player).form == Form.OBSERVER || !ready(player)
+                || !NeedsOfNatureCompat.canChangeBody(player)) {
+            return true;
+        }
+        Body body = foldedSkin(entity) ? placedSkinForEntity(entity) : bodyForEntity(entity);
+        if (body == null || entity.level() != player.level() || player.distanceToSqr(entity) > 25
+                || !player.hasLineOfSight(entity)) {
+            return true;
+        }
+        if (body.skinPlaced) {
+            if (player.getMainHandItem().is(TSFItems.SKIN_KNIFE)) {
+                restorePlacedSkin(player, body);
+            } else if (state(player).form == Form.HUMAN || state(player).form == Form.SLIME) {
+                removeBodyEntity(body);
+                body.skinPlaced = false;
+                body.skinRecoveryAt = 0;
+                giveSkin(player, body);
+                changed();
+            }
+        } else if (player.isShiftKeyDown()) {
+            pickUpBody(player, body);
+        } else if (player.getMainHandItem().is(TSFItems.SKIN_KNIFE)) {
+            skinBody(player, body);
+        } else if (state(player).form == Form.HUMAN) {
+            message(player, "leave_first");
+        } else {
+            Vec3 destination = safePosition(player.level(), entity.position());
+            if (destination == null) {
+                message(player, "no_space");
+            } else {
+                BodyAnimation animation = state(player).form == Form.SLIME ? BodyAnimation.ENTER_BODY : BodyAnimation.POSSESS;
+                enter(player, body, destination);
+                message(player, "entered", body.name);
+                changed();
+                playAnimation(player, animation);
+            }
+        }
+        return true;
+    }
+
+    public Body bodyForEntity(Entity entity) {
+        for (Body body : store.bodies.values()) {
+            if (entity.getUUID().equals(body.entityId) && body.occupant == null && !body.skinned
+                    && body.packedToken == null && body.zipperCarrier == null) {
+                return body;
+            }
+        }
+        return null;
+    }
+
+    private Body placedSkinForEntity(Entity entity) {
+        return store.bodies.values().stream().filter(body -> body.skinPlaced && body.skinned
+                && entity.getUUID().equals(body.entityId)).findFirst().orElse(null);
+    }
+
+    public boolean placeSkin(ServerPlayer player, UseOnContext context) {
+        if (hypnotized(player) || player.isSpectator() || state(player).form != Form.HUMAN || !ready(player)
+                || !NeedsOfNatureCompat.canChangeBody(player)) {
+            return false;
+        }
+        Body body = skinBody(context.getItemInHand());
+        if (body == null || !body.skinned || controller(body, new HashSet<>()) != player
+                || layers(player).stream().anyMatch(layer -> layer.body == body)) {
+            message(player, "invalid_skin");
+            return false;
+        }
+        BlockPos position = new BlockPlaceContext(context).getClickedPos();
+        Vec3 destination = Vec3.atBottomCenterOf(position);
+        AABB bounds = SKIN_DIMENSIONS.makeBoundingBox(destination);
+        if (player.distanceToSqr(destination) > 36 || !player.level().mayInteract(player, position)
+                || !player.mayUseItemAt(position, context.getClickedFace(), context.getItemInHand())
+                || !player.level().isInWorldBounds(position) || !player.level().getWorldBorder().isWithinBounds(bounds)
+                || !player.level().noBlockCollision(null, bounds)) {
+            message(player, "no_space");
+            return false;
+        }
+        locate(body, player);
+        body.x = destination.x;
+        body.y = destination.y;
+        body.z = destination.z;
+        body.skinPlaced = true;
+        body.skinDropEntity = null;
+        body.skinRecoveryAt = server.overworld().getGameTime() + 600;
+        consumePlacedItem(player, context);
+        spawnBody(body);
+        refreshInventory(player);
+        message(player, "skin_placed", body.name);
+        changed();
+        return true;
+    }
+
+    private void restorePlacedSkin(ServerPlayer player, Body body) {
+        if (state(player).form != Form.HUMAN) {
+            return;
+        }
+        Vec3 destination = safePosition(level(body.dimension), new Vec3(body.x, body.y, body.z));
+        if (destination == null) {
+            message(player, "no_space");
+            return;
+        }
+        removeBodyEntity(body);
+        body.skinPlaced = false;
+        body.skinned = false;
+        body.skinRecoveryAt = 0;
+        body.x = destination.x;
+        body.y = destination.y;
+        body.z = destination.z;
+        spawnBody(body);
+        message(player, "skin_unfolded", body.name);
+        changed();
+    }
+
+    public boolean hitSkin(ServerPlayer player, Entity entity) {
+        if (!foldedSkin(entity)) {
+            return false;
+        }
+        if (hypnotized(player) || player.isSpectator() || state(player).form == Form.SPIRIT || !ready(player)
+                || player.distanceToSqr(entity) > 25 || !player.hasLineOfSight(entity)
+                || !NeedsOfNatureCompat.canChangeBody(player)) {
+            return true;
+        }
+        Body body = placedSkinForEntity(entity);
+        if (body != null) {
+            removeBodyEntity(body);
+            body.skinPlaced = false;
+            ItemEntity drop = new ItemEntity(level(body.dimension), body.x, body.y + 0.1, body.z, createSkin(body));
+            drop.setDefaultPickUpDelay();
+            level(body.dimension).addFreshEntity(drop);
+            changed();
+        }
+        return true;
+    }
+
+    private int skinRecoverySeconds(ServerPlayer player) {
+        PlayerState state = state(player);
+        Body body = state.form == Form.OBSERVER ? store.bodies.get(state.observedBody) : null;
+        if (body == null || !body.skinned || body.skinRecoveryAt == 0
+                || !body.skinPlaced && body.skinDropEntity == null || controller(body, new HashSet<>()) != null) {
+            return -1;
+        }
+        return (int) Math.max(0, (body.skinRecoveryAt - server.overworld().getGameTime() + 19) / 20);
+    }
+
+    private void restoreOwnSkin(ServerPlayer player) {
+        if (skinRecoverySeconds(player) != 0) {
+            message(player, "skin_recovery_unavailable");
+            return;
+        }
+        Body body = store.bodies.get(state(player).observedBody);
+        Vec3 destination = safePosition(level(body.dimension), new Vec3(body.x, body.y, body.z));
+        if (destination == null) {
+            message(player, "no_space");
+            return;
+        }
+        removeBodyEntity(body);
+        if (body.skinDropEntity != null) {
+            Entity drop = level(body.dimension).getEntity(body.skinDropEntity);
+            if (drop instanceof ItemEntity item && skinBody(item.getItem()) == body) {
+                drop.discard();
+            }
+        }
+        skinDrops.remove(body.id);
+        body.skinDropEntity = null;
+        body.skinRecoveryAt = 0;
+        body.skinPlaced = false;
+        body.skinned = false;
+        body.skinToken = UUID.randomUUID();
+        body.x = destination.x;
+        body.y = destination.y;
+        body.z = destination.z;
+        spawnBody(body);
+        changed();
+    }
+
+    private void pickUpBody(ServerPlayer player, Body body) {
+        if ((state(player).form != Form.HUMAN && state(player).form != Form.SLIME) || player.isSpectator()) {
+            message(player, "cannot_carry_body");
+            return;
+        }
+        removeBodyEntity(body);
+        body.packedToken = UUID.randomUUID();
+        ItemStack stack = new ItemStack(TSFItems.EMPTY_BODY);
+        CompoundTag data = new CompoundTag();
+        data.putString("tsf_body", body.id.toString());
+        data.putString("tsf_body_token", body.packedToken.toString());
+        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(data));
+        stack.set(DataComponents.PROFILE, profile(body));
+        stack.set(DataComponents.CUSTOM_NAME, Component.translatable("item.tsf.named_body", body.name));
+        if (!player.getInventory().add(stack)) {
+            player.drop(stack, false, Prediction.SERVER_ONLY);
+        }
+        refreshInventory(player);
+        message(player, "body_picked_up", body.name);
+        changed();
+    }
+
+    public boolean placeBody(ServerPlayer player, UseOnContext context) {
+        if (hypnotized(player) || player.isSpectator() || state(player).form == Form.SPIRIT || !ready(player)) {
+            return false;
+        }
+        ItemStack stack = context.getItemInHand();
+        Body body = linkedBody(stack);
+        String token = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag().getStringOr("tsf_body_token", "");
+        if (!stack.is(TSFItems.EMPTY_BODY) || body == null || body.packedToken == null || body.skinned
+                || body.occupant != null || !body.packedToken.toString().equals(token)) {
+            message(player, "invalid_body_item");
+            return false;
+        }
+        BlockPos position = new BlockPlaceContext(context).getClickedPos();
+        Vec3 destination = Vec3.atBottomCenterOf(position);
+        double radius = BODY_DIMENSIONS.width() / 2.0;
+        AABB bounds = new AABB(destination.x - radius, destination.y, destination.z - radius,
+                destination.x + radius, destination.y + BODY_DIMENSIONS.height(), destination.z + radius);
+        if (player.distanceToSqr(destination) > 36 || !player.level().mayInteract(player, position)
+                || !player.mayUseItemAt(position, context.getClickedFace(), stack)
+                || !player.level().isInWorldBounds(position) || !player.level().getWorldBorder().isWithinBounds(bounds)
+                || !player.level().noBlockCollision(null, bounds)) {
+            message(player, "no_space");
+            return false;
+        }
+        locate(body, player);
+        body.x = destination.x;
+        body.y = destination.y;
+        body.z = destination.z;
+        body.packedToken = null;
+        spawnBody(body);
+        consumePlacedItem(player, context);
+        refreshInventory(player);
+        message(player, "body_placed", body.name);
+        changed();
+        return true;
+    }
+
+    private void consumePlacedItem(ServerPlayer player, UseOnContext context) {
+        ItemStack stack = context.getItemInHand();
+        stack.shrink(1);
+        player.setItemInHand(context.getHand(), stack.copy());
+    }
+
+    public void regenerateBody(ServerPlayer player, ItemStack totem) {
+        if (!NeedsOfNatureCompat.canChangeBody(player)) {
+            return;
+        }
+        if (!totem.is(TSFItems.BODY_REGENERATION_TOTEM) || totem.isEmpty() || !player.isAlive()
+                || hypnotized(player) || player.isSpectator() || state(player).form != Form.SLIME) {
+            message(player, "regeneration_slime_only");
+            return;
+        }
+        if (!ready(player)) {
+            return;
+        }
+        Vec3 destination = safePosition(player.level(), player.position());
+        if (destination == null) {
+            message(player, "no_space");
+            return;
+        }
+        Body body = new Body();
+        body.id = UUID.randomUUID();
+        body.owner = player.getUUID();
+        body.name = player.getGameProfile().name();
+        body.profile = ResolvableProfile.CODEC.encodeStart(JsonOps.INSTANCE, player.getProfile()).getOrThrow();
+        locate(body, player);
+        store.bodies.put(body.id, body);
+        state(player).homeBody = body.id;
+        totem.shrink(1);
+        enter(player, body, destination);
+        message(player, "body_regenerated");
+        changed();
+    }
+
+    private void enter(ServerPlayer player, Body body, Vec3 destination) {
+        player.closeContainer();
+        List<ItemStack> carried = new ArrayList<>();
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (!stack.isEmpty()) {
+                carried.add(stack.copy());
+            }
+        }
+        removeBodyEntity(body);
+        PlayerState state = state(player);
+        if (state.form == Form.OBSERVER) {
+            player.setCamera(player);
+            player.setGameMode(GameType.byName(state.savedGameMode, GameType.SURVIVAL));
+        }
+        restoreAbilities(player, state);
+        state.form = Form.HUMAN;
+        state.body = body.id;
+        state.observedBody = null;
+        state.observerFallback = null;
+        state.zipperReturnBody = null;
+        state.zipperReturnForm = null;
+        body.zipperCarrier = null;
+        body.occupant = player.getUUID();
+        player.getInventory().clearContent();
+        for (int slot = 0; slot < Math.min(body.inventory.size(), player.getInventory().getContainerSize()); slot++) {
+            player.getInventory().setItem(slot, decodeItem(body.inventory.get(slot)));
+        }
+        body.inventory.clear();
+        player.getInventory().setSelectedSlot(body.selectedSlot);
+        applyForm(player);
+        player.teleportTo(level(body.dimension), destination.x, destination.y, destination.z, Set.of(), body.yaw, 0, false);
+        player.setHealth(Math.min(body.health, player.getMaxHealth()));
+        player.getFoodData().setFoodLevel(body.food);
+        player.getFoodData().setSaturation(body.saturation);
+        for (var entry : body.accessories.entrySet()) {
+            ItemStack accessory = decodeItem(entry.getValue());
+            TrinketsCompat.Slot slot = TrinketsCompat.slots(player).stream()
+                    .filter(candidate -> candidate.name().equals(entry.getKey()) && candidate.stack().isEmpty()
+                            && candidate.inventory().canPlaceItem(candidate.index(), accessory)).findFirst().orElse(null);
+            if (slot != null) {
+                slot.inventory().setItem(slot.index(), accessory);
+                slot.inventory().setChanged();
+            } else if (!player.getInventory().add(accessory)) {
+                player.drop(accessory, false, Prediction.SERVER_ONLY);
+            }
+        }
+        body.accessories.clear();
+        for (ItemStack stack : carried) {
+            if (!player.getInventory().add(stack)) {
+                player.drop(stack, false, Prediction.SERVER_ONLY);
+            }
+        }
+        NeedsOfNatureTanks.restore(player, body.natureTank);
+        refreshInventory(player);
+        lastSkinLayers.put(player.getUUID(), layers(player).stream().map(layer -> layer.body.id).toList());
+    }
+
+    public void returnToBody(ServerPlayer player) {
+        if (hypnotized(player) || !NeedsOfNatureCompat.canChangeBody(player)) {
+            return;
+        }
+        if (state(player).form == Form.HUMAN && state(player).zipperReturnForm != null) {
+            leaveZipper(player);
+            return;
+        }
+        Body body = nativeBody(player);
+        if (player.getUUID().equals(body.occupant)) {
+            message(player, "already_home");
+            return;
+        }
+        if (body.occupant != null || body.zipperCarrier != null || body.skinned) {
+            message(player, body.skinned ? "body_is_skin" : "body_occupied");
+            return;
+        }
+        if (body.packedToken != null) {
+            message(player, "body_packed");
+            return;
+        }
+        Vec3 destination = safePosition(level(body.dimension), new Vec3(body.x, body.y, body.z));
+        if (destination == null) {
+            message(player, "no_space");
+            return;
+        }
+        BodyAnimation animation = state(player).form == Form.SLIME ? BodyAnimation.ENTER_BODY : BodyAnimation.POSSESS;
+        if (state(player).form == Form.HUMAN) {
+            detach(player, Form.SLIME);
+        }
+        enter(player, body, destination);
+        message(player, "returned");
+        changed();
+        playAnimation(player, animation);
+    }
+
+    public void skinPlayer(ServerPlayer player, ServerPlayer target) {
+        if (hypnotized(player) || !ready(player)) {
+            return;
+        }
+        if (state(player).form != Form.HUMAN || !player.getMainHandItem().is(TSFItems.SKIN_KNIFE)
+                || !near(player, target, 5) || state(target).form != Form.HUMAN || target.isSpectator()) {
+            message(player, "invalid_target");
+            return;
+        }
+        boolean downed = NeedsOfNatureCompat.isDowned(target);
+        Body body = store.bodies.get(state(target).body);
+        if (body == null || !skinRules(player, hypnotized(target), downed)
+                || !NeedsOfNatureCompat.canChangeBody(player) || !NeedsOfNatureCompat.finishDowned(target)) {
+            return;
+        }
+        detach(target, Form.OBSERVER);
+        body.skinnableDowned = downed;
+        state(target).observedBody = body.id;
+        state(target).observerFallback = player.getUUID();
+        skinBody(player, body);
+        message(target, "skinned");
+    }
+
+    private void skinBody(ServerPlayer player, Body body) {
+        if (body == null || body.occupant != null || body.skinned || state(player).form != Form.HUMAN) {
+            return;
+        }
+        if (!skinRules(player, body.skinnableHypnotized, body.skinnableDowned)) {
+            return;
+        }
+        removeBodyEntity(body);
+        body.skinned = true;
+        body.skinToken = UUID.randomUUID();
+        body.skinPlaced = true;
+        body.skinDropEntity = null;
+        body.skinRecoveryAt = server.overworld().getGameTime() + 600;
+        spawnBody(body);
+        message(player, "skin_created", body.name);
+        changed();
+    }
+
+    private ItemStack createSkin(Body body) {
+        body.skinToken = UUID.randomUUID();
+        ItemStack skin = new ItemStack(TSFItems.SKIN_SUIT);
+        CompoundTag data = new CompoundTag();
+        data.putString("tsf_body", body.id.toString());
+        data.putString("tsf_skin_token", body.skinToken.toString());
+        skin.set(DataComponents.CUSTOM_DATA, CustomData.of(data));
+        skin.set(DataComponents.PROFILE, profile(body));
+        skin.set(DataComponents.CUSTOM_NAME, Component.translatable("item.tsf.named_skin", body.name));
+        return skin;
+    }
+
+    private void giveSkin(ServerPlayer player, Body body) {
+        ItemStack skin = createSkin(body);
+        if (!player.getInventory().add(skin)) {
+            player.drop(skin, false, Prediction.SERVER_ONLY);
+        }
+        refreshInventory(player);
+    }
+
+    private boolean skinRules(ServerPlayer player, boolean hypnotized, boolean downed) {
+        TSFServerConfig config = TSFServerConfig.get();
+        if (!config.skinKnifeEnabled) {
+            message(player, "skin_knife_disabled");
+        } else if (config.skinKnifeRequiresHypnosis && !hypnotized) {
+            message(player, "skin_requires_hypnosis");
+        } else if (config.skinKnifeRequiresDowned && !NeedsOfNatureCompat.supportsDowned()) {
+            message(player, "skin_requires_non");
+        } else if (config.skinKnifeRequiresDowned && !downed) {
+            message(player, "skin_requires_downed");
+        } else {
+            return true;
+        }
+        return false;
+    }
+
+    private Body skinBody(ItemStack stack) {
+        if (!stack.is(TSFItems.SKIN_SUIT)) {
+            return null;
+        }
+        Body body = linkedBody(stack);
+        String token = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag().getStringOr("tsf_skin_token", "");
+        return body != null && !body.skinPlaced && (body.skinToken == null || body.skinToken.toString().equals(token)) ? body : null;
+    }
+
+    private Body linkedBody(ItemStack stack) {
+        String id = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag().getStringOr("tsf_body", "");
+        try {
+            return store.bodies.get(UUID.fromString(id));
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+    }
+
+    public boolean canWearSkin(ServerPlayer player, ItemStack stack) {
+        if (!NeedsOfNatureCompat.canChangeBody(player)) {
+            return false;
+        }
+        Body body = skinBody(stack);
+        if (hypnotized(player) || player.isSpectator() || state(player).form != Form.HUMAN || body == null || !body.skinned
+                || layers(player).stream().anyMatch(layer -> layer.body.id.equals(body.id))) {
+            message(player, "invalid_skin");
+            return false;
+        }
+        return true;
+    }
+
+    public void wearSkin(ServerPlayer player, ItemStack stack) {
+        if (!ready(player) || !canWearSkin(player, stack)) {
+            return;
+        }
+        Body body = store.bodies.get(state(player).body);
+        if (body == null) {
+            return;
+        }
+        if (!TrinketsCompat.equipSkin(player, stack)) {
+            body.skinLayers.add(encodeItem(stack.copyWithCount(1)));
+        }
+        stack.shrink(1);
+        refreshInventory(player);
+        message(player, "skin_worn");
+        changed();
+    }
+
+    public void unfoldSkin(ServerPlayer player, ItemStack stack) {
+        if (hypnotized(player) || state(player).form != Form.HUMAN || !ready(player)
+                || !NeedsOfNatureCompat.canChangeBody(player)) {
+            return;
+        }
+        Body body = skinBody(stack);
+        Vec3 destination = safePosition(player.level(), player.position().add(player.getLookAngle().multiply(2, 0, 2)));
+        if (body == null || !body.skinned || destination == null) {
+            message(player, "invalid_skin");
+            return;
+        }
+        locate(body, player);
+        body.x = destination.x;
+        body.y = destination.y;
+        body.z = destination.z;
+        body.skinned = false;
+        spawnBody(body);
+        stack.shrink(1);
+        refreshInventory(player);
+        message(player, "skin_unfolded", body.name);
+        changed();
+    }
+
+    private void undress(ServerPlayer player) {
+        if (!NeedsOfNatureCompat.canChangeBody(player)) {
+            return;
+        }
+        List<SkinLayer> layers = layers(player);
+        if (!layers.isEmpty() && !hypnotized(player)) {
+            SkinLayer outermost = layers.getLast();
+            outermost.remove.run();
+            if (!player.getInventory().add(outermost.stack)) {
+                player.drop(outermost.stack, false, Prediction.SERVER_ONLY);
+            }
+            refreshInventory(player);
+            message(player, "skin_removed", outermost.body.name);
+            changed();
+        } else {
+            message(player, "no_skin_worn");
+        }
+    }
+
+    private List<SkinLayer> layers(ServerPlayer player) {
+        List<SkinLayer> result = new ArrayList<>();
+        Body body = state(player).form == Form.HUMAN ? store.bodies.get(state(player).body) : null;
+        if (body == null) {
+            return result;
+        }
+        boolean migrated = false;
+        var iterator = body.skinLayers.iterator();
+        while (iterator.hasNext()) {
+            ItemStack stack = decodeItem(iterator.next());
+            Body skin = skinBody(stack);
+            if (skin != null && skin.skinned && TrinketsCompat.equipSkin(player, stack)) {
+                iterator.remove();
+                migrated = true;
+                visualsDirty = true;
+            }
+        }
+        for (JsonElement json : body.skinLayers) {
+            addLayer(result, decodeItem(json), () -> body.skinLayers.remove(json));
+        }
+        addLayer(result, player.getItemBySlot(EquipmentSlot.CHEST),
+                () -> player.setItemSlot(EquipmentSlot.CHEST, ItemStack.EMPTY));
+        for (TrinketsCompat.Slot slot : TrinketsCompat.slots(player)) {
+            addLayer(result, slot.stack(), slot::clear);
+        }
+        Set<UUID> present = new HashSet<>();
+        result.removeIf(layer -> !present.add(layer.body.id));
+        body.skinOrder.removeIf(owner -> !present.contains(owner));
+        List<UUID> discovered = result.stream().map(layer -> layer.body.id)
+                .filter(id -> !body.skinOrder.contains(id)).toList();
+        body.skinOrder.addAll(migrated ? 0 : body.skinOrder.size(), discovered);
+        result.sort(java.util.Comparator.comparingInt(layer -> body.skinOrder.indexOf(layer.body.id)));
+        return result;
+    }
+
+    private void addLayer(List<SkinLayer> layers, ItemStack stack, Runnable remove) {
+        Body body = skinBody(stack);
+        if (body != null && body.skinned) {
+            layers.add(new SkinLayer(body, stack, remove));
+        }
+    }
+
+    private record SkinLayer(Body body, ItemStack stack, Runnable remove) {
+    }
+
+    public Body appearance(ServerPlayer player) {
+        if (state(player).form != Form.HUMAN) {
+            return null;
+        }
+        List<SkinLayer> layers = layers(player);
+        return layers.isEmpty() ? store.bodies.get(state(player).body) : layers.getLast().body;
+    }
+
+    public Component assumedName(ServerPlayer player) {
+        Body appearance = appearance(player);
+        return appearance == null || appearance.owner.equals(player.getUUID()) ? null : Component.literal(appearance.name);
+    }
+
+    private ServerPlayer controller(Body body, Set<UUID> visited) {
+        if (body == null || !visited.add(body.id)) {
+            return null;
+        }
+        if (body.occupant != null) {
+            ServerPlayer occupant = server.getPlayerList().getPlayer(body.occupant);
+            return occupant != null && state(occupant).form == Form.HUMAN ? occupant : null;
+        }
+        if (body.zipperCarrier != null) {
+            ServerPlayer carrier = server.getPlayerList().getPlayer(body.zipperCarrier);
+            return carrier != null && state(carrier).form == Form.HUMAN ? carrier : null;
+        }
+        for (ServerPlayer candidate : server.getPlayerList().getPlayers()) {
+            if (layers(candidate).stream().anyMatch(layer -> layer.body == body)) {
+                return candidate;
+            }
+        }
+        for (Body parent : store.bodies.values()) {
+            if (parent.skinLayers.stream().anyMatch(json -> skinBody(decodeItem(json)) == body)
+                    || parent.inventory.stream().anyMatch(json -> skinBody(decodeItem(json)) == body)) {
+                ServerPlayer wearer = controller(parent, visited);
+                if (wearer != null) {
+                    return wearer;
+                }
+            }
+        }
+        for (ServerPlayer candidate : server.getPlayerList().getPlayers()) {
+            if (state(candidate).form == Form.HUMAN
+                    && candidate.getInventory().contains(stack -> skinBody(stack) == body)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private boolean updateObserver(ServerPlayer player) {
+        PlayerState state = state(player);
+        if (state.form != Form.OBSERVER) {
+            return false;
+        }
+        Body body = store.bodies.get(state.observedBody);
+        if (body != null && !body.skinned && body.packedToken == null && body.occupant == null
+                && body.zipperCarrier == null) {
+            Vec3 destination = safePosition(level(body.dimension), new Vec3(body.x, body.y, body.z));
+            if (destination != null) {
+                enter(player, body, destination);
+                message(player, "spectating_ended");
+                return true;
+            }
+        }
+        applyForm(player);
+        ServerPlayer target = controller(body, new HashSet<>());
+        if (target != null && !target.getUUID().equals(state.observerFallback)) {
+            state.observerFallback = target.getUUID();
+            visualsDirty = true;
+        }
+        if (target == null && body != null && body.skinned && !body.skinPlaced && body.skinDropEntity == null) {
+            target = server.getPlayerList().getPlayer(state.observerFallback);
+        }
+        if (target == player || target != null && (!target.isAlive() || state(target).form != Form.HUMAN)) {
+            target = null;
+        }
+        Entity camera = target == null ? player : target;
+        if (body != null && (body.skinPlaced && body.entityId != null || body.skinDropEntity != null)) {
+            Entity skin = level(body.dimension).getEntity(body.skinPlaced ? body.entityId : body.skinDropEntity);
+            if (skin != null) {
+                camera = skin;
+            }
+        }
+        if (camera.level() != player.level()) {
+            player.teleportTo((ServerLevel) camera.level(), camera.getX(), camera.getY(), camera.getZ(),
+                    Set.of(), camera.getYRot(), camera.getXRot(), false);
+            player.setCamera(player);
+            return false;
+        }
+        if (player.getCamera() != camera) {
+            player.setCamera(camera);
+        }
+        return false;
+    }
+
+    private JsonElement encodeItem(ItemStack stack) {
+        return ItemStack.OPTIONAL_CODEC.encodeStart(server.registryAccess().createSerializationContext(JsonOps.INSTANCE), stack).getOrThrow();
+    }
+
+    private void captureInventory(Body body, ServerPlayer player) {
+        body.inventory.clear();
+        var operations = server.registryAccess().createSerializationContext(JsonOps.INSTANCE);
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            body.inventory.add(ItemStack.OPTIONAL_CODEC.encodeStart(operations, player.getInventory().getItem(slot)).getOrThrow());
+        }
+        body.selectedSlot = player.getInventory().getSelectedSlot();
+    }
+
+    private ItemStack decodeItem(JsonElement json) {
+        return ItemStack.OPTIONAL_CODEC.parse(server.registryAccess().createSerializationContext(JsonOps.INSTANCE), json).getOrThrow();
+    }
+
+    private ResolvableProfile profile(Body body) {
+        return ResolvableProfile.CODEC.parse(JsonOps.INSTANCE, body.profile).getOrThrow();
+    }
+
+    private void locate(Body body, Entity entity) {
+        body.dimension = entity.level().dimension().identifier().toString();
+        body.x = entity.getX();
+        body.y = entity.getY();
+        body.z = entity.getZ();
+        body.yaw = entity.getYRot();
+    }
+
+    private ServerLevel level(String dimension) {
+        ServerLevel level = server.getLevel(ResourceKey.create(Registries.DIMENSION, Identifier.parse(dimension)));
+        if (level == null) {
+            throw new IllegalStateException("TSF body dimension is missing: " + dimension);
+        }
+        return level;
+    }
+
+    private Vec3 safePosition(ServerLevel level, Vec3 origin) {
+        return safePosition(level, origin, false);
+    }
+
+    private Vec3 safePosition(ServerLevel level, Vec3 origin, boolean beside) {
+        level.getChunk(BlockPos.containing(origin));
+        int[] offsets = {0, 1, -1};
+        for (int rise = 0; rise <= 2; rise++) {
+            for (int offsetX : offsets) {
+                for (int offsetZ : offsets) {
+                    if (beside && offsetX == 0 && offsetZ == 0) {
+                        continue;
+                    }
+                    Vec3 candidate = origin.add(offsetX, rise, offsetZ);
+                    AABB bounds = new AABB(candidate.x - 0.3, candidate.y, candidate.z - 0.3,
+                            candidate.x + 0.3, candidate.y + 1.8, candidate.z + 0.3);
+                    if (level.getWorldBorder().isWithinBounds(BlockPos.containing(candidate))
+                            && level.noBlockCollision(null, bounds)) {
+                        return candidate;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private void spawnBody(Body body) {
+        if (body.packedToken != null || body.zipperCarrier != null || body.skinned && !body.skinPlaced || body.occupant != null) {
+            return;
+        }
+        ServerLevel level = level(body.dimension);
+        level.getChunk(BlockPos.containing(body.x, body.y, body.z));
+        if (body.entityId != null && level.getEntity(body.entityId) != null) {
+            return;
+        }
+        Mannequin mannequin = EntityTypes.MANNEQUIN.create(level, EntitySpawnReason.TRIGGERED);
+        if (mannequin == null) {
+            throw new IllegalStateException("Unable to create TSF body");
+        }
+        mannequin.setPos(body.x, body.y, body.z);
+        mannequin.setYRot(body.yaw);
+        mannequin.setYBodyRot(body.yaw);
+        mannequin.setYHeadRot(body.yaw);
+        mannequin.setPose(Pose.SLEEPING);
+        mannequin.setNoGravity(false);
+        mannequin.setPermanentlyInvulnerable(true);
+        mannequin.setCustomName(Component.translatable(body.skinPlaced ? "item.tsf.named_skin" : "entity.tsf.empty_body", body.name));
+        mannequin.setCustomNameVisible(false);
+        mannequin.addTag(BODY_TAG);
+        ((EmptyBodyHolder) mannequin).tsf$setEmptyBody(true);
+        if (body.skinPlaced) {
+            mannequin.addTag(SKIN_TAG);
+            ((EmptyBodyHolder) mannequin).tsf$setFoldedSkin(true);
+        }
+        MannequinAccessor accessor = (MannequinAccessor) mannequin;
+        accessor.tsf$setProfile(profile(body));
+        accessor.tsf$setImmovable(false);
+        accessor.tsf$setHideDescription(true);
+        for (var entry : Inventory.EQUIPMENT_SLOT_MAPPING.int2ObjectEntrySet()) {
+            if (body.skinPlaced) {
+                break;
+            }
+            if (entry.getIntKey() < body.inventory.size()) {
+                mannequin.setItemSlot(entry.getValue(), decodeItem(body.inventory.get(entry.getIntKey())));
+            }
+        }
+        if (!body.skinPlaced && body.selectedSlot < body.inventory.size()) {
+            mannequin.setItemSlot(EquipmentSlot.MAINHAND, decodeItem(body.inventory.get(body.selectedSlot)));
+        }
+        body.entityId = mannequin.getUUID();
+        level.addFreshEntity(mannequin);
+    }
+
+    private void removeBodyEntity(Body body) {
+        Entity loaded = bodyEntities.remove(body.id);
+        if (loaded != null && !loaded.isRemoved()) {
+            locate(body, loaded);
+        }
+        if (body.entityId != null) {
+            ServerLevel level = level(body.dimension);
+            level.getChunk(BlockPos.containing(body.x, body.y, body.z));
+            Entity entity = level.getEntity(body.entityId);
+            if (entity != null) {
+                entity.discard();
+            }
+            body.entityId = null;
+        }
+    }
+
+    public void entityLoaded(Entity entity) {
+        if (entity instanceof ItemEntity item) {
+            if (item.getItem().is(TSFItems.SKIN_SUIT) || item.getItem().is(TSFItems.EMPTY_BODY)) {
+                item.setCustomName(item.getItem().get(DataComponents.CUSTOM_NAME));
+                item.setCustomNameVisible(false);
+            }
+            Body skin = skinBody(item.getItem());
+            if (skin != null && skin.skinned) {
+                skinDrops.put(skin.id, item);
+                skin.skinDropEntity = item.getUUID();
+                if (skin.skinRecoveryAt == 0) {
+                    skin.skinRecoveryAt = server.overworld().getGameTime() + 600;
+                }
+                visualsDirty = true;
+            }
+        }
+        if (entity.entityTags().contains(BODY_TAG)) {
+            Body body = bodyForEntity(entity);
+            if (body == null) {
+                body = placedSkinForEntity(entity);
+            }
+            if (body == null) {
+                entity.discard();
+            } else if (entity instanceof EmptyBodyHolder holder) {
+                holder.tsf$setEmptyBody(true);
+                holder.tsf$setFoldedSkin(body.skinPlaced);
+                entity.setCustomNameVisible(false);
+                entity.setNoGravity(false);
+                ((MannequinAccessor) entity).tsf$setImmovable(false);
+                bodyEntities.put(body.id, entity);
+                locate(body, entity);
+            }
+        }
+    }
+
+    public void died(ServerPlayer player) {
+        PlayerState state = state(player);
+        releaseZipperBody(player);
+        state.zipperReturnBody = null;
+        state.zipperReturnForm = null;
+        state.expulsionAt = 0;
+        state.expulsionBody = null;
+        clearHypnosis(player);
+        if (state.form == Form.OBSERVER) {
+            changed();
+            return;
+        }
+        state.normalRespawn = !TSFServerConfig.get().deathLeavesBody;
+        if (state.form == Form.HUMAN) {
+            saveAbilities(player, state);
+            Body body = store.bodies.get(state.body);
+            if (body != null) {
+                captureTank(body, player);
+                for (JsonElement skin : body.skinLayers) {
+                    ItemStack stack = decodeItem(skin);
+                    if (!player.level().getGameRules().get(GameRules.KEEP_INVENTORY) || !player.getInventory().add(stack)) {
+                        player.drop(stack, false, Prediction.SERVER_ONLY);
+                    }
+                }
+                body.skinLayers.clear();
+                body.skinOrder.clear();
+                locate(body, player);
+                body.occupant = state.normalRespawn ? player.getUUID() : null;
+                body.inventory.clear();
+                body.health = 20;
+                body.food = 20;
+                if (!state.normalRespawn) {
+                    spawnBody(body);
+                }
+            }
+        }
+        if (!state.normalRespawn) {
+            state.form = Form.SLIME;
+            state.body = null;
+        }
+        changed();
+    }
+
+    public void respawned(ServerPlayer player) {
+        PlayerState state = state(player);
+        if (state.normalRespawn) {
+            state.normalRespawn = false;
+            Body body = state.form == Form.HUMAN ? store.bodies.get(state.body) : null;
+            if (body == null) {
+                body = new Body();
+                body.id = UUID.randomUUID();
+                body.owner = player.getUUID();
+                body.name = player.getGameProfile().name();
+                body.profile = ResolvableProfile.CODEC.encodeStart(JsonOps.INSTANCE, player.getProfile()).getOrThrow();
+                store.bodies.put(body.id, body);
+                state.homeBody = body.id;
+            }
+            state.body = body.id;
+            state.form = Form.HUMAN;
+            state.observedBody = null;
+            state.observerFallback = null;
+            body.occupant = player.getUUID();
+            restoreAbilities(player, state);
+            locate(body, player);
+        }
+        if (state(player).form != Form.HUMAN && state(player).form != Form.OBSERVER) {
+            restoreAbilities(player, state(player));
+        }
+        applyForm(player);
+        if (state(player).form == Form.SLIME) {
+            message(player, "respawned");
+        }
+        changed();
+    }
+
+    public void recover(ServerPlayer player) {
+        clearHypnosis(player);
+        Body body = nativeBody(player);
+        UUID controller = body.occupant == null ? body.zipperCarrier : body.occupant;
+        if (controller != null && !controller.equals(player.getUUID())) {
+            ServerPlayer occupant = server.getPlayerList().getPlayer(controller);
+            if (occupant == null) {
+                message(player, "occupant_offline");
+                return;
+            }
+            detach(occupant, Form.SLIME);
+        }
+        if (body.skinned) {
+            removeBodyEntity(body);
+            body.skinPlaced = false;
+            body.skinned = false;
+            locate(body, player);
+            spawnBody(body);
+        }
+        if (body.packedToken != null) {
+            body.packedToken = null;
+            locate(body, player);
+            spawnBody(body);
+        }
+        returnToBody(player);
+    }
+
+    public void tick() {
+        ticks++;
+        updateBodyPositions();
+        updateSkinDrops();
+        for (UUID id : List.copyOf(pendingProjections)) {
+            pendingProjections.remove(id);
+            ServerPlayer player = server.getPlayerList().getPlayer(id);
+            if (player != null && canProject(player)) {
+                depart(player, Form.SPIRIT);
+            }
+        }
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            PlayerState state = state(player);
+            if (state.expulsionAt != 0 && server.overworld().getGameTime() >= state.expulsionAt) {
+                if (!player.isAlive() || state.form != Form.HUMAN || !java.util.Objects.equals(state.body, state.expulsionBody)) {
+                    state.expulsionAt = 0;
+                    state.expulsionBody = null;
+                    visualsDirty = true;
+                } else if (!NeedsOfNatureCompat.isAnimating(player)) {
+                    depart(player, Form.SLIME);
+                }
+            }
+            if (state.hypnotist != null) {
+                if (server.overworld().getGameTime() >= state.hypnosisUntil
+                        || server.getPlayerList().getPlayer(state.hypnotist) == null || !player.isAlive()) {
+                    clearHypnosis(player);
+                    message(player, "hypnosis_released");
+                    visualsDirty = true;
+                } else if (player.distanceToSqr(state.anchorX, state.anchorY, state.anchorZ) > 0.01
+                        || !player.level().dimension().identifier().toString().equals(state.anchorDimension)) {
+                    player.teleportTo(level(state.anchorDimension), state.anchorX, state.anchorY, state.anchorZ,
+                            Set.of(), player.getYRot(), player.getXRot(), false);
+                    player.setDeltaMovement(Vec3.ZERO);
+                }
+            }
+            if (state.form == Form.SPIRIT) {
+                player.noPhysics = true;
+                player.fallDistance = 0;
+                if (!player.getAbilities().flying || !player.getAbilities().mayfly) {
+                    applyForm(player);
+                }
+            }
+            if (ticks % 10 == 0) {
+                if (updateSkinLayers(player)) {
+                    visualsDirty = true;
+                }
+            }
+        }
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (updateObserver(player)) {
+                visualsDirty = true;
+            }
+            if (ticks % 5 == 0) {
+                synchronizeObserver(player);
+            }
+            int remaining = skinRecoverySeconds(player);
+            Integer previous = lastSkinRecoverySeconds.put(player.getUUID(), remaining);
+            if (previous == null || previous != remaining) {
+                visualsDirty = true;
+                if (remaining == 0) {
+                    message(player, "skin_recovery_ready");
+                }
+            }
+        }
+        if (visualsDirty) {
+            visualsDirty = false;
+            broadcast();
+            save();
+        }
+        if (ticks % 200 == 0) {
+            for (Body body : store.bodies.values()) {
+                if (body.occupant == null && body.zipperCarrier == null && (!body.skinned || body.skinPlaced)
+                        && body.packedToken == null) {
+                    ServerLevel level = level(body.dimension);
+                    if (level.hasChunkAt(BlockPos.containing(body.x, body.y, body.z))) {
+                        spawnBody(body);
+                    }
+                }
+            }
+        }
+    }
+
+    private List<VisualState> visuals() {
+        List<VisualState> visuals = new ArrayList<>();
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            PlayerState state = state(player);
+            List<SkinLayer> skins = layers(player);
+            boolean wearing = !skins.isEmpty();
+            Body appearance = appearance(player);
+            visuals.add(new VisualState(player.getUUID(), state.form, state.body,
+                    appearance == null ? player.getGameProfile().name() : appearance.name,
+                    appearance == null ? null : appearance.profile, state.hypnotist != null, wearing, skins.size(),
+                    state.zipperReturnForm != null, skinRecoverySeconds(player), state.slimeColor));
+        }
+        return visuals;
+    }
+
+    public void synchronize(ServerPlayer player, boolean openPhone) {
+        if (ServerPlayNetworking.canSend(player, StatePayload.TYPE)) {
+            ServerPlayNetworking.send(player, new StatePayload(GSON.toJson(visuals()), openPhone));
+        }
+    }
+
+    private void broadcast() {
+        if (!server.getPlayerList().getPlayers().isEmpty()) {
+            server.getPlayerList().broadcastAll(new ClientboundPlayerInfoUpdatePacket(
+                    EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME), server.getPlayerList().getPlayers()));
+        }
+        String json = GSON.toJson(visuals());
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (ServerPlayNetworking.canSend(player, StatePayload.TYPE)) {
+                ServerPlayNetworking.send(player, new StatePayload(json, false));
+            }
+        }
+    }
+
+    private void refreshInventory(ServerPlayer player) {
+        player.getInventory().setChanged();
+        player.inventoryMenu.sendAllDataToRemote();
+        player.connection.send(new ClientboundSetHeldSlotPacket(player.getInventory().getSelectedSlot()));
+    }
+
+    private void synchronizeObserver(ServerPlayer player) {
+        if (!ServerPlayNetworking.canSend(player, ObserverPayload.TYPE)) {
+            return;
+        }
+        ServerPlayer target = state(player).form == Form.OBSERVER && player.getCamera() instanceof ServerPlayer camera
+                && camera != player && state(camera).form == Form.HUMAN ? camera : null;
+        ObserverInventory inventory = null;
+        if (target != null) {
+            List<JsonElement> items = new ArrayList<>();
+            for (int slot = 0; slot < target.getInventory().getContainerSize(); slot++) {
+                items.add(encodeItem(target.getInventory().getItem(slot)));
+            }
+            List<JsonElement> crafting = new ArrayList<>();
+            for (int slot = 0; slot < 5; slot++) {
+                crafting.add(encodeItem(target.inventoryMenu.getSlot(slot).getItem()));
+            }
+            inventory = new ObserverInventory(target.getUUID(), items, crafting, target.getInventory().getSelectedSlot(),
+                    target.getHealth(), target.getAbsorptionAmount(), target.getFoodData().getFoodLevel(),
+                    target.getFoodData().getSaturationLevel(), target.experienceProgress, target.experienceLevel,
+                    target.totalExperience);
+        }
+        String json = GSON.toJson(inventory);
+        if (!json.equals(observerInventories.put(player.getUUID(), json))) {
+            ServerPlayNetworking.send(player, new ObserverPayload(json));
+        }
+    }
+
+    private void updateSkinDrops() {
+        for (var entry : List.copyOf(skinDrops.entrySet())) {
+            Body body = store.bodies.get(entry.getKey());
+            ItemEntity item = entry.getValue();
+            if (body == null || !body.skinned || skinBody(item.getItem()) != body || body.skinPlaced) {
+                skinDrops.remove(entry.getKey());
+                if (body != null && !body.skinPlaced && item.getUUID().equals(body.skinDropEntity)) {
+                    body.skinDropEntity = null;
+                    body.skinRecoveryAt = 0;
+                    visualsDirty = true;
+                }
+            } else if (item.isRemoved()) {
+                skinDrops.remove(entry.getKey());
+                if (item.getRemovalReason() != Entity.RemovalReason.UNLOADED_TO_CHUNK) {
+                    body.skinDropEntity = null;
+                    body.skinRecoveryAt = 0;
+                    visualsDirty = true;
+                }
+            } else {
+                body.dimension = item.level().dimension().identifier().toString();
+                body.x = item.getX();
+                body.y = item.getY();
+                body.z = item.getZ();
+            }
+        }
+        for (Body body : store.bodies.values()) {
+            if (body.skinned && body.skinPlaced && body.skinRecoveryAt == 0) {
+                body.skinRecoveryAt = server.overworld().getGameTime() + 600;
+                visualsDirty = true;
+            }
+            if (body.skinned && !body.skinPlaced && body.skinRecoveryAt != 0 && controller(body, new HashSet<>()) != null) {
+                skinDrops.remove(body.id);
+                body.skinDropEntity = null;
+                body.skinRecoveryAt = 0;
+                visualsDirty = true;
+            }
+        }
+    }
+
+    private void changed() {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            updateObserver(player);
+            updateSkinLayers(player);
+        }
+        visualsDirty = true;
+        save();
+    }
+
+    private boolean updateSkinLayers(ServerPlayer player) {
+        List<UUID> skins = layers(player).stream().map(layer -> layer.body.id).toList();
+        List<UUID> previous = lastSkinLayers.put(player.getUUID(), skins);
+        if (skins.equals(previous)) {
+            return false;
+        }
+        if (previous != null && !skins.isEmpty() && skins.size() >= previous.size()) {
+            playAnimation(player, BodyAnimation.WEAR_SKIN);
+        }
+        return true;
+    }
+
+    private void playAnimation(ServerPlayer player, BodyAnimation animation) {
+        NeedsOfNatureCompat.play(player, animation);
+        AnimationPayload payload = new AnimationPayload(player.getUUID(), animation);
+        for (ServerPlayer viewer : server.getPlayerList().getPlayers()) {
+            if (viewer.level() == player.level() && ServerPlayNetworking.canSend(viewer, AnimationPayload.TYPE)) {
+                ServerPlayNetworking.send(viewer, payload);
+            }
+        }
+    }
+
+    private void captureTank(Body body, ServerPlayer player) {
+        NatureTank tank = NeedsOfNatureTanks.capture(player);
+        if (tank != null) {
+            body.natureTank = tank;
+        }
+    }
+
+    private void updateBodyPositions() {
+        for (var entry : List.copyOf(bodyEntities.entrySet())) {
+            Body body = store.bodies.get(entry.getKey());
+            Entity entity = entry.getValue();
+            if (body == null || !entity.getUUID().equals(body.entityId)) {
+                bodyEntities.remove(entry.getKey());
+            } else {
+                locate(body, entity);
+                if (entity.isRemoved()) {
+                    bodyEntities.remove(entry.getKey());
+                }
+            }
+        }
+    }
+
+    public void save() {
+        updateBodyPositions();
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            PlayerState state = state(player);
+            Body body = store.bodies.get(state.body);
+            if (state.form == Form.HUMAN && body != null && player.getUUID().equals(body.occupant)) {
+                captureTank(body, player);
+            }
+        }
+        try {
+            store.save(path);
+        } catch (IOException exception) {
+            throw new IllegalStateException("Unable to save TSF state: " + path, exception);
+        }
+    }
+}

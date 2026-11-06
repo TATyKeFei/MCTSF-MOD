@@ -1,0 +1,151 @@
+package icu.tatyrealms.tatykefei.client;
+
+import com.google.gson.Gson;
+import com.mojang.serialization.JsonOps;
+import icu.tatyrealms.tatykefei.network.ObserverInventory;
+import icu.tatyrealms.tatykefei.state.BodyManager;
+import icu.tatyrealms.tatykefei.state.Form;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.contextualbar.ContextualBar;
+import net.minecraft.client.player.AbstractClientPlayer;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.renderer.entity.state.AvatarRenderState;
+import net.minecraft.client.renderer.state.level.FirstPersonHandsAndItemsRenderState.HandRenderSelection;
+import net.minecraft.client.renderer.state.level.PlayerRenderState;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.HumanoidArm;
+import net.minecraft.world.item.CrossbowItem;
+import net.minecraft.world.item.ItemDisplayContext;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.resources.Identifier;
+
+public final class ObserverView {
+    private static final Gson GSON = new Gson();
+    private static UUID target;
+    private static List<ItemStack> items = List.of();
+    private static List<ItemStack> crafting = List.of();
+    private static ObserverInventory snapshot;
+
+    private ObserverView() {
+    }
+
+    public static void receive(String json) {
+        ObserverInventory inventory = GSON.fromJson(json, ObserverInventory.class);
+        clear();
+        Minecraft client = Minecraft.getInstance();
+        if (inventory != null && client.level != null) {
+            target = inventory.target();
+            snapshot = inventory;
+            var operations = client.level.registryAccess().createSerializationContext(JsonOps.INSTANCE);
+            List<ItemStack> decoded = new ArrayList<>();
+            for (var item : inventory.items()) {
+                decoded.add(ItemStack.OPTIONAL_CODEC.parse(operations, item).getOrThrow());
+            }
+            items = decoded;
+            List<ItemStack> grid = new ArrayList<>();
+            for (var item : inventory.crafting()) {
+                grid.add(ItemStack.OPTIONAL_CODEC.parse(operations, item).getOrThrow());
+            }
+            crafting = grid;
+        }
+    }
+
+    public static void clear() {
+        target = null;
+        items = List.of();
+        crafting = List.of();
+        snapshot = null;
+    }
+
+    public static AbstractClientPlayer target() {
+        Minecraft client = Minecraft.getInstance();
+        if (target == null || client.player == null || client.level == null
+                || BodyManager.form(client.player) != Form.OBSERVER) {
+            return null;
+        }
+        return client.getCameraEntity() instanceof AbstractClientPlayer player && player.getUUID().equals(target)
+                && BodyManager.form(player) == Form.HUMAN ? player : null;
+    }
+
+    public static ItemStack item(int slot) {
+        return slot >= 0 && slot < items.size() ? items.get(slot) : ItemStack.EMPTY;
+    }
+
+    public static void updateInventory() {
+        AbstractClientPlayer player = target();
+        if (player != null) {
+            for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+                player.getInventory().setItem(slot, item(slot).copy());
+            }
+            player.getInventory().setSelectedSlot(snapshot.selectedSlot());
+            for (int slot = 0; slot < Math.min(crafting.size(), 5); slot++) {
+                player.inventoryMenu.getSlot(slot).set(crafting.get(slot).copy());
+            }
+            player.setHealth(snapshot.health());
+            player.setAbsorptionAmount(snapshot.absorption());
+            player.getFoodData().setFoodLevel(snapshot.food());
+            player.getFoodData().setSaturation(snapshot.saturation());
+            player.experienceProgress = snapshot.experienceProgress();
+            player.experienceLevel = snapshot.experienceLevel();
+            player.totalExperience = snapshot.totalExperience();
+        }
+    }
+
+    public static void extractExperience(GuiGraphicsExtractor graphics) {
+        AbstractClientPlayer player = target();
+        if (player == null) {
+            return;
+        }
+        int left = (graphics.guiWidth() - 182) / 2;
+        int top = graphics.guiHeight() - 29;
+        graphics.blitSprite(RenderPipelines.GUI_TEXTURED, Identifier.withDefaultNamespace("hud/experience_bar_background"),
+                left, top, 182, 5);
+        int progress = (int) (player.experienceProgress * 183.0F);
+        if (progress > 0) {
+            graphics.blitSprite(RenderPipelines.GUI_TEXTURED, Identifier.withDefaultNamespace("hud/experience_bar_progress"),
+                    182, 5, 0, 0, left, top, progress, 5);
+        }
+        if (player.experienceLevel > 0) {
+            ContextualBar.extractExperienceLevel(graphics, Minecraft.getInstance().font, player.experienceLevel);
+        }
+    }
+
+    public static void extractHands(PlayerRenderState state, float partialTick) {
+        AbstractClientPlayer player = target();
+        if (player == null) {
+            return;
+        }
+        Minecraft client = Minecraft.getInstance();
+        updateInventory();
+        state.hasPlayer = true;
+        state.avatarRenderState = (AvatarRenderState) client.getEntityRenderDispatcher().extractEntity(player, partialTick);
+        var hands = state.firstPersonHandsAndItems;
+        hands.attackHand = player.getCurrentSwing() == null ? InteractionHand.MAIN_HAND : player.getCurrentSwing().hand();
+        hands.viewXRot = hands.xBob = player.getViewXRot(partialTick);
+        hands.viewYRot = hands.yBob = player.getViewYRot(partialTick);
+        hands.isScoping = player.isScoping();
+        hands.useItemRemainingTicks = player.getUseItemRemainingTicks();
+        hands.handRenderSelection = player.isUsingItem() ? HandRenderSelection.onlyForHand(player.getUsedItemHand())
+                : HandRenderSelection.RENDER_BOTH_HANDS;
+        hands.mainHandItem = player.getMainHandItem().copy();
+        hands.offHandItem = player.getOffhandItem().copy();
+        hands.mainHandHeight = hands.oldMainHandHeight = hands.offHandHeight = hands.oldOffHandHeight = 1;
+        boolean right = player.getMainArm() == HumanoidArm.RIGHT;
+        hands.mainHandRenderState.clear();
+        hands.offHandRenderState.clear();
+        client.getItemModelResolver().updateForTopItem(hands.mainHandRenderState, hands.mainHandItem,
+                right ? ItemDisplayContext.FIRST_PERSON_RIGHT_HAND : ItemDisplayContext.FIRST_PERSON_LEFT_HAND, player.level(), player, player.getId());
+        client.getItemModelResolver().updateForTopItem(hands.offHandRenderState, hands.offHandItem,
+                right ? ItemDisplayContext.FIRST_PERSON_LEFT_HAND : ItemDisplayContext.FIRST_PERSON_RIGHT_HAND, player.level(), player, player.getId());
+        hands.mainHandUseDuration = hands.mainHandItem.getUseDuration(player);
+        hands.offHandUseDuration = hands.offHandItem.getUseDuration(player);
+        hands.mainHandChargeDuration = CrossbowItem.getChargeDuration(hands.mainHandItem, player);
+        hands.offHandChargeDuration = CrossbowItem.getChargeDuration(hands.offHandItem, player);
+        hands.mainHandSwapScale = hands.offHandSwapScale = 1;
+        hands.hasMainHandMapData = hands.hasOffHandMapData = false;
+    }
+}

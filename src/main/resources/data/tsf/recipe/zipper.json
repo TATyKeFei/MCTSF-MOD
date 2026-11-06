@@ -1,0 +1,6 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "equipment",
+  "ingredients": ["minecraft:iron_ingot", "minecraft:iron_nugget", "minecraft:string"],
+  "result": {"id": "tsf:zipper", "count": 1}
+}

@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "AAA",
+    "APA",
+    "AAA"
+  ],
+  "key": {
+    "A": "minecraft:arrow",
+    "P": "tsf:personality_expulsion_lingering_potion"
+  },
+  "result": {
+    "id": "tsf:personality_expulsion_arrow",
+    "count": 8
+  }
+}

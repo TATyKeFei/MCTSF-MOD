@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": ["GEG", "GTG", "GEG"],
+  "key": {"G": "minecraft:gold_ingot", "E": "minecraft:emerald", "T": "minecraft:totem_of_undying"},
+  "result": {"id": "tsf:body_regeneration_totem", "count": 1}
+}

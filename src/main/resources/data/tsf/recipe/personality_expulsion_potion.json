@@ -1,0 +1,6 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": ["minecraft:glass_bottle", "minecraft:slime_ball", "minecraft:fermented_spider_eye"],
+  "result": {"id": "tsf:personality_expulsion_potion", "count": 1}
+}

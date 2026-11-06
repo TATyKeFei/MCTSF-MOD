@@ -1,0 +1,13 @@
+{
+  "model": {
+    "type": "minecraft:condition",
+    "property": "minecraft:has_component",
+    "component": "minecraft:profile",
+    "on_true": {
+      "type": "minecraft:special",
+      "base": "tsf:item/skin_suit_display",
+      "model": {"type": "tsf:skin_suit"}
+    },
+    "on_false": {"type": "minecraft:model", "model": "tsf:item/empty_body"}
+  }
+}

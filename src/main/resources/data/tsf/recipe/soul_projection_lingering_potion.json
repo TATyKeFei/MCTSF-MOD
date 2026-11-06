@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "tsf:soul_projection_splash_potion",
+    "minecraft:dragon_breath"
+  ],
+  "result": {
+    "id": "tsf:soul_projection_lingering_potion",
+    "count": 1
+  }
+}

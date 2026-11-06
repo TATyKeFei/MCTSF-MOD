@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "tsf",
+  "version": "${version}",
+  "name": "TSF",
+  "icon": "assets/tsf/textures/item/phone.png",
+  "description": "手机催眠、灵魂出窍与人格排泄药水、附身夺舍、折叠皮物放置、空肉体搬运、肉体再生与拉链饰品，支持服务端皮刀规则。",
+  "authors": ["TATyKeFei"],
+  "environment": "*",
+  "entrypoints": {
+    "main": ["icu.tatyrealms.tatykefei.TSF"],
+    "client": ["icu.tatyrealms.tatykefei.client.TSFClient"],
+    "modmenu": ["icu.tatyrealms.tatykefei.client.TSFModMenu"]
+  },
+  "mixins": ["tsf.mixins.json", {"config": "tsf.client.mixins.json", "environment": "client"}],
+  "depends": {
+    "fabricloader": ">=0.20.1",
+    "minecraft": "~26.3",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "order": 100,
+  "amount": 8,
+  "cosmetic_slots": false,
+  "icon": "trinkets:container/slots/cape",
+  "validator_predicates": ["trinkets:tag"],
+  "drop_rule": "default"
+}

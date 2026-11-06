@@ -1,0 +1,6 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": ["minecraft:glass_bottle", "minecraft:soul_sand", "minecraft:ghast_tear"],
+  "result": {"id": "tsf:soul_projection_potion", "count": 1}
+}
