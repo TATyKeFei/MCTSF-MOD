@@ -10,6 +10,7 @@ public final class PlayerState {
     public UUID homeBody;
     public UUID observedBody;
     public UUID observerFallback;
+    public UUID spiritHost;
     public UUID zipperReturnBody;
     public Form zipperReturnForm;
     public UUID expulsionBody;

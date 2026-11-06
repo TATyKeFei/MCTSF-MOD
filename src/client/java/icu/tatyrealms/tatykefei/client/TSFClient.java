@@ -90,7 +90,7 @@ public final class TSFClient implements ClientModInitializer {
             }
             while (undress.consumeClick()) {
                 if (client.player != null && client.gui.screen() == null) {
-                    send(Action.UNDRESS, null);
+                    send(Action.EXIT, null);
                 }
             }
             if (client.player != null && BodyManager.form(client.player) == Form.SPIRIT) {

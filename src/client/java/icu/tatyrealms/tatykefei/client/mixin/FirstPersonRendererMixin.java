@@ -15,7 +15,9 @@ public abstract class FirstPersonRendererMixin {
     @Inject(method = "submitHandsWithItems", at = @At("HEAD"), cancellable = true)
     private void tsf$hideHands(CallbackInfo callback) {
         var player = Minecraft.getInstance().player;
-        if (player != null && BodyManager.form(player) != Form.HUMAN && ObserverView.target() == null) {
+        if (player != null && BodyManager.form(player) != Form.HUMAN && ObserverView.target() == null
+                && !(BodyManager.form(player) == Form.SPIRIT
+                && (BodyManager.spiritSpear(player.getMainHandItem()) || BodyManager.spiritSpear(player.getOffhandItem())))) {
             callback.cancel();
         }
     }

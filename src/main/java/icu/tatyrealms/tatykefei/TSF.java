@@ -92,6 +92,15 @@ public final class TSF implements ModInitializer {
             if (BodyManager.hypnotized(player)) {
                 return InteractionResult.FAIL;
             }
+            if (entity instanceof Player && player.getItemInHand(hand).is(TSFItems.PHONE)) {
+                return TSFItems.PHONE.use(level, player, hand);
+            }
+            if (entity instanceof Player && BodyManager.spiritSpear(player.getItemInHand(hand))) {
+                if (player instanceof ServerPlayer serverPlayer && entity instanceof ServerPlayer target) {
+                    BodyManager.get().useSpiritSpear(serverPlayer, target, hand);
+                }
+                return InteractionResult.SUCCESS;
+            }
             if (entity instanceof Player target && BodyManager.form(target) == Form.SLIME
                     && player.getItemInHand(hand).has(net.minecraft.core.component.DataComponents.DYE)) {
                 if (player instanceof ServerPlayer serverPlayer && target instanceof ServerPlayer targetPlayer) {
@@ -117,7 +126,7 @@ public final class TSF implements ModInitializer {
                         && BodyManager.get().enterZipper(serverPlayer, target)) {
                     return InteractionResult.SUCCESS;
                 }
-                if (BodyManager.form(player) != Form.HUMAN) {
+                if (BodyManager.form(player) == Form.SLIME) {
                     if (player instanceof ServerPlayer serverPlayer && entity instanceof ServerPlayer target) {
                         BodyManager.get().handle(serverPlayer, new ActionPayload(Action.POSSESS, target.getUUID().toString()));
                     }
@@ -127,6 +136,12 @@ public final class TSF implements ModInitializer {
             return BodyManager.form(player) == Form.SPIRIT ? InteractionResult.FAIL : InteractionResult.PASS;
         });
         AttackEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
+            if (entity instanceof Player && BodyManager.spiritSpear(player.getItemInHand(hand))) {
+                if (player instanceof ServerPlayer serverPlayer && entity instanceof ServerPlayer target) {
+                    BodyManager.get().useSpiritSpear(serverPlayer, target, hand);
+                }
+                return InteractionResult.SUCCESS;
+            }
             if (BodyManager.foldedSkin(entity)) {
                 if (player instanceof ServerPlayer serverPlayer) {
                     BodyManager.get().hitSkin(serverPlayer, entity);
@@ -157,7 +172,8 @@ public final class TSF implements ModInitializer {
                 return InteractionResult.SUCCESS;
             }
             if (BodyManager.form(player) == Form.SPIRIT && !player.getItemInHand(hand).is(TSFItems.PHONE)
-                    && !player.getItemInHand(hand).is(TSFItems.SKIN_SUIT)) {
+                    && !player.getItemInHand(hand).is(TSFItems.SKIN_SUIT)
+                    && !BodyManager.spiritSpear(player.getItemInHand(hand))) {
                 return InteractionResult.FAIL;
             }
             return InteractionResult.PASS;

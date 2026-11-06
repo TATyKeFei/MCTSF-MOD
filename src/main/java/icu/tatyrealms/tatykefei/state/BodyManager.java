@@ -44,6 +44,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Prediction;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntitySpawnReason;
@@ -55,6 +56,7 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Abilities;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.component.CustomData;
@@ -80,6 +82,7 @@ public final class BodyManager {
     private final Path path;
     private final StateStore store;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
+    private final Map<UUID, HypnosisSession> hypnosisSessions = new HashMap<>();
     private final Map<UUID, List<UUID>> lastSkinLayers = new HashMap<>();
     private final Set<UUID> pendingProjections = new HashSet<>();
     private final Map<UUID, ItemEntity> skinDrops = new HashMap<>();
@@ -114,6 +117,19 @@ public final class BodyManager {
 
     public static boolean hypnotized(Player player) {
         return ((FormHolder) player).tsf$isHypnotized();
+    }
+
+    public static boolean spiritSpear(ItemStack stack) {
+        return stack.is(TSFItems.POSSESSION_SPEAR) || stack.is(TSFItems.SNATCHING_SPEAR);
+    }
+
+    public static Player aimedPlayer(Player player, double distance) {
+        Vec3 start = player.getEyePosition();
+        Vec3 end = player.pick(distance, 1.0F, false).getLocation();
+        var hit = ProjectileUtil.getEntityHitResult(player, start, end,
+                player.getBoundingBox().expandTowards(end.subtract(start)).inflate(1),
+                entity -> entity.isPickable() && !entity.isSpectator(), start.distanceToSqr(end));
+        return hit != null && hit.getEntity() instanceof Player target ? target : null;
     }
 
     public static boolean emptyBody(Entity entity) {
@@ -184,6 +200,10 @@ public final class BodyManager {
             NeedsOfNatureTanks.restore(player, null);
         }
         clearHypnosis(player);
+        cancelHypnosis(player);
+        if (state.spiritHost != null) {
+            releaseSpiritAttachment(player);
+        }
         applyForm(player);
         lastSkinLayers.put(player.getUUID(), layers(player).stream().map(layer -> layer.body.id).toList());
         visualsDirty = true;
@@ -192,7 +212,12 @@ public final class BodyManager {
 
     public void left(ServerPlayer player) {
         PlayerState state = state(player);
+        cancelHypnosis(player);
         NeedsOfNatureCompat.endSession(player);
+        if (state.spiritHost != null) {
+            releaseSpiritAttachment(player);
+            returnToBody(player);
+        }
         placeWornSkins(player);
         Body occupied = store.bodies.get(state.body);
         if (player.isAlive() && state.form == Form.HUMAN && occupied != null
@@ -217,6 +242,9 @@ public final class BodyManager {
         }
         clearHypnosis(player);
         for (ServerPlayer other : server.getPlayerList().getPlayers()) {
+            if (player.getUUID().equals(state(other).spiritHost)) {
+                releaseSpiritAttachment(other);
+            }
             if (player.getUUID().equals(state(other).hypnotist)) {
                 clearHypnosis(other);
             }
@@ -289,7 +317,8 @@ public final class BodyManager {
         if (!ready(player) || hypnotized(player)) {
             return;
         }
-        if (state(player).form == Form.OBSERVER && payload.action() != Action.RETURN && payload.action() != Action.RESTORE_SKIN) {
+        if (state(player).form == Form.OBSERVER && payload.action() != Action.RETURN
+                && payload.action() != Action.RESTORE_SKIN && payload.action() != Action.EXIT) {
             message(player, "observing");
             return;
         }
@@ -301,7 +330,7 @@ public final class BodyManager {
         switch (payload.action()) {
             case SLIME_COLOR -> colorSlime(player, payload.target());
             case RESTORE_SKIN -> restoreOwnSkin(player);
-            case HYPNOTIZE -> hypnotize(player, target);
+            case HYPNOTIZE -> message(player, "hold_phone");
             case RELEASE -> release(player, target);
             case PROJECT -> message(player, "use_projection_potion");
             case EXPEL_SELF -> message(player, "use_expulsion_potion");
@@ -323,6 +352,7 @@ public final class BodyManager {
             case POSSESS -> possess(player, target);
             case RETURN -> returnToBody(player);
             case UNDRESS -> undress(player);
+            case EXIT -> exit(player);
             default -> {
             }
         }
@@ -349,6 +379,56 @@ public final class BodyManager {
     private boolean near(ServerPlayer actor, ServerPlayer target, double distance) {
         return target != null && actor != target && target.isAlive() && actor.level() == target.level()
                 && actor.distanceToSqr(target) <= distance * distance && actor.hasLineOfSight(target);
+    }
+
+    public boolean beginHypnosis(ServerPlayer player, InteractionHand hand) {
+        Player aimed = aimedPlayer(player, 16);
+        if (!(aimed instanceof ServerPlayer target) || state(player).form != Form.HUMAN
+                || hypnotized(player) || !player.isAlive() || player.isSpectator()
+                || !player.getItemInHand(hand).is(TSFItems.PHONE)) {
+            return false;
+        }
+        if (state(target).form != Form.HUMAN || target.isSpectator()) {
+            message(player, "invalid_target");
+            return true;
+        }
+        hypnosisSessions.put(player.getUUID(), new HypnosisSession(target.getUUID(), server.overworld().getGameTime()));
+        player.startUsingItem(hand);
+        return true;
+    }
+
+    public void cancelHypnosis(ServerPlayer player) {
+        hypnosisSessions.remove(player.getUUID());
+    }
+
+    public void tickHypnosis(ServerPlayer player) {
+        HypnosisSession session = hypnosisSessions.get(player.getUUID());
+        if (session == null) {
+            player.stopUsingItem();
+            return;
+        }
+        ServerPlayer target = server.getPlayerList().getPlayer(session.target());
+        if (!player.isUsingItem() || !player.getUseItem().is(TSFItems.PHONE) || hypnotized(player)
+                || state(player).form != Form.HUMAN || !player.isAlive() || player.isSpectator()
+                || !near(player, target, 16) || state(target).form != Form.HUMAN || target.isSpectator()
+                || aimedPlayer(player, 16) != target) {
+            cancelHypnosis(player);
+            player.stopUsingItem();
+            player.sendSystemMessage(Component.translatable("message.tsf.hypnosis_cancelled"), true);
+            return;
+        }
+        long elapsed = server.overworld().getGameTime() - session.started();
+        if (elapsed >= 60) {
+            cancelHypnosis(player);
+            player.stopUsingItem();
+            hypnotize(player, target);
+        } else if (elapsed % 5 == 0) {
+            player.sendSystemMessage(Component.translatable("message.tsf.hypnosis_progress", target.getDisplayName(),
+                    String.format(java.util.Locale.ROOT, "%.1f", (60 - elapsed) / 20.0)), true);
+        }
+    }
+
+    private record HypnosisSession(UUID target, long started) {
     }
 
     private void hypnotize(ServerPlayer player, ServerPlayer target) {
@@ -661,8 +741,12 @@ public final class BodyManager {
         restoreAbilities(player, state);
         state.body = null;
         state.form = form;
+        state.spiritHost = null;
+        state.observedBody = null;
+        state.observerFallback = null;
         lastSkinLayers.put(player.getUUID(), List.of());
         clearHypnosis(player);
+        cancelHypnosis(player);
         applyForm(player);
         player.teleportTo(player.level(), player.getX(), player.getY() + 0.15, player.getZ(), Set.of(),
                 player.getYRot(), player.getXRot(), false);
@@ -701,10 +785,124 @@ public final class BodyManager {
             player.noPhysics = true;
             player.onUpdateAbilities();
         }
+        updateSpiritSpears(player);
         player.fallDistance = 0;
     }
 
+    private void updateSpiritSpears(ServerPlayer player) {
+        boolean spirit = state(player).form == Form.SPIRIT;
+        boolean possession = false;
+        boolean snatching = false;
+        boolean changed = false;
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (!spiritSpear(stack)) {
+                continue;
+            }
+            boolean duplicate = stack.is(TSFItems.POSSESSION_SPEAR) ? possession : snatching;
+            if (!spirit || duplicate) {
+                player.getInventory().setItem(slot, ItemStack.EMPTY);
+                changed = true;
+            } else {
+                possession |= stack.is(TSFItems.POSSESSION_SPEAR);
+                snatching |= stack.is(TSFItems.SNATCHING_SPEAR);
+                if (stack.getCount() != 1) {
+                    stack.setCount(1);
+                    changed = true;
+                }
+            }
+        }
+        if (spirit && !possession) {
+            changed |= player.getInventory().add(new ItemStack(TSFItems.POSSESSION_SPEAR));
+        }
+        if (spirit && !snatching) {
+            changed |= player.getInventory().add(new ItemStack(TSFItems.SNATCHING_SPEAR));
+        }
+        if (changed) {
+            refreshInventory(player);
+        }
+    }
+
+    public void useSpiritSpear(ServerPlayer player, ServerPlayer target, InteractionHand hand) {
+        ItemStack stack = player.getItemInHand(hand);
+        if (!player.isAlive() || hypnotized(player) || !spiritSpear(stack) || !ready(player)) {
+            return;
+        }
+        if (state(player).form != Form.SPIRIT || player.isSpectator()) {
+            message(player, "spear_spirit_only");
+            return;
+        }
+        if (stack.is(TSFItems.POSSESSION_SPEAR)) {
+            attachSpirit(player, target);
+        } else {
+            takeOver(player, target);
+        }
+    }
+
+    private void attachSpirit(ServerPlayer player, ServerPlayer target) {
+        if (!near(player, target, 5) || state(target).form != Form.HUMAN || target.isSpectator()) {
+            message(player, "invalid_target");
+            return;
+        }
+        if (!NeedsOfNatureCompat.canChangeBody(player) || !NeedsOfNatureCompat.canChangeBody(target)) {
+            return;
+        }
+        PlayerState state = state(player);
+        state.spiritHost = target.getUUID();
+        state.observedBody = state(target).body;
+        state.observerFallback = target.getUUID();
+        state.form = Form.OBSERVER;
+        applyForm(player);
+        message(player, "spirit_attached", target.getDisplayName());
+        message(target, "spirit_host", player.getGameProfile().name());
+        changed();
+    }
+
+    private void releaseSpiritAttachment(ServerPlayer player) {
+        PlayerState state = state(player);
+        ServerPlayer host = server.getPlayerList().getPlayer(state.spiritHost);
+        Entity position = host == null ? player : host;
+        Vec3 destination = position.position();
+        ServerLevel level = (ServerLevel) position.level();
+        player.setCamera(player);
+        player.setGameMode(GameType.byName(state.savedGameMode, GameType.SURVIVAL));
+        restoreAbilities(player, state);
+        state.form = Form.SPIRIT;
+        state.spiritHost = null;
+        state.observedBody = null;
+        state.observerFallback = null;
+        applyForm(player);
+        player.teleportTo(level, destination.x, destination.y, destination.z, Set.of(),
+                player.getYRot(), player.getXRot(), false);
+        player.setDeltaMovement(Vec3.ZERO);
+        message(player, "spirit_detached");
+        visualsDirty = true;
+    }
+
+    private void exit(ServerPlayer player) {
+        if (state(player).spiritHost != null) {
+            releaseSpiritAttachment(player);
+            changed();
+            return;
+        }
+        Body body = store.bodies.get(state(player).body);
+        if (state(player).form != Form.HUMAN || state(player).zipperReturnForm != null
+                || body != null && !player.getUUID().equals(body.owner)) {
+            returnToBody(player);
+        } else {
+            undress(player);
+        }
+    }
+
     public void possess(ServerPlayer player, ServerPlayer target) {
+        if (state(player).form == Form.SPIRIT && !player.getMainHandItem().is(TSFItems.SNATCHING_SPEAR)) {
+            message(player, "use_spirit_spear");
+            return;
+        }
+        takeOver(player, target);
+    }
+
+    private void takeOver(ServerPlayer player, ServerPlayer target) {
         if ((state(player).form != Form.SPIRIT && state(player).form != Form.SLIME) || player.isSpectator()) {
             message(player, "leave_first");
             return;
@@ -722,7 +920,7 @@ public final class BodyManager {
             message(player, "no_space");
             return;
         }
-        BodyAnimation animation = state(player).form == Form.SLIME ? BodyAnimation.TAKEOVER : BodyAnimation.POSSESS;
+        BodyAnimation animation = BodyAnimation.TAKEOVER;
         transferControl(player, target, body, destination);
         changed();
         playAnimation(player, animation);
@@ -1022,7 +1220,7 @@ public final class BodyManager {
         List<ItemStack> carried = new ArrayList<>();
         for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
             ItemStack stack = player.getInventory().getItem(slot);
-            if (!stack.isEmpty()) {
+            if (!stack.isEmpty() && !spiritSpear(stack)) {
                 carried.add(stack.copy());
             }
         }
@@ -1037,6 +1235,7 @@ public final class BodyManager {
         state.body = body.id;
         state.observedBody = null;
         state.observerFallback = null;
+        state.spiritHost = null;
         state.zipperReturnBody = null;
         state.zipperReturnForm = null;
         body.zipperCarrier = null;
@@ -1078,6 +1277,9 @@ public final class BodyManager {
     public void returnToBody(ServerPlayer player) {
         if (hypnotized(player) || !NeedsOfNatureCompat.canChangeBody(player)) {
             return;
+        }
+        if (state(player).spiritHost != null) {
+            releaseSpiritAttachment(player);
         }
         if (state(player).form == Form.HUMAN && state(player).zipperReturnForm != null) {
             leaveZipper(player);
@@ -1377,7 +1579,7 @@ public final class BodyManager {
             return false;
         }
         Body body = store.bodies.get(state.observedBody);
-        if (body != null && !body.skinned && body.packedToken == null && body.occupant == null
+        if (state.spiritHost == null && body != null && !body.skinned && body.packedToken == null && body.occupant == null
                 && body.zipperCarrier == null) {
             Vec3 destination = safePosition(level(body.dimension), new Vec3(body.x, body.y, body.z));
             if (destination != null) {
@@ -1386,8 +1588,13 @@ public final class BodyManager {
                 return true;
             }
         }
+        ServerPlayer target = state.spiritHost == null ? controller(body, new HashSet<>())
+                : server.getPlayerList().getPlayer(state.spiritHost);
+        if (state.spiritHost != null && (target == null || !target.isAlive() || state(target).form != Form.HUMAN)) {
+            releaseSpiritAttachment(player);
+            return true;
+        }
         applyForm(player);
-        ServerPlayer target = controller(body, new HashSet<>());
         if (target != null && !target.getUUID().equals(state.observerFallback)) {
             state.observerFallback = target.getUUID();
             visualsDirty = true;
@@ -1399,7 +1606,8 @@ public final class BodyManager {
             target = null;
         }
         Entity camera = target == null ? player : target;
-        if (body != null && (body.skinPlaced && body.entityId != null || body.skinDropEntity != null)) {
+        if (state.spiritHost == null && body != null
+                && (body.skinPlaced && body.entityId != null || body.skinDropEntity != null)) {
             Entity skin = level(body.dimension).getEntity(body.skinPlaced ? body.entityId : body.skinDropEntity);
             if (skin != null) {
                 camera = skin;
@@ -1425,7 +1633,8 @@ public final class BodyManager {
         body.inventory.clear();
         var operations = server.registryAccess().createSerializationContext(JsonOps.INSTANCE);
         for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
-            body.inventory.add(ItemStack.OPTIONAL_CODEC.encodeStart(operations, player.getInventory().getItem(slot)).getOrThrow());
+            ItemStack stack = player.getInventory().getItem(slot);
+            body.inventory.add(ItemStack.OPTIONAL_CODEC.encodeStart(operations, spiritSpear(stack) ? ItemStack.EMPTY : stack).getOrThrow());
         }
         body.selectedSlot = player.getInventory().getSelectedSlot();
     }
@@ -1693,6 +1902,10 @@ public final class BodyManager {
         }
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             PlayerState state = state(player);
+            if (!player.isUsingItem() || !player.getUseItem().is(TSFItems.PHONE)) {
+                cancelHypnosis(player);
+            }
+            updateSpiritSpears(player);
             if (state.expulsionAt != 0 && server.overworld().getGameTime() >= state.expulsionAt) {
                 if (!player.isAlive() || state.form != Form.HUMAN || !java.util.Objects.equals(state.body, state.expulsionBody)) {
                     state.expulsionAt = 0;

@@ -35,6 +35,10 @@ import net.minecraft.world.level.Level;
 
 public final class TSFItems {
     public static final Item PHONE = register("phone", PhoneItem::new);
+    public static final Item POSSESSION_SPEAR = register("possession_spear", properties -> new SpiritSpearItem(properties
+            .component(DataComponents.LORE, new ItemLore(List.of(Component.translatable("tooltip.tsf.possession_spear"))))));
+    public static final Item SNATCHING_SPEAR = register("snatching_spear", properties -> new SpiritSpearItem(properties
+            .component(DataComponents.LORE, new ItemLore(List.of(Component.translatable("tooltip.tsf.snatching_spear"))))));
     public static final Item SKIN_KNIFE = register("skin_knife", Item::new);
     public static final Item SKIN_SUIT = register("skin_suit", SkinSuitItem::new);
     public static final Item EMPTY_BODY = register("empty_body", EmptyBodyItem::new);
@@ -64,6 +68,8 @@ public final class TSFItems {
                 .icon(PHONE::getDefaultInstance)
                 .displayItems((parameters, output) -> {
                     output.accept(PHONE);
+                    output.accept(POSSESSION_SPEAR);
+                    output.accept(SNATCHING_SPEAR);
                     output.accept(SKIN_KNIFE);
                     output.accept(SKIN_SUIT);
                     output.accept(EMPTY_BODY);
@@ -104,20 +110,6 @@ public final class TSFItems {
                         List.of(new MobEffectInstance(expulsion ? BodyPotionEffects.PERSONALITY_EXPULSION : BodyPotionEffects.SOUL_PROJECTION, 1)), Optional.empty()))
                 .component(DataComponents.LORE, new ItemLore(List.of(Component.translatable(expulsion
                         ? "tooltip.tsf.personality_expulsion_potion" : "tooltip.tsf.soul_projection_potion"))));
-    }
-
-    private static final class PhoneItem extends Item {
-        private PhoneItem(Properties properties) {
-            super(properties);
-        }
-
-        @Override
-        public InteractionResult use(Level level, Player player, InteractionHand hand) {
-            if (player instanceof ServerPlayer serverPlayer) {
-                BodyManager.get().openPhone(serverPlayer);
-            }
-            return InteractionResult.SUCCESS;
-        }
     }
 
     private static final class SkinSuitItem extends Item {

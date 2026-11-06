@@ -12,5 +12,6 @@ public enum Action {
     UNDRESS,
     LEAVE_ZIPPER,
     RESTORE_SKIN,
-    SLIME_COLOR
+    SLIME_COLOR,
+    EXIT
 }

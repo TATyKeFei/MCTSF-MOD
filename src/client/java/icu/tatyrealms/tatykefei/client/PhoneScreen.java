@@ -87,9 +87,8 @@ public final class PhoneScreen extends Screen {
         next.active = page < maxPage;
         int buttonX = left + panelWidth / 2 + 2;
         int buttonWidth = panelWidth / 2 - 14;
-        action("hypnotize", "hypnotize_hint", Action.HYPNOTIZE, buttonX, top + 70, buttonWidth);
-        action("release", "release_hint", Action.RELEASE, buttonX, top + 90, buttonWidth);
-        action("expel_target", "expel_target_hint", Action.EXPEL_TARGET, buttonX, top + 110, buttonWidth);
+        action("release", "release_hint", Action.RELEASE, buttonX, top + 70, buttonWidth);
+        action("expel_target", "expel_target_hint", Action.EXPEL_TARGET, buttonX, top + 90, buttonWidth);
         int bottom = top + panelHeight - 67;
         int half = (panelWidth - 28) / 2;
         action("leave_zipper", "leave_zipper_hint", Action.LEAVE_ZIPPER, left + 12, bottom, panelWidth - 24);
@@ -97,7 +96,7 @@ public final class PhoneScreen extends Screen {
         action("undress", "undress_hint", Action.UNDRESS, left + 16 + half, bottom + 24, half);
         slimeColors = addRenderableWidget(Button.builder(Component.translatable("screen.tsf.slime_color"),
                 button -> minecraft.gui.setScreen(new SlimeColorScreen(this)))
-                .bounds(buttonX, top + 70, buttonWidth, 20).build());
+                .bounds(buttonX, top + 110, buttonWidth, 20).build());
         updateActions();
     }
 
@@ -114,29 +113,27 @@ public final class PhoneScreen extends Screen {
     }
 
     private void updateActions() {
-        if (minecraft.player == null || actions.size() != 6) {
+        if (minecraft.player == null || actions.size() != 5) {
             return;
         }
         Form form = BodyManager.form(minecraft.player);
         boolean targetPresent = targets.stream().anyMatch(player -> player.getUUID().equals(selected));
         boolean free = !BodyManager.hypnotized(minecraft.player) && form != Form.OBSERVER;
-        actions.get(0).active = free && form == Form.HUMAN && targetPresent;
-        actions.get(0).visible = form != Form.SLIME;
+        actions.get(0).active = free && targetPresent;
         slimeColors.visible = form == Form.SLIME;
         slimeColors.active = free && slimeColors.visible;
         actions.get(1).active = free && targetPresent;
-        actions.get(2).active = free && targetPresent;
         VisualState visual = TSFClient.visual(minecraft.player.getUUID());
         boolean recovery = visual != null && visual.skinRecoverySeconds() >= 0;
-        actions.get(3).visible = visual != null && (visual.zipperControl() || recovery);
-        actions.get(3).active = recovery ? visual.skinRecoverySeconds() == 0 : free && actions.get(3).visible;
-        actions.get(3).setMessage(recovery ? Component.translatable(visual.skinRecoverySeconds() == 0
+        actions.get(2).visible = visual != null && (visual.zipperControl() || recovery);
+        actions.get(2).active = recovery ? visual.skinRecoverySeconds() == 0 : free && actions.get(2).visible;
+        actions.get(2).setMessage(recovery ? Component.translatable(visual.skinRecoverySeconds() == 0
                 ? "screen.tsf.restore_skin" : "screen.tsf.restore_skin_wait", visual.skinRecoverySeconds())
                 : Component.translatable("screen.tsf.leave_zipper"));
-        actions.get(3).setTooltip(Tooltip.create(Component.translatable(recovery
+        actions.get(2).setTooltip(Tooltip.create(Component.translatable(recovery
                 ? "screen.tsf.restore_skin_hint" : "screen.tsf.leave_zipper_hint")));
-        actions.get(4).active = !BodyManager.hypnotized(minecraft.player);
-        actions.get(5).active = free && visual != null && visual.wearingSkin();
+        actions.get(3).active = !BodyManager.hypnotized(minecraft.player);
+        actions.get(4).active = free && visual != null && visual.wearingSkin();
     }
 
     public void refresh() {
