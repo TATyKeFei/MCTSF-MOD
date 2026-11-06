@@ -42,12 +42,6 @@
 ./gradlew runClient` 或 `./gradlew runServer
 ```
 
-## GitHub Actions 自动构建
-
-推送代码、创建或更新 PR 时会自动构建，也可以在仓库的 **Actions → Build TSF → Run workflow** 手动触发。
-
-构建成功后，在对应运行页面底部的 **Artifacts** 下载 `TSF-构建编号`。解压后将不以 `-sources.jar` 结尾的 JAR 放入游戏或服务端的 `mods` 文件夹。构建产物保留 14 天。
-
 # 服务端设置
 
 首次启动世界或服务端时生成 `config/tsf-server.json`; 修改后`/tsf config reload` 重载
