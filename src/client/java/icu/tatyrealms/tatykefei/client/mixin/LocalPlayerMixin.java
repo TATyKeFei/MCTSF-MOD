@@ -17,7 +17,8 @@ public abstract class LocalPlayerMixin {
         LocalPlayer player = (LocalPlayer) (Object) this;
         if (BodyManager.form(player) == Form.SPIRIT) {
             player.noPhysics = true;
-            player.getAbilities().flying = true;
+            player.setOnGround(false);
+            player.getAbilities().flying = player.getAbilities().mayfly;
         }
     }
 

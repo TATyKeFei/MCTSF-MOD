@@ -65,7 +65,9 @@ public abstract class PlayerMixin implements FormHolder {
     @Inject(method = "aiStep", at = @At("HEAD"))
     private void tsf$spiritPhysics(CallbackInfo callback) {
         if (tsf$getForm() == Form.SPIRIT) {
-            ((Player) (Object) this).noPhysics = true;
+            Player player = (Player) (Object) this;
+            player.noPhysics = true;
+            player.setOnGround(false);
         }
     }
 
