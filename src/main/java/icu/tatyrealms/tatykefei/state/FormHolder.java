@@ -8,4 +8,8 @@ public interface FormHolder {
     boolean tsf$isHypnotized();
 
     void tsf$setHypnotized(boolean hypnotized);
+
+    int tsf$hypnosisRestrictions();
+
+    void tsf$setHypnosisRestrictions(int restrictions);
 }

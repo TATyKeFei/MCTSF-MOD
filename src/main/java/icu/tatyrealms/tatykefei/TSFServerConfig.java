@@ -17,12 +17,16 @@ public final class TSFServerConfig {
     public boolean skinKnifeRequiresDowned = false;
     public int expulsionDelaySeconds = 3;
     public boolean deathLeavesBody = true;
+    public int maxSkinLayers = 16;
 
     public static TSFServerConfig parse(String json) throws IOException {
         try {
             TSFServerConfig loaded = GSON.fromJson(json, TSFServerConfig.class);
             if (loaded == null || loaded.expulsionDelaySeconds < 1 || loaded.expulsionDelaySeconds > 60) {
                 throw new IOException("expulsionDelaySeconds must be between 1 and 60");
+            }
+            if (loaded.maxSkinLayers < 1 || loaded.maxSkinLayers > 64) {
+                throw new IOException("maxSkinLayers must be between 1 and 64");
             }
             return loaded;
         } catch (RuntimeException exception) {
@@ -52,11 +56,8 @@ public final class TSFServerConfig {
     public static void reload() throws IOException {
         TSFServerConfig loaded = new TSFServerConfig();
         if (Files.exists(PATH)) {
-            try (var reader = Files.newBufferedReader(PATH, StandardCharsets.UTF_8)) {
-                loaded = GSON.fromJson(reader, TSFServerConfig.class);
-                if (loaded == null || loaded.expulsionDelaySeconds < 1 || loaded.expulsionDelaySeconds > 60) {
-                    throw new IOException("expulsionDelaySeconds must be between 1 and 60: " + PATH);
-                }
+            try {
+                loaded = parse(Files.readString(PATH, StandardCharsets.UTF_8));
             } catch (RuntimeException exception) {
                 throw new IOException("Cannot read TSF server config: " + PATH, exception);
             }

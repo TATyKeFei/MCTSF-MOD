@@ -33,11 +33,14 @@ public abstract class PlayerMixin implements FormHolder {
     private static final EntityDataAccessor<Integer> TSF_FORM = SynchedEntityData.defineId(Player.class, EntityDataSerializers.INT);
     @Unique
     private static final EntityDataAccessor<Boolean> TSF_HYPNOTIZED = SynchedEntityData.defineId(Player.class, EntityDataSerializers.BOOLEAN);
+    @Unique
+    private static final EntityDataAccessor<Integer> TSF_HYPNOSIS_RESTRICTIONS = SynchedEntityData.defineId(Player.class, EntityDataSerializers.INT);
 
     @Inject(method = "defineSynchedData", at = @At("TAIL"))
     private void tsf$defineData(SynchedEntityData.Builder builder, CallbackInfo callback) {
         builder.define(TSF_FORM, Form.HUMAN.ordinal());
         builder.define(TSF_HYPNOTIZED, false);
+        builder.define(TSF_HYPNOSIS_RESTRICTIONS, 0);
     }
 
     @Override
@@ -62,6 +65,16 @@ public abstract class PlayerMixin implements FormHolder {
         ((Player) (Object) this).getEntityData().set(TSF_HYPNOTIZED, hypnotized);
     }
 
+    @Override
+    public int tsf$hypnosisRestrictions() {
+        return ((Player) (Object) this).getEntityData().get(TSF_HYPNOSIS_RESTRICTIONS);
+    }
+
+    @Override
+    public void tsf$setHypnosisRestrictions(int restrictions) {
+        ((Player) (Object) this).getEntityData().set(TSF_HYPNOSIS_RESTRICTIONS, restrictions);
+    }
+
     @Inject(method = "aiStep", at = @At("HEAD"))
     private void tsf$spiritPhysics(CallbackInfo callback) {
         if (tsf$getForm() == Form.SPIRIT) {
@@ -73,7 +86,8 @@ public abstract class PlayerMixin implements FormHolder {
 
     @Inject(method = "touch", at = @At("HEAD"), cancellable = true)
     private void tsf$spiritCannotCollect(Entity entity, CallbackInfo callback) {
-        if (tsf$getForm() == Form.SPIRIT || tsf$isHypnotized()) {
+        if (tsf$getForm() == Form.SPIRIT || BodyManager.restricted((Player) (Object) this,
+                icu.tatyrealms.tatykefei.state.HypnosisRestrictions.INTERACTION)) {
             callback.cancel();
         }
     }

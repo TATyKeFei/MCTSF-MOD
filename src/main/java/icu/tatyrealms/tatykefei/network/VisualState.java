@@ -6,5 +6,5 @@ import java.util.UUID;
 
 public record VisualState(UUID player, Form form, UUID body, String bodyName, JsonElement profile,
                           boolean hypnotized, boolean wearingSkin, int skinLayers, boolean zipperControl,
-                          int skinRecoverySeconds, Integer slimeColor) {
+                          int skinRecoverySeconds, Integer slimeColor, UUID hypnotist, int hypnosisRestrictions) {
 }

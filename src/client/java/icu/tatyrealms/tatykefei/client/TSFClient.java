@@ -12,6 +12,7 @@ import icu.tatyrealms.tatykefei.network.StatePayload;
 import icu.tatyrealms.tatykefei.network.VisualState;
 import icu.tatyrealms.tatykefei.network.ObserverPayload;
 import icu.tatyrealms.tatykefei.network.SettingsPayload;
+import icu.tatyrealms.tatykefei.network.SkinLayersPayload;
 import icu.tatyrealms.tatykefei.state.BodyManager;
 import icu.tatyrealms.tatykefei.state.Form;
 import java.util.HashMap;
@@ -46,6 +47,11 @@ public final class TSFClient implements ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(SettingsPayload.TYPE, (payload, context) -> {
             if (context.client().gui.screen() instanceof TSFSettingsScreen screen) {
                 screen.receive(payload);
+            }
+        });
+        ClientPlayNetworking.registerGlobalReceiver(SkinLayersPayload.TYPE, (payload, context) -> {
+            if (context.client().gui.screen() instanceof SkinLayersScreen screen) {
+                screen.receive(GSON.fromJson(payload.json(), SkinLayersPayload.Snapshot.class));
             }
         });
         KeyMapping.Category controls = KeyMapping.Category.register(TSF.id("controls"));

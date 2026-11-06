@@ -18,6 +18,9 @@ public final class PlayerState {
     public String savedGameMode;
     public UUID hypnotist;
     public long hypnosisUntil;
+    public int hypnosisRestrictions = HypnosisRestrictions.ALL;
+    public float anchorYaw;
+    public float anchorPitch;
     public String anchorDimension;
     public double anchorX;
     public double anchorY;

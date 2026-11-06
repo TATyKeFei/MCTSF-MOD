@@ -9,6 +9,7 @@ import icu.tatyrealms.tatykefei.compat.TrinketsCompat;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureCompat;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureTanks;
 import icu.tatyrealms.tatykefei.item.TSFItems;
+import icu.tatyrealms.tatykefei.item.ProtectionTotems;
 import icu.tatyrealms.tatykefei.mixin.MannequinAccessor;
 import icu.tatyrealms.tatykefei.network.Action;
 import icu.tatyrealms.tatykefei.network.ActionPayload;
@@ -18,6 +19,7 @@ import icu.tatyrealms.tatykefei.network.StatePayload;
 import icu.tatyrealms.tatykefei.network.VisualState;
 import icu.tatyrealms.tatykefei.network.ObserverInventory;
 import icu.tatyrealms.tatykefei.network.ObserverPayload;
+import icu.tatyrealms.tatykefei.network.SkinLayersPayload;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -119,6 +121,10 @@ public final class BodyManager {
         return ((FormHolder) player).tsf$isHypnotized();
     }
 
+    public static boolean restricted(Player player, int restriction) {
+        return hypnotized(player) && (((FormHolder) player).tsf$hypnosisRestrictions() & restriction) != 0;
+    }
+
     public static boolean spiritSpear(ItemStack stack) {
         return stack.is(TSFItems.POSSESSION_SPEAR) || stack.is(TSFItems.SNATCHING_SPEAR);
     }
@@ -212,6 +218,7 @@ public final class BodyManager {
 
     public void left(ServerPlayer player) {
         PlayerState state = state(player);
+        ProtectionTotems.clear(player.getUUID());
         cancelHypnosis(player);
         NeedsOfNatureCompat.endSession(player);
         if (state.spiritHost != null) {
@@ -314,7 +321,24 @@ public final class BodyManager {
             }
             return;
         }
-        if (!ready(player) || hypnotized(player)) {
+        if (payload.action() == Action.OPEN_SKINS) {
+            if (!hypnotized(player) && state(player).form == Form.HUMAN) {
+                synchronizeSkins(player);
+            }
+            return;
+        }
+        boolean hypnosisControl = switch (payload.action()) {
+            case HYPNOSIS_MOVEMENT, HYPNOSIS_INTERACTION, HYPNOSIS_LOOK, HYPNOSIS_SPEECH -> true;
+            default -> false;
+        };
+        if ((!hypnosisControl && !ready(player)) || hypnotized(player)) {
+            return;
+        }
+        if (payload.action() == Action.REPLACE_SKIN) {
+            if (state(player).form == Form.HUMAN) {
+                replaceOuterSkin(player, payload.target());
+                synchronizeSkins(player);
+            }
             return;
         }
         if (state(player).form == Form.OBSERVER && payload.action() != Action.RETURN
@@ -332,6 +356,10 @@ public final class BodyManager {
             case RESTORE_SKIN -> restoreOwnSkin(player);
             case HYPNOTIZE -> message(player, "hold_phone");
             case RELEASE -> release(player, target);
+            case HYPNOSIS_MOVEMENT -> toggleHypnosis(player, target, HypnosisRestrictions.MOVEMENT);
+            case HYPNOSIS_INTERACTION -> toggleHypnosis(player, target, HypnosisRestrictions.INTERACTION);
+            case HYPNOSIS_LOOK -> toggleHypnosis(player, target, HypnosisRestrictions.LOOK);
+            case HYPNOSIS_SPEECH -> toggleHypnosis(player, target, HypnosisRestrictions.SPEECH);
             case PROJECT -> message(player, "use_projection_potion");
             case EXPEL_SELF -> message(player, "use_expulsion_potion");
             case LEAVE_ZIPPER -> {
@@ -356,9 +384,15 @@ public final class BodyManager {
             default -> {
             }
         }
+        if (payload.action() == Action.UNDRESS) {
+            synchronizeSkins(player);
+        }
     }
 
     private boolean ready(ServerPlayer player) {
+        if (ProtectionTotems.coolingDown(player)) {
+            return false;
+        }
         long now = server.overworld().getGameTime();
         Long previous = cooldowns.get(player.getUUID());
         if (previous != null && now - previous < 8) {
@@ -390,6 +424,9 @@ public final class BodyManager {
         }
         if (state(target).form != Form.HUMAN || target.isSpectator()) {
             message(player, "invalid_target");
+            return true;
+        }
+        if (ProtectionTotems.coolingDown(player)) {
             return true;
         }
         hypnosisSessions.put(player.getUUID(), new HypnosisSession(target.getUUID(), server.overworld().getGameTime()));
@@ -442,16 +479,23 @@ public final class BodyManager {
             message(player, "already_hypnotized");
             return;
         }
+        if (ProtectionTotems.blocks(player, target, ProtectionTotems.Kind.HYPNOSIS)) {
+            return;
+        }
         target.closeContainer();
         target.stopRiding();
         target.stopUsingItem();
         state.hypnotist = player.getUUID();
+        state.hypnosisRestrictions = HypnosisRestrictions.ALL;
         state.hypnosisUntil = server.overworld().getGameTime() + 1200;
         state.anchorDimension = target.level().dimension().identifier().toString();
         state.anchorX = target.getX();
         state.anchorY = target.getY();
         state.anchorZ = target.getZ();
+        state.anchorYaw = target.getYRot();
+        state.anchorPitch = target.getXRot();
         ((FormHolder) target).tsf$setHypnotized(true);
+        ((FormHolder) target).tsf$setHypnosisRestrictions(state.hypnosisRestrictions);
         message(player, "hypnosis_success", target.getDisplayName());
         message(target, "hypnosis_received", player.getDisplayName());
         changed();
@@ -472,6 +516,37 @@ public final class BodyManager {
         state.hypnotist = null;
         state.hypnosisUntil = 0;
         ((FormHolder) player).tsf$setHypnotized(false);
+        ((FormHolder) player).tsf$setHypnosisRestrictions(0);
+    }
+
+    private void toggleHypnosis(ServerPlayer actor, ServerPlayer target, int restriction) {
+        if (target == null || !actor.getUUID().equals(state(target).hypnotist)
+                || state(target).hypnosisUntil <= server.overworld().getGameTime()
+                || !near(actor, target, 16) || state(target).form != Form.HUMAN) {
+            message(actor, "hypnotize_first");
+            return;
+        }
+        PlayerState state = state(target);
+        state.hypnosisRestrictions ^= restriction;
+        if ((state.hypnosisRestrictions & restriction) != 0) {
+            if (restriction == HypnosisRestrictions.MOVEMENT) {
+                state.anchorDimension = target.level().dimension().identifier().toString();
+                state.anchorX = target.getX();
+                state.anchorY = target.getY();
+                state.anchorZ = target.getZ();
+            }
+            if (restriction == HypnosisRestrictions.LOOK) {
+                state.anchorYaw = target.getYRot();
+                state.anchorPitch = target.getXRot();
+            }
+            if (restriction == HypnosisRestrictions.INTERACTION) {
+                target.closeContainer();
+                target.stopUsingItem();
+            }
+        }
+        ((FormHolder) target).tsf$setHypnosisRestrictions(state.hypnosisRestrictions);
+        message(target, "hypnosis_rules_changed");
+        visualsDirty = true;
     }
 
     public boolean canProject(ServerPlayer player) {
@@ -847,6 +922,9 @@ public final class BodyManager {
         if (!NeedsOfNatureCompat.canChangeBody(player) || !NeedsOfNatureCompat.canChangeBody(target)) {
             return;
         }
+        if (ProtectionTotems.blocks(player, target, ProtectionTotems.Kind.POSSESSION)) {
+            return;
+        }
         PlayerState state = state(player);
         state.spiritHost = target.getUUID();
         state.observedBody = state(target).body;
@@ -921,6 +999,9 @@ public final class BodyManager {
             return;
         }
         BodyAnimation animation = BodyAnimation.TAKEOVER;
+        if (ProtectionTotems.blocks(player, target, ProtectionTotems.Kind.POSSESSION)) {
+            return;
+        }
         transferControl(player, target, body, destination);
         changed();
         playAnimation(player, animation);
@@ -974,7 +1055,7 @@ public final class BodyManager {
             Vec3 destination = safePosition(player.level(), entity.position());
             if (destination == null) {
                 message(player, "no_space");
-            } else {
+            } else if (!protectBody(player, body, ProtectionTotems.Kind.POSSESSION)) {
                 BodyAnimation animation = state(player).form == Form.SLIME ? BodyAnimation.ENTER_BODY : BodyAnimation.POSSESS;
                 enter(player, body, destination);
                 message(player, "entered", body.name);
@@ -1325,7 +1406,14 @@ public final class BodyManager {
         boolean downed = NeedsOfNatureCompat.isDowned(target);
         Body body = store.bodies.get(state(target).body);
         if (body == null || !skinRules(player, hypnotized(target), downed)
-                || !NeedsOfNatureCompat.canChangeBody(player) || !NeedsOfNatureCompat.finishDowned(target)) {
+                || !NeedsOfNatureCompat.canChangeBody(player)
+                || !downed && !NeedsOfNatureCompat.canChangeBody(target)) {
+            return;
+        }
+        if (ProtectionTotems.blocks(player, target, ProtectionTotems.Kind.SKIN)) {
+            return;
+        }
+        if (!NeedsOfNatureCompat.finishDowned(target)) {
             return;
         }
         detach(target, Form.OBSERVER);
@@ -1343,6 +1431,9 @@ public final class BodyManager {
         if (!skinRules(player, body.skinnableHypnotized, body.skinnableDowned)) {
             return;
         }
+        if (protectBody(player, body, ProtectionTotems.Kind.SKIN)) {
+            return;
+        }
         removeBodyEntity(body);
         body.skinned = true;
         body.skinToken = UUID.randomUUID();
@@ -1352,6 +1443,33 @@ public final class BodyManager {
         spawnBody(body);
         message(player, "skin_created", body.name);
         changed();
+    }
+
+    private boolean protectBody(ServerPlayer actor, Body body, ProtectionTotems.Kind kind) {
+        if (actor.getUUID().equals(body.owner)) {
+            return false;
+        }
+        for (var item : ProtectionTotems.items(kind)) {
+            for (int slot = 0; slot < body.inventory.size(); slot++) {
+                ItemStack stack = decodeItem(body.inventory.get(slot));
+                if (stack.is(item)) {
+                    ProtectionTotems.consume(actor, body.owner, body.name, stack, kind);
+                    body.inventory.set(slot, encodeItem(stack));
+                    save();
+                    return true;
+                }
+            }
+            for (var entry : body.accessories.entrySet()) {
+                ItemStack stack = decodeItem(entry.getValue());
+                if (stack.is(item)) {
+                    ProtectionTotems.consume(actor, body.owner, body.name, stack, kind);
+                    entry.setValue(encodeItem(stack));
+                    save();
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private ItemStack createSkin(Body body) {
@@ -1409,6 +1527,10 @@ public final class BodyManager {
     }
 
     public boolean canWearSkin(ServerPlayer player, ItemStack stack) {
+        return canWearSkin(player, stack, false);
+    }
+
+    private boolean canWearSkin(ServerPlayer player, ItemStack stack, boolean replacing) {
         if (!NeedsOfNatureCompat.canChangeBody(player)) {
             return false;
         }
@@ -1418,7 +1540,70 @@ public final class BodyManager {
             message(player, "invalid_skin");
             return false;
         }
+        if (layers(player).size() - (replacing ? 1 : 0) >= TSFServerConfig.get().maxSkinLayers) {
+            message(player, "skin_layer_limit", TSFServerConfig.get().maxSkinLayers);
+            return false;
+        }
         return true;
+    }
+
+    public void synchronizeSkins(ServerPlayer player) {
+        if (!ServerPlayNetworking.canSend(player, SkinLayersPayload.TYPE)) {
+            return;
+        }
+        List<SkinLayer> worn = layers(player);
+        List<SkinLayersPayload.Entry> current = worn.stream()
+                .map(layer -> new SkinLayersPayload.Entry(layer.body.id, layer.body.name, -1)).toList();
+        List<SkinLayersPayload.Entry> available = new ArrayList<>();
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            Body skin = skinBody(player.getInventory().getItem(slot));
+            if (skin != null && skin.skinned && worn.stream().noneMatch(layer -> layer.body == skin)) {
+                available.add(new SkinLayersPayload.Entry(skin.id, skin.name, slot));
+            }
+        }
+        ServerPlayNetworking.send(player, new SkinLayersPayload(GSON.toJson(
+                new SkinLayersPayload.Snapshot(current, available, TSFServerConfig.get().maxSkinLayers))));
+    }
+
+    private void replaceOuterSkin(ServerPlayer player, String requestedBody) {
+        UUID requested;
+        try {
+            requested = UUID.fromString(requestedBody);
+        } catch (IllegalArgumentException exception) {
+            return;
+        }
+        int slot = -1;
+        for (int index = 0; index < player.getInventory().getContainerSize(); index++) {
+            Body candidate = skinBody(player.getInventory().getItem(index));
+            if (candidate != null && requested.equals(candidate.id)) {
+                slot = index;
+                break;
+            }
+        }
+        if (slot < 0) {
+            return;
+        }
+        List<SkinLayer> worn = layers(player);
+        ItemStack replacement = player.getInventory().getItem(slot);
+        if (worn.isEmpty() || !canWearSkin(player, replacement, true)) {
+            return;
+        }
+        SkinLayer outer = worn.getLast();
+        ItemStack removed = outer.stack.copy();
+        ItemStack incoming = replacement.copyWithCount(1);
+        outer.remove.run();
+        replacement.shrink(1);
+        Body body = store.bodies.get(state(player).body);
+        body.skinOrder.remove(outer.body.id);
+        if (!TrinketsCompat.equipSkin(player, incoming)) {
+            body.skinLayers.add(encodeItem(incoming));
+        }
+        if (!player.getInventory().add(removed)) {
+            player.drop(removed, false, Prediction.SERVER_ONLY);
+        }
+        refreshInventory(player);
+        message(player, "skin_replaced", outer.body.name, skinBody(incoming).name);
+        changed();
     }
 
     public void wearSkin(ServerPlayer player, ItemStack stack) {
@@ -1921,11 +2106,18 @@ public final class BodyManager {
                     clearHypnosis(player);
                     message(player, "hypnosis_released");
                     visualsDirty = true;
-                } else if (player.distanceToSqr(state.anchorX, state.anchorY, state.anchorZ) > 0.01
-                        || !player.level().dimension().identifier().toString().equals(state.anchorDimension)) {
+                } else if (restricted(player, HypnosisRestrictions.MOVEMENT)
+                        && (player.distanceToSqr(state.anchorX, state.anchorY, state.anchorZ) > 0.01
+                        || !player.level().dimension().identifier().toString().equals(state.anchorDimension))) {
                     player.teleportTo(level(state.anchorDimension), state.anchorX, state.anchorY, state.anchorZ,
                             Set.of(), player.getYRot(), player.getXRot(), false);
                     player.setDeltaMovement(Vec3.ZERO);
+                }
+                if (restricted(player, HypnosisRestrictions.LOOK)
+                        && (Math.abs(net.minecraft.util.Mth.wrapDegrees(player.getYRot() - state.anchorYaw)) > 0.01F
+                        || Math.abs(player.getXRot() - state.anchorPitch) > 0.01F)) {
+                    player.teleportTo(player.level(), player.getX(), player.getY(), player.getZ(), Set.of(),
+                            state.anchorYaw, state.anchorPitch, false);
                 }
             }
             if (state.form == Form.SPIRIT) {
@@ -1985,7 +2177,8 @@ public final class BodyManager {
             visuals.add(new VisualState(player.getUUID(), state.form, state.body,
                     appearance == null ? player.getGameProfile().name() : appearance.name,
                     appearance == null ? null : appearance.profile, state.hypnotist != null, wearing, skins.size(),
-                    state.zipperReturnForm != null, skinRecoverySeconds(player), state.slimeColor));
+                    state.zipperReturnForm != null, skinRecoverySeconds(player), state.slimeColor,
+                    state.hypnotist, state.hypnotist == null ? 0 : state.hypnosisRestrictions));
         }
         return visuals;
     }
@@ -2091,6 +2284,20 @@ public final class BodyManager {
     }
 
     private boolean updateSkinLayers(ServerPlayer player) {
+        List<SkinLayer> worn = layers(player);
+        int limit = TSFServerConfig.get().maxSkinLayers;
+        if (worn.size() > limit) {
+            for (int index = worn.size() - 1; index >= limit; index--) {
+                SkinLayer excess = worn.get(index);
+                ItemStack removed = excess.stack.copy();
+                excess.remove.run();
+                if (!player.getInventory().add(removed)) {
+                    player.drop(removed, false, Prediction.SERVER_ONLY);
+                }
+            }
+            refreshInventory(player);
+            message(player, "skin_layer_limit", limit);
+        }
         List<UUID> skins = layers(player).stream().map(layer -> layer.body.id).toList();
         List<UUID> previous = lastSkinLayers.put(player.getUUID(), skins);
         if (skins.equals(previous)) {

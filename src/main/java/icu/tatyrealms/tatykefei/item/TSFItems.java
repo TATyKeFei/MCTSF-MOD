@@ -35,6 +35,10 @@ import net.minecraft.world.level.Level;
 
 public final class TSFItems {
     public static final Item PHONE = register("phone", PhoneItem::new);
+    public static final Item HYPNOSIS_PROTECTION_TOTEM = protection("hypnosis_protection_totem", 5);
+    public static final Item POSSESSION_PROTECTION_TOTEM = protection("possession_protection_totem", 5);
+    public static final Item SKIN_PROTECTION_TOTEM = protection("skin_protection_totem", 5);
+    public static final Item TSF_PROTECTION_TOTEM = protection("tsf_protection_totem", 15);
     public static final Item POSSESSION_SPEAR = register("possession_spear", properties -> new SpiritSpearItem(properties
             .component(DataComponents.LORE, new ItemLore(List.of(Component.translatable("tooltip.tsf.possession_spear"))))));
     public static final Item SNATCHING_SPEAR = register("snatching_spear", properties -> new SpiritSpearItem(properties
@@ -62,12 +66,21 @@ public final class TSFItems {
                 factory.apply(new Item.Properties().setId(key).stacksTo(1)));
     }
 
+    private static Item protection(String name, int uses) {
+        return register(name, properties -> new Item(properties.durability(uses)
+                .component(DataComponents.LORE, new ItemLore(List.of(Component.translatable("tooltip.tsf." + name))))));
+    }
+
     public static void initialize() {
         Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, TSF.id("main"), FabricCreativeModeTab.builder()
                 .title(Component.translatable("itemGroup.tsf"))
                 .icon(PHONE::getDefaultInstance)
                 .displayItems((parameters, output) -> {
                     output.accept(PHONE);
+                    output.accept(HYPNOSIS_PROTECTION_TOTEM);
+                    output.accept(POSSESSION_PROTECTION_TOTEM);
+                    output.accept(SKIN_PROTECTION_TOTEM);
+                    output.accept(TSF_PROTECTION_TOTEM);
                     output.accept(POSSESSION_SPEAR);
                     output.accept(SNATCHING_SPEAR);
                     output.accept(SKIN_KNIFE);

@@ -2,6 +2,7 @@ package icu.tatyrealms.tatykefei.client.mixin;
 
 import icu.tatyrealms.tatykefei.state.BodyManager;
 import icu.tatyrealms.tatykefei.state.Form;
+import icu.tatyrealms.tatykefei.state.HypnosisRestrictions;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.ClientInput;
 import net.minecraft.client.player.KeyboardInput;
@@ -17,7 +18,7 @@ public abstract class KeyboardInputMixin extends ClientInput {
     @Inject(method = "tick", at = @At("TAIL"))
     private void tsf$hypnosis(CallbackInfo callback) {
         var player = Minecraft.getInstance().player;
-        if (player != null && (BodyManager.hypnotized(player) || BodyManager.form(player) == Form.OBSERVER)) {
+        if (player != null && (BodyManager.restricted(player, HypnosisRestrictions.MOVEMENT) || BodyManager.form(player) == Form.OBSERVER)) {
             keyPresses = Input.EMPTY;
             moveVector = Vec2.ZERO;
         }

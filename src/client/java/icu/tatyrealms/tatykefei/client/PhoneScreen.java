@@ -28,6 +28,8 @@ public final class PhoneScreen extends Screen {
     private List<Player> targets = new ArrayList<>();
     private final List<Button> actions = new ArrayList<>();
     private Button slimeColors;
+    private Button hypnosisControls;
+    private Button skinManagement;
 
     public PhoneScreen() {
         super(Component.translatable("screen.tsf.phone"));
@@ -89,6 +91,12 @@ public final class PhoneScreen extends Screen {
         int buttonWidth = panelWidth / 2 - 14;
         action("release", "release_hint", Action.RELEASE, buttonX, top + 70, buttonWidth);
         action("expel_target", "expel_target_hint", Action.EXPEL_TARGET, buttonX, top + 90, buttonWidth);
+        hypnosisControls = addRenderableWidget(Button.builder(Component.translatable("screen.tsf.hypnosis_controls"),
+                button -> minecraft.gui.setScreen(new HypnosisScreen(this, selected)))
+                .bounds(buttonX, top + 110, buttonWidth, 20).build());
+        skinManagement = addRenderableWidget(Button.builder(Component.translatable("screen.tsf.skin_management"),
+                button -> minecraft.gui.setScreen(new SkinLayersScreen(this)))
+                .bounds(buttonX, top + 134, buttonWidth, 20).build());
         int bottom = top + panelHeight - 67;
         int half = (panelWidth - 28) / 2;
         action("leave_zipper", "leave_zipper_hint", Action.LEAVE_ZIPPER, left + 12, bottom, panelWidth - 24);
@@ -96,7 +104,7 @@ public final class PhoneScreen extends Screen {
         action("undress", "undress_hint", Action.UNDRESS, left + 16 + half, bottom + 24, half);
         slimeColors = addRenderableWidget(Button.builder(Component.translatable("screen.tsf.slime_color"),
                 button -> minecraft.gui.setScreen(new SlimeColorScreen(this)))
-                .bounds(buttonX, top + 110, buttonWidth, 20).build());
+                .bounds(buttonX, top + 134, buttonWidth, 20).build());
         updateActions();
     }
 
@@ -122,6 +130,11 @@ public final class PhoneScreen extends Screen {
         actions.get(0).active = free && targetPresent;
         slimeColors.visible = form == Form.SLIME;
         slimeColors.active = free && slimeColors.visible;
+        skinManagement.visible = form == Form.HUMAN;
+        skinManagement.active = free && skinManagement.visible;
+        VisualState targetVisual = selected == null ? null : TSFClient.visual(selected);
+        hypnosisControls.active = free && targetPresent && targetVisual != null
+                && minecraft.player.getUUID().equals(targetVisual.hypnotist());
         actions.get(1).active = free && targetPresent;
         VisualState visual = TSFClient.visual(minecraft.player.getUUID());
         boolean recovery = visual != null && visual.skinRecoverySeconds() >= 0;

@@ -1,6 +1,7 @@
 package icu.tatyrealms.tatykefei;
 
 import icu.tatyrealms.tatykefei.item.TSFItems;
+import icu.tatyrealms.tatykefei.item.ProtectionTotems;
 import icu.tatyrealms.tatykefei.compat.TrinketsCompat;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureCompat;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureTanks;
@@ -11,6 +12,8 @@ import icu.tatyrealms.tatykefei.network.AnimationPayload;
 import icu.tatyrealms.tatykefei.network.StatePayload;
 import icu.tatyrealms.tatykefei.network.SettingsPayload;
 import icu.tatyrealms.tatykefei.network.ObserverPayload;
+import icu.tatyrealms.tatykefei.network.SkinLayersPayload;
+import icu.tatyrealms.tatykefei.state.HypnosisRestrictions;
 import icu.tatyrealms.tatykefei.state.BodyManager;
 import icu.tatyrealms.tatykefei.state.Form;
 import net.fabricmc.api.ModInitializer;
@@ -29,6 +32,7 @@ import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.resources.Identifier;
@@ -58,6 +62,7 @@ public final class TSF implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(StatePayload.TYPE, StatePayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(AnimationPayload.TYPE, AnimationPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(ObserverPayload.TYPE, ObserverPayload.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(SkinLayersPayload.TYPE, SkinLayersPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(SettingsPayload.TYPE, SettingsPayload.CODEC);
         PayloadTypeRegistry.serverboundPlay().register(SettingsPayload.TYPE, SettingsPayload.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(SettingsPayload.TYPE, (payload, context) -> {
@@ -74,7 +79,15 @@ public final class TSF implements ModInitializer {
             new BodyManager(server);
         });
         ServerLifecycleEvents.BEFORE_SAVE.register((server, flush, force) -> BodyManager.get().save());
-        ServerLifecycleEvents.SERVER_STOPPED.register(server -> BodyManager.clear());
+        ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
+            BodyManager.clear();
+            ProtectionTotems.clear();
+        });
+        ServerMessageEvents.ALLOW_CHAT_MESSAGE.register((message, sender, parameters) ->
+                !BodyManager.restricted(sender, HypnosisRestrictions.SPEECH));
+        ServerMessageEvents.ALLOW_COMMAND_MESSAGE.register((message, source, parameters) ->
+                !(source.getEntity() instanceof Player player)
+                        || !BodyManager.restricted(player, HypnosisRestrictions.SPEECH));
         ServerTickEvents.END_SERVER_TICK.register(server -> BodyManager.get().tick());
         ServerEntityEvents.ENTITY_LOAD.register((entity, level) -> BodyManager.get().entityLoaded(entity));
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> BodyManager.get().joined(handler.player));
@@ -89,7 +102,7 @@ public final class TSF implements ModInitializer {
         ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer, newPlayer, alive) -> BodyManager.get().respawned(newPlayer));
 
         UseEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
-            if (BodyManager.hypnotized(player)) {
+            if (BodyManager.restricted(player, HypnosisRestrictions.INTERACTION)) {
                 return InteractionResult.FAIL;
             }
             if (entity instanceof Player && player.getItemInHand(hand).is(TSFItems.PHONE)) {
@@ -136,6 +149,9 @@ public final class TSF implements ModInitializer {
             return BodyManager.form(player) == Form.SPIRIT ? InteractionResult.FAIL : InteractionResult.PASS;
         });
         AttackEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
+            if (BodyManager.restricted(player, HypnosisRestrictions.INTERACTION)) {
+                return InteractionResult.FAIL;
+            }
             if (entity instanceof Player && BodyManager.spiritSpear(player.getItemInHand(hand))) {
                 if (player instanceof ServerPlayer serverPlayer && entity instanceof ServerPlayer target) {
                     BodyManager.get().useSpiritSpear(serverPlayer, target, hand);
@@ -148,7 +164,7 @@ public final class TSF implements ModInitializer {
                 }
                 return InteractionResult.SUCCESS;
             }
-            if (BodyManager.hypnotized(player) || BodyManager.form(player) == Form.SPIRIT
+            if (BodyManager.restricted(player, HypnosisRestrictions.INTERACTION) || BodyManager.form(player) == Form.SPIRIT
                     || BodyManager.emptyBody(entity)) {
                 return InteractionResult.FAIL;
             }
@@ -161,7 +177,7 @@ public final class TSF implements ModInitializer {
             return InteractionResult.PASS;
         });
         UseItemCallback.EVENT.register((player, level, hand) -> {
-            if (BodyManager.hypnotized(player)) {
+            if (BodyManager.restricted(player, HypnosisRestrictions.INTERACTION)) {
                 return InteractionResult.FAIL;
             }
             if (BodyManager.form(player) == Form.SLIME
@@ -185,7 +201,7 @@ public final class TSF implements ModInitializer {
     }
 
     private static boolean restricted(Player player) {
-        return BodyManager.hypnotized(player) || BodyManager.form(player) == Form.SPIRIT;
+        return BodyManager.restricted(player, HypnosisRestrictions.INTERACTION) || BodyManager.form(player) == Form.SPIRIT;
     }
 
     public static SettingsPayload settings(ServerPlayer player, SettingsPayload payload) {
