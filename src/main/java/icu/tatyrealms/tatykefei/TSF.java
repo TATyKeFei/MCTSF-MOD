@@ -4,6 +4,7 @@ import icu.tatyrealms.tatykefei.item.TSFItems;
 import icu.tatyrealms.tatykefei.item.ProtectionTotems;
 import icu.tatyrealms.tatykefei.compat.TrinketsCompat;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureCompat;
+import icu.tatyrealms.tatykefei.compat.NeedsOfNatureHypnosis;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureTanks;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import icu.tatyrealms.tatykefei.network.Action;
@@ -13,6 +14,8 @@ import icu.tatyrealms.tatykefei.network.StatePayload;
 import icu.tatyrealms.tatykefei.network.SettingsPayload;
 import icu.tatyrealms.tatykefei.network.ObserverPayload;
 import icu.tatyrealms.tatykefei.network.SkinLayersPayload;
+import icu.tatyrealms.tatykefei.network.HypnosisProgressPayload;
+import icu.tatyrealms.tatykefei.network.HypnosisSpeechPayload;
 import icu.tatyrealms.tatykefei.state.HypnosisRestrictions;
 import icu.tatyrealms.tatykefei.state.BodyManager;
 import icu.tatyrealms.tatykefei.state.Form;
@@ -57,12 +60,15 @@ public final class TSF implements ModInitializer {
         TSFItems.initialize();
         TrinketsCompat.initialize();
         NeedsOfNatureCompat.initialize();
+        NeedsOfNatureHypnosis.initialize();
         NeedsOfNatureTanks.initialize();
         PayloadTypeRegistry.serverboundPlay().register(ActionPayload.TYPE, ActionPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(StatePayload.TYPE, StatePayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(AnimationPayload.TYPE, AnimationPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(ObserverPayload.TYPE, ObserverPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(SkinLayersPayload.TYPE, SkinLayersPayload.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(HypnosisProgressPayload.TYPE, HypnosisProgressPayload.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(HypnosisSpeechPayload.TYPE, HypnosisSpeechPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(SettingsPayload.TYPE, SettingsPayload.CODEC);
         PayloadTypeRegistry.serverboundPlay().register(SettingsPayload.TYPE, SettingsPayload.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(SettingsPayload.TYPE, (payload, context) -> {
@@ -70,6 +76,8 @@ public final class TSF implements ModInitializer {
         });
         ServerPlayNetworking.registerGlobalReceiver(ActionPayload.TYPE,
                 (payload, context) -> BodyManager.get().handle(context.player(), payload));
+        ServerPlayNetworking.registerGlobalReceiver(HypnosisSpeechPayload.TYPE,
+                (payload, context) -> BodyManager.get().speakAsHypnotized(context.player(), payload));
         ServerLifecycleEvents.SERVER_STARTING.register(server -> {
             try {
                 TSFServerConfig.reload();

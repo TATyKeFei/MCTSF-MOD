@@ -7,6 +7,7 @@ import icu.tatyrealms.tatykefei.TSF;
 import icu.tatyrealms.tatykefei.TSFServerConfig;
 import icu.tatyrealms.tatykefei.compat.TrinketsCompat;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureCompat;
+import icu.tatyrealms.tatykefei.compat.NeedsOfNatureHypnosis;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureTanks;
 import icu.tatyrealms.tatykefei.item.TSFItems;
 import icu.tatyrealms.tatykefei.item.ProtectionTotems;
@@ -20,6 +21,8 @@ import icu.tatyrealms.tatykefei.network.VisualState;
 import icu.tatyrealms.tatykefei.network.ObserverInventory;
 import icu.tatyrealms.tatykefei.network.ObserverPayload;
 import icu.tatyrealms.tatykefei.network.SkinLayersPayload;
+import icu.tatyrealms.tatykefei.network.HypnosisProgressPayload;
+import icu.tatyrealms.tatykefei.network.HypnosisSpeechPayload;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -36,6 +39,8 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ChatType;
+import net.minecraft.network.chat.PlayerChatMessage;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
 import net.minecraft.network.protocol.game.ClientboundSetHeldSlotPacket;
 import net.minecraft.resources.Identifier;
@@ -46,6 +51,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Prediction;
+import net.minecraft.util.StringUtil;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
@@ -431,11 +437,20 @@ public final class BodyManager {
         }
         hypnosisSessions.put(player.getUUID(), new HypnosisSession(target.getUUID(), server.overworld().getGameTime()));
         player.startUsingItem(hand);
+        hypnosisProgress(player, target.getDisplayName().getString(), 0, HypnosisProgressPayload.DURATION_TICKS);
         return true;
     }
 
     public void cancelHypnosis(ServerPlayer player) {
-        hypnosisSessions.remove(player.getUUID());
+        if (hypnosisSessions.remove(player.getUUID()) != null) {
+            hypnosisProgress(player, "", 0, 0);
+        }
+    }
+
+    private void hypnosisProgress(ServerPlayer player, String name, int elapsed, int duration) {
+        if (ServerPlayNetworking.canSend(player, HypnosisProgressPayload.TYPE)) {
+            ServerPlayNetworking.send(player, new HypnosisProgressPayload(name, elapsed, duration));
+        }
     }
 
     public void tickHypnosis(ServerPlayer player) {
@@ -455,17 +470,44 @@ public final class BodyManager {
             return;
         }
         long elapsed = server.overworld().getGameTime() - session.started();
-        if (elapsed >= 60) {
+        if (elapsed >= HypnosisProgressPayload.DURATION_TICKS) {
             cancelHypnosis(player);
             player.stopUsingItem();
             hypnotize(player, target);
-        } else if (elapsed % 5 == 0) {
-            player.sendSystemMessage(Component.translatable("message.tsf.hypnosis_progress", target.getDisplayName(),
-                    String.format(java.util.Locale.ROOT, "%.1f", (60 - elapsed) / 20.0)), true);
+        } else if (elapsed % 2 == 0) {
+            hypnosisProgress(player, target.getDisplayName().getString(), (int) elapsed, HypnosisProgressPayload.DURATION_TICKS);
         }
     }
 
     private record HypnosisSession(UUID target, long started) {
+    }
+
+    public boolean hasActiveHypnosis(ServerPlayer player) {
+        PlayerState state = state(player);
+        return player.isAlive() && !player.isSpectator() && state.form == Form.HUMAN && state.hypnotist != null
+                && state.hypnosisUntil > server.overworld().getGameTime()
+                && server.getPlayerList().getPlayer(state.hypnotist) != null && hypnotized(player);
+    }
+
+    public void speakAsHypnotized(ServerPlayer actor, HypnosisSpeechPayload payload) {
+        if (!actor.isAlive() || actor.isSpectator() || hypnotized(actor) || state(actor).form != Form.HUMAN
+                || !hasPhoneAccess(actor) || !ready(actor)) {
+            return;
+        }
+        ServerPlayer target = server.getPlayerList().getPlayer(payload.target());
+        if (!near(actor, target, 16) || !hasActiveHypnosis(target) || !actor.getUUID().equals(state(target).hypnotist)) {
+            message(actor, "hypnotize_first");
+            return;
+        }
+        String text = payload.message().strip();
+        if (text.isEmpty() || text.length() > HypnosisSpeechPayload.MAX_LENGTH
+                || text.codePoints().anyMatch(character -> !StringUtil.isAllowedChatCharacter(character))) {
+            message(actor, "hypnosis_speech_invalid");
+            return;
+        }
+        Component decorated = server.getChatDecorator().decorate(target, Component.literal(text));
+        server.getPlayerList().broadcastChatMessage(PlayerChatMessage.system(text).withUnsignedContent(decorated),
+                actor.createCommandSourceStack(), ChatType.bind(ChatType.CHAT, target));
     }
 
     private void hypnotize(ServerPlayer player, ServerPlayer target) {
@@ -2101,24 +2143,34 @@ public final class BodyManager {
                 }
             }
             if (state.hypnotist != null) {
+                boolean animating = NeedsOfNatureCompat.isAnimating(player);
+                if (animating) {
+                    state.anchorDimension = player.level().dimension().identifier().toString();
+                    state.anchorX = player.getX();
+                    state.anchorY = player.getY();
+                    state.anchorZ = player.getZ();
+                    state.anchorYaw = player.getYRot();
+                    state.anchorPitch = player.getXRot();
+                }
                 if (server.overworld().getGameTime() >= state.hypnosisUntil
                         || server.getPlayerList().getPlayer(state.hypnotist) == null || !player.isAlive()) {
                     clearHypnosis(player);
                     message(player, "hypnosis_released");
                     visualsDirty = true;
-                } else if (restricted(player, HypnosisRestrictions.MOVEMENT)
+                } else if (!animating && restricted(player, HypnosisRestrictions.MOVEMENT)
                         && (player.distanceToSqr(state.anchorX, state.anchorY, state.anchorZ) > 0.01
                         || !player.level().dimension().identifier().toString().equals(state.anchorDimension))) {
                     player.teleportTo(level(state.anchorDimension), state.anchorX, state.anchorY, state.anchorZ,
                             Set.of(), player.getYRot(), player.getXRot(), false);
                     player.setDeltaMovement(Vec3.ZERO);
                 }
-                if (restricted(player, HypnosisRestrictions.LOOK)
+                if (!animating && restricted(player, HypnosisRestrictions.LOOK)
                         && (Math.abs(net.minecraft.util.Mth.wrapDegrees(player.getYRot() - state.anchorYaw)) > 0.01F
                         || Math.abs(player.getXRot() - state.anchorPitch) > 0.01F)) {
                     player.teleportTo(player.level(), player.getX(), player.getY(), player.getZ(), Set.of(),
                             state.anchorYaw, state.anchorPitch, false);
                 }
+                NeedsOfNatureHypnosis.acceptPending(player);
             }
             if (state.form == Form.SPIRIT) {
                 player.noPhysics = true;

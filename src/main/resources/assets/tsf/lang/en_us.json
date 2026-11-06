@@ -1,4 +1,9 @@
 {
+  "screen.tsf.control_speech": "Speak as the hypnotized player",
+  "screen.tsf.send_speech": "Send",
+  "screen.tsf.hypnotizing": "Hypnotizing %s",
+  "screen.tsf.hypnosis_percent": "%s%%",
+  "message.tsf.hypnosis_speech_invalid": "Enter a single chat line of 1–256 characters.",
   "item.tsf.hypnosis_protection_totem": "Hypnosis Protection Totem",
   "item.tsf.possession_protection_totem": "Possession Protection Totem",
   "item.tsf.skin_protection_totem": "Skinning Protection Totem",

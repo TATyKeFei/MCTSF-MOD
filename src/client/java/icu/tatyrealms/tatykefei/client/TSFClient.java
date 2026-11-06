@@ -13,6 +13,8 @@ import icu.tatyrealms.tatykefei.network.VisualState;
 import icu.tatyrealms.tatykefei.network.ObserverPayload;
 import icu.tatyrealms.tatykefei.network.SettingsPayload;
 import icu.tatyrealms.tatykefei.network.SkinLayersPayload;
+import icu.tatyrealms.tatykefei.network.HypnosisProgressPayload;
+import icu.tatyrealms.tatykefei.network.HypnosisSpeechPayload;
 import icu.tatyrealms.tatykefei.state.BodyManager;
 import icu.tatyrealms.tatykefei.state.Form;
 import java.util.HashMap;
@@ -43,6 +45,8 @@ public final class TSFClient implements ClientModInitializer {
         NeedsOfNatureClientCompat.initialize();
         SpecialModelRenderers.ID_MAPPER.put(TSF.id("skin_suit"), SkinSuitRenderer.Unbaked.CODEC);
         ClientPlayNetworking.registerGlobalReceiver(AnimationPayload.TYPE, (payload, context) -> BodyAnimations.receive(payload));
+        ClientPlayNetworking.registerGlobalReceiver(HypnosisProgressPayload.TYPE,
+                (payload, context) -> HypnosisProgress.receive(payload));
         ClientPlayNetworking.registerGlobalReceiver(ObserverPayload.TYPE, (payload, context) -> ObserverView.receive(payload.json()));
         ClientPlayNetworking.registerGlobalReceiver(SettingsPayload.TYPE, (payload, context) -> {
             if (context.client().gui.screen() instanceof TSFSettingsScreen screen) {
@@ -78,6 +82,7 @@ public final class TSFClient implements ClientModInitializer {
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             BodyAnimations.tick(client);
+            HypnosisProgress.tick(client);
             ObserverView.updateInventory();
             if (client.level != null) {
                 for (var player : client.level.players()) {
@@ -108,6 +113,7 @@ public final class TSFClient implements ClientModInitializer {
             PROFILES.clear();
             SLIMES.clear();
             BodyAnimations.clear();
+            HypnosisProgress.clear();
             ObserverView.clear();
         });
     }
@@ -122,6 +128,14 @@ public final class TSFClient implements ClientModInitializer {
         if (ClientPlayNetworking.canSend(ActionPayload.TYPE)) {
             ClientPlayNetworking.send(new ActionPayload(Action.SLIME_COLOR, hex));
         }
+    }
+
+    public static boolean sendHypnotizedSpeech(UUID target, String message) {
+        if (!ClientPlayNetworking.canSend(HypnosisSpeechPayload.TYPE)) {
+            return false;
+        }
+        ClientPlayNetworking.send(new HypnosisSpeechPayload(target, message));
+        return true;
     }
 
     public static VisualState visual(UUID player) {

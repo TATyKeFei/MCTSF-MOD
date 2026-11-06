@@ -1,4 +1,9 @@
 {
+  "screen.tsf.control_speech": "控制对方发言",
+  "screen.tsf.send_speech": "发送",
+  "screen.tsf.hypnotizing": "正在催眠 %s",
+  "screen.tsf.hypnosis_percent": "%s%%",
+  "message.tsf.hypnosis_speech_invalid": "请输入1～256字的单行聊天内容",
   "item.tsf.hypnosis_protection_totem": "催眠反制图腾",
   "item.tsf.possession_protection_totem": "附身反制图腾",
   "item.tsf.skin_protection_totem": "皮物反制图腾",
