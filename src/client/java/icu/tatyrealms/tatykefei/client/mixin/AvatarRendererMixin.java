@@ -69,6 +69,8 @@ public abstract class AvatarRendererMixin {
         }
         if (avatar instanceof Player player) {
             if (BodyManager.form(player) == Form.SPIRIT) {
+                state.nameTag = null;
+                state.scoreText = null;
                 state.isInvisible = true;
                 state.isInvisibleToPlayer = false;
             }
