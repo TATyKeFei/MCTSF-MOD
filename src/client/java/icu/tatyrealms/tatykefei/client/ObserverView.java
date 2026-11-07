@@ -2,6 +2,7 @@ package icu.tatyrealms.tatykefei.client;
 
 import com.google.gson.Gson;
 import com.mojang.serialization.JsonOps;
+import icu.tatyrealms.tatykefei.client.mixin.LivingEntityUseAccessor;
 import icu.tatyrealms.tatykefei.network.ObserverInventory;
 import icu.tatyrealms.tatykefei.state.BodyManager;
 import icu.tatyrealms.tatykefei.state.Form;
@@ -21,6 +22,7 @@ import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.item.CrossbowItem;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.resources.Identifier;
 
 public final class ObserverView {
@@ -79,7 +81,10 @@ public final class ObserverView {
         AbstractClientPlayer player = target();
         if (player != null) {
             for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
-                player.getInventory().setItem(slot, item(slot).copy());
+                ItemStack item = item(slot);
+                if (!ItemStack.matches(player.getInventory().getItem(slot), item)) {
+                    player.getInventory().setItem(slot, item.copy());
+                }
             }
             player.getInventory().setSelectedSlot(snapshot.selectedSlot());
             for (int slot = 0; slot < Math.min(crafting.size(), 5); slot++) {
@@ -92,7 +97,40 @@ public final class ObserverView {
             player.experienceProgress = snapshot.experienceProgress();
             player.experienceLevel = snapshot.experienceLevel();
             player.totalExperience = snapshot.totalExperience();
+            updateUseItem(player);
         }
+    }
+
+    private static void updateUseItem(AbstractClientPlayer player) {
+        if (player.isUsingItem()) {
+            ItemStack item = player.getItemInHand(player.getUsedItemHand());
+            LivingEntityUseAccessor accessor = (LivingEntityUseAccessor) player;
+            if (!ItemStack.isSameItem(player.getUseItem(), item)) {
+                accessor.tsf$setUseItemRemaining(item.getUseDuration(player));
+            }
+            accessor.tsf$setUseItem(item);
+        }
+    }
+
+    private static HandRenderSelection handsToRender(AbstractClientPlayer player) {
+        ItemStack main = player.getMainHandItem();
+        ItemStack off = player.getOffhandItem();
+        boolean holdsBow = main.is(Items.BOW) || off.is(Items.BOW);
+        boolean holdsCrossbow = main.is(Items.CROSSBOW) || off.is(Items.CROSSBOW);
+        if (!holdsBow && !holdsCrossbow) {
+            return HandRenderSelection.RENDER_BOTH_HANDS;
+        }
+        if (!player.isUsingItem()) {
+            return main.is(Items.CROSSBOW) && CrossbowItem.isCharged(main)
+                    ? HandRenderSelection.RENDER_MAIN_HAND_ONLY : HandRenderSelection.RENDER_BOTH_HANDS;
+        }
+        ItemStack used = player.getUseItem();
+        InteractionHand hand = player.getUsedItemHand();
+        if (used.is(Items.BOW) || used.is(Items.CROSSBOW)) {
+            return HandRenderSelection.onlyForHand(hand);
+        }
+        return hand == InteractionHand.MAIN_HAND && off.is(Items.CROSSBOW) && CrossbowItem.isCharged(off)
+                ? HandRenderSelection.RENDER_MAIN_HAND_ONLY : HandRenderSelection.RENDER_BOTH_HANDS;
     }
 
     public static void extractExperience(GuiGraphicsExtractor graphics) {
@@ -128,10 +166,9 @@ public final class ObserverView {
         ((ObserverViewAngles) player).tsf$extractViewAngles(hands, partialTick);
         hands.isScoping = player.isScoping();
         hands.useItemRemainingTicks = player.getUseItemRemainingTicks();
-        hands.handRenderSelection = player.isUsingItem() ? HandRenderSelection.onlyForHand(player.getUsedItemHand())
-                : HandRenderSelection.RENDER_BOTH_HANDS;
-        hands.mainHandItem = player.getMainHandItem().copy();
-        hands.offHandItem = player.getOffhandItem().copy();
+        hands.handRenderSelection = handsToRender(player);
+        hands.mainHandItem = player.getMainHandItem();
+        hands.offHandItem = player.getOffhandItem();
         hands.mainHandHeight = hands.oldMainHandHeight = hands.offHandHeight = hands.oldOffHandHeight = 1;
         boolean right = player.getMainArm() == HumanoidArm.RIGHT;
         hands.mainHandRenderState.clear();
