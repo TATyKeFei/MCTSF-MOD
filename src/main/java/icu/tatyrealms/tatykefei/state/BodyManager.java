@@ -867,6 +867,42 @@ public final class BodyManager {
                 .anyMatch(slot -> slot.name().startsWith("chest/necklace/") && slot.stack().is(TSFItems.ZIPPER));
     }
 
+    private boolean wearingZipper(Body body) {
+        return body != null && body.accessories.entrySet().stream().anyMatch(entry ->
+                entry.getKey().startsWith("chest/necklace/") && decodeItem(entry.getValue()).is(TSFItems.ZIPPER));
+    }
+
+    public boolean equipBodyZipper(Entity entity, ItemStack stack) {
+        Body body = bodyForEntity(entity);
+        if (body == null || !emptyBody(entity) || !stack.is(TSFItems.ZIPPER) || stack.isEmpty()
+                || !TrinketsCompat.available() || wearingZipper(body)
+                || body.accessories.containsKey("chest/necklace/0")) {
+            return false;
+        }
+        body.accessories.put("chest/necklace/0", encodeItem(stack.copyWithCount(1)));
+        stack.shrink(1);
+        changed();
+        return true;
+    }
+
+    private void enterEmptyZipper(ServerPlayer player, Body body, Vec3 destination) {
+        PlayerState state = state(player);
+        UUID returnBody = state.zipperReturnForm == null ? state.body : state.zipperReturnBody;
+        Form returnForm = state.zipperReturnForm == null ? state.form : state.zipperReturnForm;
+        if (state.form == Form.HUMAN) {
+            detach(player, Form.SPIRIT);
+        }
+        if (returnForm == Form.HUMAN) {
+            storeZipperBody(player, returnBody);
+        }
+        enter(player, body, destination);
+        state.zipperReturnBody = returnBody;
+        state.zipperReturnForm = returnForm;
+        message(player, "zipper_entered", body.name);
+        changed();
+        playAnimation(player, BodyAnimation.WEAR_SKIN);
+    }
+
     public boolean enterZipper(ServerPlayer player, ServerPlayer target) {
         if (!wearingZipper(target)) {
             return false;
@@ -1254,6 +1290,21 @@ public final class BodyManager {
                 body.skinRecoveryAt = 0;
                 giveSkin(player, body);
                 changed();
+            }
+        } else if (player.getMainHandItem().is(TSFItems.ZIPPER)) {
+            if (equipBodyZipper(entity, player.getMainHandItem())) {
+                refreshInventory(player);
+                message(player, "zipper_equipped");
+            } else {
+                message(player, "zipper_no_slot");
+            }
+        } else if (!player.isShiftKeyDown() && state(player).form == Form.HUMAN
+                && player.getMainHandItem().isEmpty() && wearingZipper(body)) {
+            Vec3 destination = safePosition(player.level(), entity.position());
+            if (destination == null) {
+                message(player, "no_space");
+            } else {
+                enterEmptyZipper(player, body, destination);
             }
         } else if (player.isShiftKeyDown()) {
             pickUpBody(player, body);

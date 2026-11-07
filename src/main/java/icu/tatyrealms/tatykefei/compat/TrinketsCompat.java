@@ -49,6 +49,10 @@ public final class TrinketsCompat {
         return equip(player, stack, "chest/tsf_skin/");
     }
 
+    public static boolean available() {
+        return componentGetter != null;
+    }
+
     public static boolean equipNecklace(ServerPlayer player, ItemStack stack) {
         return equip(player, stack, "chest/necklace/");
     }

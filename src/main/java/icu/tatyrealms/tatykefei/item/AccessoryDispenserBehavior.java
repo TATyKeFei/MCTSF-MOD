@@ -4,6 +4,7 @@ import icu.tatyrealms.tatykefei.state.BodyManager;
 import net.minecraft.core.dispenser.BlockSource;
 import net.minecraft.core.dispenser.DefaultDispenseItemBehavior;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.DispenserBlock;
 import net.minecraft.world.phys.AABB;
@@ -18,6 +19,13 @@ public final class AccessoryDispenserBehavior extends DefaultDispenseItemBehavio
                     : BodyManager.get().equipZipper(player, stack);
             if (equipped) {
                 return stack;
+            }
+        }
+        if (stack.is(TSFItems.ZIPPER)) {
+            for (var entity : source.level().getEntitiesOfClass(Entity.class, new AABB(destination), BodyManager::emptyBody)) {
+                if (BodyManager.get().equipBodyZipper(entity, stack)) {
+                    return stack;
+                }
             }
         }
         return super.execute(source, stack);
