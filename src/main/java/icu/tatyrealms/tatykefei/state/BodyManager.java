@@ -2516,7 +2516,8 @@ public final class BodyManager {
             inventory = new ObserverInventory(target.getUUID(), items, crafting, target.getInventory().getSelectedSlot(),
                     target.getHealth(), target.getAbsorptionAmount(), target.getFoodData().getFoodLevel(),
                     target.getFoodData().getSaturationLevel(), target.experienceProgress, target.experienceLevel,
-                    target.totalExperience);
+                    target.totalExperience, target.isUsingItem() ? target.getUsedItemHand() : null,
+                    target.getUseItemRemainingTicks());
         }
         String json = GSON.toJson(inventory);
         if (!json.equals(observerInventories.put(player.getUUID(), json))) {

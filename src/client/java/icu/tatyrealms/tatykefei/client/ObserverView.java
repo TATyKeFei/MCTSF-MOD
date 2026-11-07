@@ -31,6 +31,8 @@ public final class ObserverView {
     private static List<ItemStack> items = List.of();
     private static List<ItemStack> crafting = List.of();
     private static ObserverInventory snapshot;
+    private static long receivedTick;
+    private static boolean useItemPending;
     private static AbstractClientPlayer handPlayer;
     private static ObserverHands handAnimation;
 
@@ -46,6 +48,8 @@ public final class ObserverView {
         if (inventory != null && client.level != null) {
             target = inventory.target();
             snapshot = inventory;
+            receivedTick = client.level.getGameTime();
+            useItemPending = inventory.useItemHand() != null;
             var operations = client.level.registryAccess().createSerializationContext(JsonOps.INSTANCE);
             List<ItemStack> decoded = new ArrayList<>();
             for (var item : inventory.items()) {
@@ -65,6 +69,8 @@ public final class ObserverView {
         items = List.of();
         crafting = List.of();
         snapshot = null;
+        receivedTick = 0;
+        useItemPending = false;
         handPlayer = null;
         handAnimation = null;
     }
@@ -107,8 +113,13 @@ public final class ObserverView {
         if (player != null) {
             for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
                 ItemStack item = item(slot);
-                if (!ItemStack.matches(player.getInventory().getItem(slot), item)) {
-                    player.getInventory().setItem(slot, item.copy());
+                ItemStack current = player.getInventory().getItem(slot);
+                if (!ItemStack.matches(current, item)) {
+                    if (ItemStack.isSameItemSameComponents(current, item)) {
+                        current.setCount(item.getCount());
+                    } else {
+                        player.getInventory().setItem(slot, item.copy());
+                    }
                 }
             }
             player.getInventory().setSelectedSlot(snapshot.selectedSlot());
@@ -130,7 +141,11 @@ public final class ObserverView {
         if (player.isUsingItem()) {
             ItemStack item = player.getItemInHand(player.getUsedItemHand());
             LivingEntityUseAccessor accessor = (LivingEntityUseAccessor) player;
-            if (!ItemStack.isSameItem(player.getUseItem(), item)) {
+            if (useItemPending && snapshot.useItemHand() == player.getUsedItemHand()) {
+                long elapsed = Math.max(0, player.level().getGameTime() - receivedTick);
+                accessor.tsf$setUseItemRemaining((int) Math.max(0, snapshot.useItemRemainingTicks() - elapsed));
+                useItemPending = false;
+            } else if (!ItemStack.isSameItem(player.getUseItem(), item)) {
                 accessor.tsf$setUseItemRemaining(item.getUseDuration(player));
             }
             accessor.tsf$setUseItem(item);

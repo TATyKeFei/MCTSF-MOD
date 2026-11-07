@@ -48,6 +48,8 @@
 ./gradlew runClient` 或 `./gradlew runServer
 ```
 
+多人游戏请同时更新客户端和服务端的 TSF，以同步旁观时的物品栏与连续使用物品的动画进度。
+
 # 服务端设置
 
 首次启动世界或服务端时生成 `config/tsf-server.json`; 修改后`/tsf config reload` 重载
