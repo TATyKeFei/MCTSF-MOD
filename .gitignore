@@ -1,5 +1,7 @@
 .gradle/
 build/
+gradle/
+docs/
 run/
 out/
 *.iml
