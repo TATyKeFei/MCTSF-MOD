@@ -11,6 +11,7 @@ import icu.tatyrealms.tatykefei.compat.NeedsOfNatureHypnosis;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureTanks;
 import icu.tatyrealms.tatykefei.item.TSFItems;
 import net.minecraft.world.item.Items;
+import net.minecraft.core.particles.ParticleTypes;
 import icu.tatyrealms.tatykefei.item.ProtectionTotems;
 import icu.tatyrealms.tatykefei.mixin.MannequinAccessor;
 import icu.tatyrealms.tatykefei.network.Action;
@@ -2352,6 +2353,10 @@ public final class BodyManager {
                             state.anchorYaw, state.anchorPitch, false);
                 }
                 NeedsOfNatureHypnosis.acceptPending(player);
+                if (ticks % 40 == 0 && hasActiveHypnosis(player)) {
+                    player.level().sendParticles(ParticleTypes.HEART, player.getX(), player.getY() + player.getBbHeight() + 0.2,
+                            player.getZ(), 3, 0.2, 0.15, 0.2, 0.02);
+                }
             }
             if (state.form == Form.SPIRIT) {
                 player.noPhysics = false;
