@@ -675,23 +675,24 @@ public final class BodyManager {
         return true;
     }
 
-    public void equipZipper(ServerPlayer player, ItemStack stack) {
+    public boolean equipZipper(ServerPlayer player, ItemStack stack) {
         if (!stack.is(TSFItems.ZIPPER) || stack.isEmpty() || hypnotized(player)
                 || player.isSpectator() || state(player).form != Form.HUMAN) {
             message(player, "zipper_human_only");
-            return;
+            return false;
         }
         if (!NeedsOfNatureCompat.canChangeBody(player)) {
-            return;
+            return false;
         }
         if (!TrinketsCompat.equipNecklace(player, stack)) {
             message(player, "zipper_no_slot");
-            return;
+            return false;
         }
         stack.shrink(1);
         refreshInventory(player);
         message(player, "zipper_equipped");
         changed();
+        return true;
     }
 
     public boolean wearingZipper(ServerPlayer player) {
@@ -1648,13 +1649,13 @@ public final class BodyManager {
         changed();
     }
 
-    public void wearSkin(ServerPlayer player, ItemStack stack) {
+    public boolean wearSkin(ServerPlayer player, ItemStack stack) {
         if (!ready(player) || !canWearSkin(player, stack)) {
-            return;
+            return false;
         }
         Body body = store.bodies.get(state(player).body);
         if (body == null) {
-            return;
+            return false;
         }
         if (!TrinketsCompat.equipSkin(player, stack)) {
             body.skinLayers.add(encodeItem(stack.copyWithCount(1)));
@@ -1663,6 +1664,7 @@ public final class BodyManager {
         refreshInventory(player);
         message(player, "skin_worn");
         changed();
+        return true;
     }
 
     public void unfoldSkin(ServerPlayer player, ItemStack stack) {

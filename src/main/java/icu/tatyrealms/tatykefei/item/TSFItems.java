@@ -115,6 +115,8 @@ public final class TSFItems {
                 SOUL_PROJECTION_ARROW, PERSONALITY_EXPULSION_ARROW)) {
             DispenserBlock.registerProjectileBehavior(item);
         }
+        DispenserBlock.registerBehavior(SKIN_SUIT, new AccessoryDispenserBehavior());
+        DispenserBlock.registerBehavior(ZIPPER, new AccessoryDispenserBehavior());
     }
 
     private static Item.Properties potionProperties(Item.Properties properties, boolean expulsion) {
