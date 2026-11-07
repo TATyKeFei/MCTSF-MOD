@@ -18,7 +18,8 @@
 
 | MOD              | 用途                                 | 依赖性 | 版本    |
 | :---             | :---                                 | :---   | :---    |
-| Minecraft        | 游戏本体                             | 必须   | 26.3    |
+| Minecraft Java   | 游戏本体                             | 必须   | 26.3    |
+| Java             | 游戏编程语言运行环境                 | 必须   | JDK 25+ |
 | Fabric Loader    | 模组加载器                           | 必须   | 0.20.1  |
 | Fabric api       | 加载、开发模组                       | 必须   | 0.20.1  |
 | Trinkets Updated | 添加饰品栏装备饰品，皮物和拉链等需要 | 可选 (推荐)  | 4.2.1+26.3 +         |
@@ -35,6 +36,12 @@
 | :---                  | :---     |
 | YesSteveModel/OpenYSM | 由于YSM模组自身争议版权原因，加上一些模型作者可能会对自己的模型被拿来做这种事反感导致冲突，因此不会兼容（同时也建议大家避免冲突请用自己画的/公共皮肤玩） |
 
+# 下载与安装
+
+你可在 [Releases](https://github.com/TATyKeFei/MCTSF-MOD/releases) 找到最新发布的稳定版本；如想体验开发中的功能，可在 [Action](https://github.com/TATyKeFei/MCTSF-MOD/actions) 中找到 Github 自动编译的最新版构建，不带-source名称的.jar模组就是
+
+将模组jar本体拖进 客户端/服务端 根目录`./mods/`文件夹；需要客户端和服务端都安装模组才生效
+
 # 构建
 
 需要 Java 25、Fabric Loader 0.20.1 或更新版本，以及适用于 26.3 的 Fabric API。开发使用 Fabric API `0.165.2+26.3`
@@ -47,8 +54,6 @@
 # 开发启动
 ./gradlew runClient` 或 `./gradlew runServer
 ```
-
-多人游戏请同时更新客户端和服务端的 TSF，以同步旁观时的物品栏与连续使用物品的动画进度。
 
 # 服务端设置
 
