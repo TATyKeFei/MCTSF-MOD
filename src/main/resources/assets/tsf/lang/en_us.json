@@ -1,4 +1,10 @@
 {
+  "item.tsf.bottled_slime": "Bottled Personality Slime",
+  "item.tsf.named_bottled_slime": "%s's Personality Slime",
+  "message.tsf.slime_captured": "Captured %s in a bottle. Use the bottle to release them.",
+  "message.tsf.slime_bottled": "You are inside a bottle, waiting to be released.",
+  "message.tsf.slime_released": "You left the bottle as a personality slime.",
+  "message.tsf.invalid_slime_bottle": "This bottle is invalid or you cannot release its slime in your current form.",
   "screen.tsf.control_speech": "Speak as the hypnotized player",
   "screen.tsf.send_speech": "Send",
   "screen.tsf.hypnotizing": "Hypnotizing %s",

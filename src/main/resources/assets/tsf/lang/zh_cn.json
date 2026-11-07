@@ -1,4 +1,10 @@
 {
+  "item.tsf.bottled_slime": "瓶装人格史莱姆",
+  "item.tsf.named_bottled_slime": "%s 的人格史莱姆",
+  "message.tsf.slime_captured": "已将 %s 的人格史莱姆装入瓶中，手持瓶子右键可释放",
+  "message.tsf.slime_bottled": "你被装进了瓶子，等待持有者释放",
+  "message.tsf.slime_released": "你已离开瓶子，恢复人格史莱姆形态",
+  "message.tsf.invalid_slime_bottle": "瓶子已经失效，或当前状态无法释放史莱姆",
   "screen.tsf.control_speech": "控制对方发言",
   "screen.tsf.send_speech": "发送",
   "screen.tsf.hypnotizing": "正在催眠 %s",

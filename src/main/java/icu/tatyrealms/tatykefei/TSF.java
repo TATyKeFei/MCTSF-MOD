@@ -123,6 +123,13 @@ public final class TSF implements ModInitializer {
                 return InteractionResult.SUCCESS;
             }
             if (entity instanceof Player target && BodyManager.form(target) == Form.SLIME
+                    && player.getItemInHand(hand).is(net.minecraft.world.item.Items.GLASS_BOTTLE)) {
+                if (player instanceof ServerPlayer serverPlayer && target instanceof ServerPlayer targetPlayer) {
+                    BodyManager.get().bottleSlime(serverPlayer, targetPlayer, hand);
+                }
+                return InteractionResult.SUCCESS;
+            }
+            if (entity instanceof Player target && BodyManager.form(target) == Form.SLIME
                     && player.getItemInHand(hand).has(net.minecraft.core.component.DataComponents.DYE)) {
                 if (player instanceof ServerPlayer serverPlayer && target instanceof ServerPlayer targetPlayer) {
                     BodyManager.get().dyeSlime(serverPlayer, targetPlayer, player.getItemInHand(hand));

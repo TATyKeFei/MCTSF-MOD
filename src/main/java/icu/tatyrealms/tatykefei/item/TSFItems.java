@@ -56,6 +56,7 @@ public final class TSFItems {
     public static final Item SOUL_PROJECTION_ARROW = register("soul_projection_arrow", properties -> new ArrowItem(potionProperties(properties.stacksTo(64), false).component(DataComponents.POTION_DURATION_SCALE, 0.125F)));
     public static final Item PERSONALITY_EXPULSION_ARROW = register("personality_expulsion_arrow", properties -> new ArrowItem(potionProperties(properties.stacksTo(64), true).component(DataComponents.POTION_DURATION_SCALE, 0.125F)));
     public static final Item ZIPPER = register("zipper", ZipperItem::new);
+    public static final Item BOTTLED_SLIME = register("bottled_slime", BottledSlimeItem::new);
 
     private TSFItems() {
     }

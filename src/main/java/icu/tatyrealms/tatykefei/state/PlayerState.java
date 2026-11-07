@@ -6,6 +6,11 @@ public final class PlayerState {
     public Form form = Form.HUMAN;
     public boolean normalRespawn;
     public Integer slimeColor;
+    public UUID slimeBottleToken;
+    public String slimeBottleDimension;
+    public double slimeBottleX;
+    public double slimeBottleY;
+    public double slimeBottleZ;
     public UUID body;
     public UUID homeBody;
     public UUID observedBody;

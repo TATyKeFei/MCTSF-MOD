@@ -10,6 +10,7 @@ import icu.tatyrealms.tatykefei.compat.NeedsOfNatureCompat;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureHypnosis;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureTanks;
 import icu.tatyrealms.tatykefei.item.TSFItems;
+import net.minecraft.world.item.Items;
 import icu.tatyrealms.tatykefei.item.ProtectionTotems;
 import icu.tatyrealms.tatykefei.mixin.MannequinAccessor;
 import icu.tatyrealms.tatykefei.network.Action;
@@ -91,6 +92,7 @@ public final class BodyManager {
     private final StateStore store;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
     private final Map<UUID, HypnosisSession> hypnosisSessions = new HashMap<>();
+    private final Map<UUID, ItemEntity> slimeBottleDrops = new HashMap<>();
     private final Map<UUID, List<UUID>> lastSkinLayers = new HashMap<>();
     private final Set<UUID> pendingProjections = new HashSet<>();
     private final Map<UUID, ItemEntity> skinDrops = new HashMap<>();
@@ -186,6 +188,9 @@ public final class BodyManager {
     public void joined(ServerPlayer player) {
         PlayerState state = state(player);
         nativeBody(player);
+        if (state.slimeBottleToken == null && state.slimeBottleDimension != null) {
+            finishSlimeRelease(player);
+        }
         if (state.form == Form.HUMAN) {
             Body body = store.bodies.get(state.body);
             if (body == null || !player.getUUID().equals(body.occupant)) {
@@ -319,6 +324,10 @@ public final class BodyManager {
 
     public void handle(ServerPlayer player, ActionPayload payload) {
         if (!player.isAlive()) {
+            return;
+        }
+        if (state(player).slimeBottleToken != null) {
+            message(player, "slime_bottled");
             return;
         }
         if (payload.action() == Action.OPEN) {
@@ -673,6 +682,163 @@ public final class BodyManager {
             changed();
         }
         return true;
+    }
+
+    public boolean bottleSlime(ServerPlayer actor, ServerPlayer target, InteractionHand hand) {
+        ItemStack empty = actor.getItemInHand(hand);
+        if (!empty.is(Items.GLASS_BOTTLE) || actor.isSpectator() || !actor.isAlive() || hypnotized(actor)
+                || state(actor).form != Form.HUMAN && state(actor).form != Form.SLIME
+                || !near(actor, target, 5) || state(target).form != Form.SLIME || !ready(actor)
+                || !NeedsOfNatureCompat.canChangeBody(target)) {
+            return false;
+        }
+        PlayerState captive = state(target);
+        captive.slimeBottleToken = UUID.randomUUID();
+        locateSlimeBottle(captive, actor);
+        ItemStack bottle = new ItemStack(TSFItems.BOTTLED_SLIME);
+        CompoundTag data = new CompoundTag();
+        data.putString("tsf_slime", target.getUUID().toString());
+        data.putString("tsf_slime_token", captive.slimeBottleToken.toString());
+        bottle.set(DataComponents.CUSTOM_DATA, CustomData.of(data));
+        bottle.set(DataComponents.CUSTOM_NAME, Component.translatable("item.tsf.named_bottled_slime", target.getGameProfile().name()));
+        bottle.set(DataComponents.POTION_CONTENTS, new net.minecraft.world.item.alchemy.PotionContents(
+                java.util.Optional.empty(), java.util.Optional.of(captive.slimeColor == null ? 0x76C853 : captive.slimeColor),
+                List.of(), java.util.Optional.empty()));
+        empty.shrink(1);
+        if (empty.isEmpty()) {
+            actor.setItemInHand(hand, bottle);
+        } else if (!actor.getInventory().add(bottle)) {
+            actor.drop(bottle, false, Prediction.SERVER_ONLY);
+        }
+        target.closeContainer();
+        target.stopUsingItem();
+        target.stopRiding();
+        captive.form = Form.OBSERVER;
+        captive.observedBody = null;
+        captive.observerFallback = null;
+        clearHypnosis(target);
+        applyForm(target);
+        updateSlimeBottleObserver(target);
+        refreshInventory(actor);
+        message(actor, "slime_captured", target.getGameProfile().name());
+        message(target, "slime_bottled");
+        changed();
+        return true;
+    }
+
+    private PlayerState bottledSlime(ItemStack stack) {
+        if (!stack.is(TSFItems.BOTTLED_SLIME) || stack.isEmpty()) {
+            return null;
+        }
+        CompoundTag data = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        try {
+            PlayerState captive = store.players.get(UUID.fromString(data.getStringOr("tsf_slime", "")));
+            return captive != null && captive.slimeBottleToken != null
+                    && captive.slimeBottleToken.toString().equals(data.getStringOr("tsf_slime_token", "")) ? captive : null;
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+    }
+
+    public boolean releaseSlimeBottle(ServerPlayer actor, InteractionHand hand, Vec3 origin) {
+        ItemStack stack = actor.getItemInHand(hand);
+        PlayerState captive = bottledSlime(stack);
+        if (actor.isSpectator() || !actor.isAlive() || hypnotized(actor) || state(actor).form == Form.SPIRIT
+                || captive == null || actor.distanceToSqr(origin) > 36) {
+            message(actor, "invalid_slime_bottle");
+            return false;
+        }
+        Vec3 destination = safePosition(actor.level(), origin);
+        if (destination == null || !actor.level().mayInteract(actor, BlockPos.containing(destination))) {
+            message(actor, "no_space");
+            return false;
+        }
+        releaseSlime(captive, actor.level(), destination);
+        stack.shrink(1);
+        ItemStack empty = new ItemStack(Items.GLASS_BOTTLE);
+        if (stack.isEmpty()) {
+            actor.setItemInHand(hand, empty);
+        } else if (!actor.getInventory().add(empty)) {
+            actor.drop(empty, false, Prediction.SERVER_ONLY);
+        }
+        refreshInventory(actor);
+        changed();
+        return true;
+    }
+
+    public void breakSlimeBottle(ItemEntity item) {
+        PlayerState captive = bottledSlime(item.getItem());
+        if (captive != null) {
+            Vec3 destination = safePosition((ServerLevel) item.level(), item.position());
+            releaseSlime(captive, (ServerLevel) item.level(), destination == null ? item.position() : destination);
+            changed();
+        }
+    }
+
+    private void releaseSlime(PlayerState captive, ServerLevel level, Vec3 destination) {
+        slimeBottleDrops.remove(captive.slimeBottleToken);
+        captive.slimeBottleToken = null;
+        captive.form = Form.SLIME;
+        captive.slimeBottleDimension = level.dimension().identifier().toString();
+        captive.slimeBottleX = destination.x;
+        captive.slimeBottleY = destination.y;
+        captive.slimeBottleZ = destination.z;
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (state(player) == captive) {
+                finishSlimeRelease(player);
+                break;
+            }
+        }
+    }
+
+    private void finishSlimeRelease(ServerPlayer player) {
+        PlayerState captive = state(player);
+        player.setCamera(player);
+        player.setGameMode(GameType.byName(captive.savedGameMode, GameType.SURVIVAL));
+        restoreAbilities(player, captive);
+        captive.form = Form.SLIME;
+        applyForm(player);
+        player.teleportTo(level(captive.slimeBottleDimension), captive.slimeBottleX, captive.slimeBottleY,
+                captive.slimeBottleZ, Set.of(), player.getYRot(), player.getXRot(), false);
+        captive.slimeBottleDimension = null;
+        message(player, "slime_released");
+    }
+
+    private void locateSlimeBottle(PlayerState captive, Entity location) {
+        captive.slimeBottleDimension = location.level().dimension().identifier().toString();
+        captive.slimeBottleX = location.getX();
+        captive.slimeBottleY = location.getY();
+        captive.slimeBottleZ = location.getZ();
+    }
+
+    private void updateSlimeBottleObserver(ServerPlayer player) {
+        PlayerState captive = state(player);
+        Entity camera = null;
+        for (ServerPlayer carrier : server.getPlayerList().getPlayers()) {
+            if (carrier != player && !carrier.isSpectator()
+                    && carrier.getInventory().contains(stack -> bottledSlime(stack) == captive)) {
+                camera = carrier;
+                break;
+            }
+        }
+        ItemEntity drop = slimeBottleDrops.get(captive.slimeBottleToken);
+        if (camera == null && drop != null && !drop.isRemoved() && bottledSlime(drop.getItem()) == captive) {
+            camera = drop;
+        }
+        if (camera != null) {
+            locateSlimeBottle(captive, camera);
+        }
+        ServerLevel destination = level(captive.slimeBottleDimension);
+        if (player.level() != destination || camera == null
+                && player.distanceToSqr(captive.slimeBottleX, captive.slimeBottleY, captive.slimeBottleZ) > 1) {
+            player.setCamera(player);
+            player.teleportTo(destination, captive.slimeBottleX, captive.slimeBottleY, captive.slimeBottleZ,
+                    Set.of(), player.getYRot(), player.getXRot(), false);
+        }
+        Entity view = camera == null ? player : camera;
+        if (player.getCamera() != view) {
+            player.setCamera(view);
+        }
     }
 
     public boolean equipZipper(ServerPlayer player, ItemStack stack) {
@@ -1399,7 +1565,7 @@ public final class BodyManager {
     }
 
     public void returnToBody(ServerPlayer player) {
-        if (hypnotized(player) || !NeedsOfNatureCompat.canChangeBody(player)) {
+        if (state(player).slimeBottleToken != null || hypnotized(player) || !NeedsOfNatureCompat.canChangeBody(player)) {
             return;
         }
         if (state(player).spiritHost != null) {
@@ -1807,6 +1973,10 @@ public final class BodyManager {
         if (state.form != Form.OBSERVER) {
             return false;
         }
+        if (state.slimeBottleToken != null) {
+            updateSlimeBottleObserver(player);
+            return false;
+        }
         Body body = store.bodies.get(state.observedBody);
         if (state.spiritHost == null && body != null && !body.skinned && body.packedToken == null && body.occupant == null
                 && body.zipperCarrier == null) {
@@ -1983,6 +2153,11 @@ public final class BodyManager {
 
     public void entityLoaded(Entity entity) {
         if (entity instanceof ItemEntity item) {
+            PlayerState captive = bottledSlime(item.getItem());
+            if (captive != null) {
+                item.setUnlimitedLifetime();
+                slimeBottleDrops.put(captive.slimeBottleToken, item);
+            }
             if (item.getItem().is(TSFItems.SKIN_SUIT) || item.getItem().is(TSFItems.EMPTY_BODY)) {
                 item.setCustomName(item.getItem().get(DataComponents.CUSTOM_NAME));
                 item.setCustomNameVisible(false);
@@ -2092,6 +2267,10 @@ public final class BodyManager {
     }
 
     public void recover(ServerPlayer player) {
+        PlayerState captive = state(player);
+        if (captive.slimeBottleToken != null) {
+            releaseSlime(captive, player.level(), player.position());
+        }
         clearHypnosis(player);
         Body body = nativeBody(player);
         UUID controller = body.occupant == null ? body.zipperCarrier : body.occupant;
