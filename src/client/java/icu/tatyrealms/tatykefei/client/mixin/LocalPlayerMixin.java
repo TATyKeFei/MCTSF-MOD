@@ -16,9 +16,16 @@ public abstract class LocalPlayerMixin {
     private void tsf$spiritFlight(CallbackInfo callback) {
         LocalPlayer player = (LocalPlayer) (Object) this;
         if (BodyManager.form(player) == Form.SPIRIT) {
-            player.noPhysics = true;
+            player.noPhysics = false;
             player.setOnGround(false);
             player.getAbilities().flying = player.getAbilities().mayfly;
+        }
+    }
+
+    @Inject(method = "moveTowardsClosestSpace", at = @At("HEAD"), cancellable = true)
+    private void tsf$spiritCanOverlapPartialBlocks(double horizontal, double depth, CallbackInfo callback) {
+        if (BodyManager.form((LocalPlayer) (Object) this) == Form.SPIRIT) {
+            callback.cancel();
         }
     }
 

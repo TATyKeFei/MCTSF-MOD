@@ -105,7 +105,7 @@ public final class TSFClient implements ClientModInitializer {
                 }
             }
             if (client.player != null && BodyManager.form(client.player) == Form.SPIRIT) {
-                client.player.noPhysics = true;
+                client.player.noPhysics = false;
             }
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {

@@ -2,7 +2,9 @@ package icu.tatyrealms.tatykefei.mixin;
 
 import icu.tatyrealms.tatykefei.state.EmptyBodyHolder;
 import icu.tatyrealms.tatykefei.state.BodyManager;
+import icu.tatyrealms.tatykefei.state.Form;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Pose;
@@ -31,6 +33,11 @@ public abstract class LivingEntityMixin {
     @Inject(method = "push(Lnet/minecraft/world/entity/Entity;)V", at = @At("HEAD"), cancellable = true)
     private void tsf$noBodyPush(Entity entity, CallbackInfo callback) {
         Entity self = (Entity) (Object) this;
+        if (self instanceof Player player && BodyManager.form(player) == Form.SPIRIT
+                || entity instanceof Player other && BodyManager.form(other) == Form.SPIRIT) {
+            callback.cancel();
+            return;
+        }
         if (BodyManager.emptyBody(self) || BodyManager.emptyBody(entity)) {
             Entity body = BodyManager.emptyBody(self) ? self : entity;
             Entity source = body == self ? entity : self;

@@ -900,7 +900,7 @@ public final class BodyManager {
             player.getAbilities().flying = true;
             player.getAbilities().invulnerable = true;
             player.setNoGravity(true);
-            player.noPhysics = true;
+            player.noPhysics = false;
             player.onUpdateAbilities();
         }
         updateSpiritSpears(player);
@@ -2175,7 +2175,7 @@ public final class BodyManager {
                 NeedsOfNatureHypnosis.acceptPending(player);
             }
             if (state.form == Form.SPIRIT) {
-                player.noPhysics = true;
+                player.noPhysics = false;
                 player.fallDistance = 0;
                 if (!player.getAbilities().flying || !player.getAbilities().mayfly) {
                     applyForm(player);

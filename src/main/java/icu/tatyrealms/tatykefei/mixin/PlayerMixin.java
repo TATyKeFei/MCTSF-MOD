@@ -79,7 +79,7 @@ public abstract class PlayerMixin implements FormHolder {
     private void tsf$spiritPhysics(CallbackInfo callback) {
         if (tsf$getForm() == Form.SPIRIT) {
             Player player = (Player) (Object) this;
-            player.noPhysics = true;
+            player.noPhysics = false;
             player.setOnGround(false);
         }
     }
@@ -101,7 +101,7 @@ public abstract class PlayerMixin implements FormHolder {
             player.refreshDimensions();
         }
         if (tsf$getForm() == Form.SPIRIT) {
-            player.noPhysics = true;
+            player.noPhysics = false;
             player.fallDistance = 0;
         }
     }
