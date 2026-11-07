@@ -9,16 +9,27 @@ import java.util.Arrays;
 import java.util.UUID;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.player.AbstractClientPlayer;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.PlayerModelType;
 
 public final class NeedsOfNatureClientCompat {
+    private static Constructor<?> roleSelection;
     private NeedsOfNatureClientCompat() {
     }
 
     public static void initialize() {
         if (!FabricLoader.getInstance().isModLoaded("needsofnature")) {
             return;
+        }
+        try {
+            Class<?> selection = Class.forName("com.nonid.client.NonPlayerInteractionClient$AnimationSelectionScreen");
+            Class<?> group = Class.forName("com.nonid.client.NonPlayerInteractionClient$CandidateGroup");
+            roleSelection = Class.forName("com.nonid.client.NonPlayerInteractionClient$RoleSelectionScreen")
+                    .getDeclaredConstructor(selection, UUID.class, group);
+            roleSelection.setAccessible(true);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            NeedsOfNatureCompat.warn(exception);
         }
         try {
             Method animation = Class.forName("com.nonid.internal.animation.client.runtime.ClientAnimationRuntime")
@@ -46,6 +57,19 @@ public final class NeedsOfNatureClientCompat {
                     });
         } catch (ReflectiveOperationException | LinkageError exception) {
             NeedsOfNatureCompat.warn(exception);
+        }
+    }
+
+    public static Screen roleSelection(Screen parent, UUID request, Object group) {
+        if (roleSelection == null) {
+            return null;
+        }
+        try {
+            return (Screen) roleSelection.newInstance(parent, request, group);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            roleSelection = null;
+            NeedsOfNatureCompat.warn(exception);
+            return null;
         }
     }
 }
