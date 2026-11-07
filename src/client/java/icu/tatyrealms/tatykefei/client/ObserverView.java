@@ -31,14 +31,18 @@ public final class ObserverView {
     private static List<ItemStack> items = List.of();
     private static List<ItemStack> crafting = List.of();
     private static ObserverInventory snapshot;
+    private static AbstractClientPlayer handPlayer;
+    private static ObserverHands handAnimation;
 
     private ObserverView() {
     }
 
     public static void receive(String json) {
         ObserverInventory inventory = GSON.fromJson(json, ObserverInventory.class);
-        clear();
         Minecraft client = Minecraft.getInstance();
+        if (inventory == null || !inventory.target().equals(target) || client.level == null) {
+            clear();
+        }
         if (inventory != null && client.level != null) {
             target = inventory.target();
             snapshot = inventory;
@@ -61,6 +65,8 @@ public final class ObserverView {
         items = List.of();
         crafting = List.of();
         snapshot = null;
+        handPlayer = null;
+        handAnimation = null;
     }
 
     public static AbstractClientPlayer target() {
@@ -75,6 +81,25 @@ public final class ObserverView {
 
     public static ItemStack item(int slot) {
         return slot >= 0 && slot < items.size() ? items.get(slot) : ItemStack.EMPTY;
+    }
+
+    public static void tick() {
+        updateInventory();
+        AbstractClientPlayer player = target();
+        if (player == null) {
+            handPlayer = null;
+            handAnimation = null;
+        } else {
+            hands(player).tick(player);
+        }
+    }
+
+    private static ObserverHands hands(AbstractClientPlayer player) {
+        if (handPlayer != player) {
+            handPlayer = player;
+            handAnimation = new ObserverHands(player);
+        }
+        return handAnimation;
     }
 
     public static void updateInventory() {
@@ -167,9 +192,7 @@ public final class ObserverView {
         hands.isScoping = player.isScoping();
         hands.useItemRemainingTicks = player.getUseItemRemainingTicks();
         hands.handRenderSelection = handsToRender(player);
-        hands.mainHandItem = player.getMainHandItem();
-        hands.offHandItem = player.getOffhandItem();
-        hands.mainHandHeight = hands.oldMainHandHeight = hands.offHandHeight = hands.oldOffHandHeight = 1;
+        hands(player).extract(hands);
         boolean right = player.getMainArm() == HumanoidArm.RIGHT;
         hands.mainHandRenderState.clear();
         hands.offHandRenderState.clear();
@@ -181,7 +204,8 @@ public final class ObserverView {
         hands.offHandUseDuration = hands.offHandItem.getUseDuration(player);
         hands.mainHandChargeDuration = CrossbowItem.getChargeDuration(hands.mainHandItem, player);
         hands.offHandChargeDuration = CrossbowItem.getChargeDuration(hands.offHandItem, player);
-        hands.mainHandSwapScale = hands.offHandSwapScale = 1;
+        hands.mainHandSwapScale = client.getItemModelResolver().swapAnimationScale(hands.mainHandItem);
+        hands.offHandSwapScale = client.getItemModelResolver().swapAnimationScale(hands.offHandItem);
         hands.hasMainHandMapData = hands.hasOffHandMapData = false;
     }
 }

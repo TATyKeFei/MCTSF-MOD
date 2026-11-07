@@ -83,7 +83,7 @@ public final class TSFClient implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             BodyAnimations.tick(client);
             HypnosisProgress.tick(client);
-            ObserverView.updateInventory();
+            ObserverView.tick();
             if (client.level != null) {
                 for (var player : client.level.players()) {
                     if (BodyManager.form(player) == Form.SLIME) {
