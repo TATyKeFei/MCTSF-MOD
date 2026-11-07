@@ -125,8 +125,7 @@ public final class ObserverView {
         state.avatarRenderState = (AvatarRenderState) client.getEntityRenderDispatcher().extractEntity(player, partialTick);
         var hands = state.firstPersonHandsAndItems;
         hands.attackHand = player.getCurrentSwing() == null ? InteractionHand.MAIN_HAND : player.getCurrentSwing().hand();
-        hands.viewXRot = hands.xBob = player.getViewXRot(partialTick);
-        hands.viewYRot = hands.yBob = player.getViewYRot(partialTick);
+        ((ObserverViewAngles) player).tsf$extractViewAngles(hands, partialTick);
         hands.isScoping = player.isScoping();
         hands.useItemRemainingTicks = player.getUseItemRemainingTicks();
         hands.handRenderSelection = player.isUsingItem() ? HandRenderSelection.onlyForHand(player.getUsedItemHand())
