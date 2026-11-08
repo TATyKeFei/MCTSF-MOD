@@ -1727,7 +1727,7 @@ public final class BodyManager {
         if (body == null || body.occupant != null || body.skinned || state(player).form != Form.HUMAN) {
             return;
         }
-        if (!skinRules(player, body.skinnableHypnotized, body.skinnableDowned)) {
+        if (!skinKnifeEnabled(player)) {
             return;
         }
         if (protectBody(player, body, ProtectionTotems.Kind.SKIN)) {
@@ -1793,9 +1793,10 @@ public final class BodyManager {
 
     private boolean skinRules(ServerPlayer player, boolean hypnotized, boolean downed) {
         TSFServerConfig config = TSFServerConfig.get();
-        if (!config.skinKnifeEnabled) {
-            message(player, "skin_knife_disabled");
-        } else if (config.skinKnifeRequiresHypnosis && !hypnotized) {
+        if (!skinKnifeEnabled(player)) {
+            return false;
+        }
+        if (config.skinKnifeRequiresHypnosis && !hypnotized) {
             message(player, "skin_requires_hypnosis");
         } else if (config.skinKnifeRequiresDowned && !NeedsOfNatureCompat.supportsDowned()) {
             message(player, "skin_requires_non");
@@ -1805,6 +1806,14 @@ public final class BodyManager {
             return true;
         }
         return false;
+    }
+
+    private boolean skinKnifeEnabled(ServerPlayer player) {
+        if (!TSFServerConfig.get().skinKnifeEnabled) {
+            message(player, "skin_knife_disabled");
+            return false;
+        }
+        return true;
     }
 
     private Body skinBody(ItemStack stack) {

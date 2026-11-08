@@ -143,7 +143,7 @@
   "message.tsf.expulsion_scheduled": "Personality Expulsion Potion consumed. Your personality will be expelled in %s seconds.",
   "message.tsf.config_reloaded": "TSF server settings reloaded.",
   "message.tsf.skin_knife_disabled": "Skinning with the Skin Knife is disabled on this server.",
-  "message.tsf.skin_requires_hypnosis": "The target must be hypnotized first. Empty bodies must have been left while hypnotized.",
+  "message.tsf.skin_requires_hypnosis": "Living targets must be hypnotized first. Empty bodies can be skinned directly.",
   "message.tsf.skin_requires_non": "This server requires a compatible NeedsOfNature installation for the downed skinning rule.",
   "message.tsf.skin_requires_downed": "The target must currently be in a NeedsOfNature defeated animation before skinning.",
   "message.tsf.skin_placed": "Placed %s's folded skin. Right-click to collect, attack to drop it, or use a Skin Knife to restore the body.",

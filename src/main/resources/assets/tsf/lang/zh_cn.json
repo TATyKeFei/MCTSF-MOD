@@ -143,7 +143,7 @@
   "message.tsf.expulsion_scheduled": "已饮用人格排泄药水，%s 秒后排出人格。",
   "message.tsf.config_reloaded": "TSF 服务端设置已重载。",
   "message.tsf.skin_knife_disabled": "服务端已关闭皮刀皮化功能。",
-  "message.tsf.skin_requires_hypnosis": "服务端要求目标被催眠后才能皮化；空肉体须在催眠状态下离体。",
+  "message.tsf.skin_requires_hypnosis": "服务端要求活人目标被催眠后才能皮化；空肉体可直接皮化。",
   "message.tsf.skin_requires_non": "服务端已启用倒地皮化规则，需要安装兼容的自然之需。",
   "message.tsf.skin_requires_downed": "目标必须正处于自然之需的倒地（defeated）动画中，才能皮化。",
   "message.tsf.skin_placed": "已放下 %s 的折叠皮物。右键拾起，攻击变成掉落物，皮刀右键复原肉体。",
