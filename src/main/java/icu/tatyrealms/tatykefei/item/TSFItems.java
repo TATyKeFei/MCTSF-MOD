@@ -175,7 +175,8 @@ public final class TSFItems {
 
     private static final class BodyRegenerationTotemItem extends Item {
         private BodyRegenerationTotemItem(Properties properties) {
-            super(properties);
+            super(properties.component(DataComponents.LORE, new ItemLore(List.of(
+                    Component.translatable("tooltip.tsf.body_regeneration_totem")))));
         }
 
         @Override

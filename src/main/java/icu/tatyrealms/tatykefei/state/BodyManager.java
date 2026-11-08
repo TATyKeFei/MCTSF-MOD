@@ -1563,20 +1563,28 @@ public final class BodyManager {
     }
 
     public void regenerateBody(ServerPlayer player, ItemStack totem) {
+        regenerateBody(player, player, totem);
+    }
+
+    public void regenerateBody(ServerPlayer actor, ServerPlayer player, ItemStack totem) {
+        if (actor != player && (!near(actor, player, 5) || !actor.isAlive() || actor.isSpectator()
+                || hypnotized(actor) || state(actor).form == Form.SPIRIT || state(actor).form == Form.OBSERVER)) {
+            return;
+        }
         if (!NeedsOfNatureCompat.canChangeBody(player)) {
             return;
         }
         if (!totem.is(TSFItems.BODY_REGENERATION_TOTEM) || totem.isEmpty() || !player.isAlive()
                 || hypnotized(player) || player.isSpectator() || state(player).form != Form.SLIME) {
-            message(player, "regeneration_slime_only");
+            message(actor, "regeneration_slime_only");
             return;
         }
-        if (!ready(player)) {
+        if (!ready(actor)) {
             return;
         }
         Vec3 destination = safePosition(player.level(), player.position());
         if (destination == null) {
-            message(player, "no_space");
+            message(actor, "no_space");
             return;
         }
         Body body = new Body();
@@ -1591,6 +1599,10 @@ public final class BodyManager {
         totem.shrink(1);
         enter(player, body, destination);
         message(player, "body_regenerated");
+        if (actor != player) {
+            refreshInventory(actor);
+            message(actor, "body_regenerated_other", player.getDisplayName());
+        }
         changed();
     }
 

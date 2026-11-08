@@ -126,6 +126,12 @@ public final class TSF implements ModInitializer {
             if (entity instanceof Player && player.getItemInHand(hand).is(TSFItems.PHONE)) {
                 return TSFItems.PHONE.use(level, player, hand);
             }
+            if (entity instanceof Player && player.getItemInHand(hand).is(TSFItems.BODY_REGENERATION_TOTEM)) {
+                if (player instanceof ServerPlayer actor && entity instanceof ServerPlayer target) {
+                    BodyManager.get().regenerateBody(actor, target, player.getItemInHand(hand));
+                }
+                return InteractionResult.SUCCESS;
+            }
             if (entity instanceof Player && BodyManager.spiritSpear(player.getItemInHand(hand))) {
                 if (player instanceof ServerPlayer serverPlayer && entity instanceof ServerPlayer target) {
                     BodyManager.get().useSpiritSpear(serverPlayer, target, hand);
