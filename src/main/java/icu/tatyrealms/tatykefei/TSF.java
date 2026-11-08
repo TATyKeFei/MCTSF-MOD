@@ -153,6 +153,11 @@ public final class TSF implements ModInitializer {
                 return InteractionResult.SUCCESS;
             }
             if (BodyManager.emptyBody(entity)) {
+                if (entity instanceof net.minecraft.world.entity.Leashable leashable && leashable.canBeLeashed()
+                        && (player.getItemInHand(hand).is(net.minecraft.world.item.Items.LEAD)
+                        || player.getItemInHand(hand).is(net.minecraft.world.item.Items.SHEARS))) {
+                    return entity.interact(player, hand, hit == null ? entity.position() : hit.getLocation());
+                }
                 if (player instanceof ServerPlayer serverPlayer && hand == InteractionHand.MAIN_HAND) {
                     BodyManager.get().interactBody(serverPlayer, entity);
                 }

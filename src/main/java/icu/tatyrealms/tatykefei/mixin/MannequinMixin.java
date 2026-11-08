@@ -6,7 +6,9 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.entity.decoration.Mannequin;
+import net.minecraft.world.entity.Leashable;
 import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -14,7 +16,30 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(Mannequin.class)
-public abstract class MannequinMixin implements EmptyBodyHolder {
+public abstract class MannequinMixin implements EmptyBodyHolder, Leashable {
+    @Unique
+    private LeashData tsf$leashData;
+
+    @Override
+    public LeashData getLeashData() {
+        return tsf$leashData;
+    }
+
+    @Override
+    public void setLeashData(LeashData leashData) {
+        tsf$leashData = leashData;
+    }
+
+    @Override
+    public boolean canBeLeashed() {
+        return tsf$isEmptyBody() && !tsf$isFoldedSkin();
+    }
+
+    @Inject(method = "addAdditionalSaveData", at = @At("TAIL"))
+    private void tsf$saveLeash(ValueOutput output, CallbackInfo callback) {
+        writeLeashData(output, tsf$leashData);
+    }
+
     @Unique
     private static final EntityDataAccessor<Boolean> TSF_BODY = SynchedEntityData.defineId(Mannequin.class, EntityDataSerializers.BOOLEAN);
     @Unique
@@ -42,6 +67,7 @@ public abstract class MannequinMixin implements EmptyBodyHolder {
     private void tsf$load(ValueInput input, CallbackInfo callback) {
         tsf$setEmptyBody(((Mannequin) (Object) this).entityTags().contains(BodyManager.BODY_TAG));
         tsf$setFoldedSkin(((Mannequin) (Object) this).entityTags().contains(BodyManager.SKIN_TAG));
+        readLeashData(input);
     }
 
     @Override

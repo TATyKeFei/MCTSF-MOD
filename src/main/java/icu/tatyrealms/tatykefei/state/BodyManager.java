@@ -2271,6 +2271,9 @@ public final class BodyManager {
             level.getChunk(BlockPos.containing(body.x, body.y, body.z));
             Entity entity = level.getEntity(body.entityId);
             if (entity != null) {
+                if (entity instanceof net.minecraft.world.entity.Leashable leashable && leashable.isLeashed()) {
+                    leashable.dropLeash();
+                }
                 entity.discard();
             }
             body.entityId = null;
