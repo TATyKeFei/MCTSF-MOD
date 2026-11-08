@@ -91,6 +91,8 @@ public final class BodyManager {
     private final MinecraftServer server;
     private final Path path;
     private final StateStore store;
+    private final AsyncStateWriter stateWriter;
+    private boolean saveRequested;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
     private final Map<UUID, HypnosisSession> hypnosisSessions = new HashMap<>();
     private final Map<UUID, ItemEntity> slimeBottleDrops = new HashMap<>();
@@ -111,6 +113,7 @@ public final class BodyManager {
         } catch (IOException exception) {
             throw new IllegalStateException("TSF 存档读取失败，请检查 " + path, exception);
         }
+        stateWriter = new AsyncStateWriter(path);
         instance = this;
     }
 
@@ -119,7 +122,16 @@ public final class BodyManager {
     }
 
     public static void clear() {
-        instance = null;
+        if (instance != null) {
+            BodyManager manager = instance;
+            try (AsyncStateWriter writer = manager.stateWriter) {
+                manager.save(true);
+            } catch (IOException exception) {
+                throw new IllegalStateException("Unable to finish saving TSF state: " + manager.path, exception);
+            } finally {
+                instance = null;
+            }
+        }
     }
 
     public static Form form(Player player) {
@@ -2351,6 +2363,7 @@ public final class BodyManager {
 
     public void tick() {
         ticks++;
+        boolean recoveryChanged = false;
         updateBodyPositions();
         updateSkinDrops();
         for (UUID id : List.copyOf(pendingProjections)) {
@@ -2432,16 +2445,18 @@ public final class BodyManager {
             int remaining = skinRecoverySeconds(player);
             Integer previous = lastSkinRecoverySeconds.put(player.getUUID(), remaining);
             if (previous == null || previous != remaining) {
-                visualsDirty = true;
+                recoveryChanged = true;
                 if (remaining == 0) {
                     message(player, "skin_recovery_ready");
                 }
             }
         }
-        if (visualsDirty) {
+        if (visualsDirty || recoveryChanged) {
+            if (visualsDirty) {
+                save();
+            }
             visualsDirty = false;
             broadcast();
-            save();
         }
         if (ticks % 200 == 0) {
             for (Body body : store.bodies.values()) {
@@ -2453,6 +2468,9 @@ public final class BodyManager {
                     }
                 }
             }
+        }
+        if (saveRequested) {
+            submitSave();
         }
     }
 
@@ -2632,6 +2650,21 @@ public final class BodyManager {
     }
 
     public void save() {
+        saveRequested = true;
+    }
+
+    public void save(boolean flush) {
+        submitSave();
+        if (flush) {
+            try {
+                stateWriter.flush();
+            } catch (IOException exception) {
+                throw new IllegalStateException("Unable to save TSF state: " + path, exception);
+            }
+        }
+    }
+
+    private void submitSave() {
         updateBodyPositions();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             PlayerState state = state(player);
@@ -2640,10 +2673,7 @@ public final class BodyManager {
                 captureTank(body, player);
             }
         }
-        try {
-            store.save(path);
-        } catch (IOException exception) {
-            throw new IllegalStateException("Unable to save TSF state: " + path, exception);
-        }
+        stateWriter.submit(store.snapshot());
+        saveRequested = false;
     }
 }

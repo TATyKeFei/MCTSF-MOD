@@ -2,6 +2,7 @@ package icu.tatyrealms.tatykefei.state;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
@@ -33,10 +34,14 @@ public final class StateStore {
         }
     }
 
-    public void save(Path path) throws IOException {
+    public JsonElement snapshot() {
+        return GSON.toJsonTree(this);
+    }
+
+    static void write(Path path, JsonElement snapshot) throws IOException {
         Files.createDirectories(path.getParent());
         Path temporary = path.resolveSibling(path.getFileName() + ".tmp");
-        Files.writeString(temporary, GSON.toJson(this), StandardCharsets.UTF_8);
+        Files.writeString(temporary, GSON.toJson(snapshot), StandardCharsets.UTF_8);
         try {
             Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (AtomicMoveNotSupportedException exception) {

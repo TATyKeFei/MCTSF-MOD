@@ -86,7 +86,7 @@ public final class TSF implements ModInitializer {
             }
             new BodyManager(server);
         });
-        ServerLifecycleEvents.BEFORE_SAVE.register((server, flush, force) -> BodyManager.get().save());
+        ServerLifecycleEvents.BEFORE_SAVE.register((server, flush, force) -> BodyManager.get().save(flush));
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
             BodyManager.clear();
             ProtectionTotems.clear();
