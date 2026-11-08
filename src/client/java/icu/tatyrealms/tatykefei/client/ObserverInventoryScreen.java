@@ -34,7 +34,6 @@ public final class ObserverInventoryScreen extends InventoryScreen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-        ObserverView.updateInventory();
         extractContents(graphics, mouseX, mouseY, partialTick);
         extractTooltip(graphics, mouseX, mouseY);
     }

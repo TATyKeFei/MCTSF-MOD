@@ -8,6 +8,7 @@ import icu.tatyrealms.tatykefei.network.ObserverInventory;
 import icu.tatyrealms.tatykefei.state.BodyManager;
 import icu.tatyrealms.tatykefei.state.Form;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -35,6 +36,10 @@ public final class ObserverView {
     private static ObserverInventory snapshot;
     private static long receivedTick;
     private static boolean useItemPending;
+    private static final BitSet changedItems = new BitSet();
+    private static final BitSet changedCrafting = new BitSet();
+    private static AbstractClientPlayer inventoryPlayer;
+    private static boolean statusPending;
     private static AbstractClientPlayer handPlayer;
     private static ObserverHands handAnimation;
 
@@ -55,17 +60,21 @@ public final class ObserverView {
             target = inventory.target();
             items = new ArrayList<>();
             crafting = new ArrayList<>();
+            changedItems.clear();
+            changedCrafting.clear();
         } else if (!inventory.target().equals(target)) {
             return;
         }
         snapshot = inventory;
         receivedTick = client.level.getGameTime();
         useItemPending = inventory.status().useItemHand() != null;
-        decodeChanges(items, inventory.items());
-        decodeChanges(crafting, inventory.crafting());
+        statusPending = true;
+        decodeChanges(items, inventory.items(), changedItems);
+        decodeChanges(crafting, inventory.crafting(), changedCrafting);
+        updateInventory();
     }
 
-    private static void decodeChanges(List<ItemStack> decoded, Map<Integer, JsonElement> changes) {
+    private static void decodeChanges(List<ItemStack> decoded, Map<Integer, JsonElement> changes, BitSet changedSlots) {
         if (changes.isEmpty()) {
             return;
         }
@@ -75,6 +84,7 @@ public final class ObserverView {
                 decoded.add(ItemStack.EMPTY);
             }
             decoded.set(entry.getKey(), ItemStack.OPTIONAL_CODEC.parse(operations, entry.getValue()).getOrThrow());
+            changedSlots.set(entry.getKey());
         }
     }
 
@@ -85,6 +95,10 @@ public final class ObserverView {
         snapshot = null;
         receivedTick = 0;
         useItemPending = false;
+        changedItems.clear();
+        changedCrafting.clear();
+        inventoryPlayer = null;
+        statusPending = false;
         handPlayer = null;
         handAnimation = null;
     }
@@ -107,6 +121,7 @@ public final class ObserverView {
         updateInventory();
         AbstractClientPlayer player = target();
         if (player == null) {
+            inventoryPlayer = null;
             handPlayer = null;
             handAnimation = null;
         } else {
@@ -126,7 +141,13 @@ public final class ObserverView {
         AbstractClientPlayer player = target();
         if (player != null) {
             var status = snapshot.status();
-            for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            if (inventoryPlayer != player) {
+                inventoryPlayer = player;
+                changedItems.set(0, player.getInventory().getContainerSize());
+                changedCrafting.set(0, crafting.size());
+                statusPending = true;
+            }
+            for (int slot = changedItems.nextSetBit(0); slot >= 0; slot = changedItems.nextSetBit(slot + 1)) {
                 ItemStack item = item(slot);
                 ItemStack current = player.getInventory().getItem(slot);
                 if (!ItemStack.matches(current, item)) {
@@ -137,17 +158,25 @@ public final class ObserverView {
                     }
                 }
             }
-            player.getInventory().setSelectedSlot(status.selectedSlot());
-            for (int slot = 0; slot < Math.min(crafting.size(), 5); slot++) {
-                player.inventoryMenu.getSlot(slot).set(crafting.get(slot).copy());
+            changedItems.clear();
+            for (int slot = changedCrafting.nextSetBit(0); slot >= 0; slot = changedCrafting.nextSetBit(slot + 1)) {
+                var craftingSlot = player.inventoryMenu.getSlot(slot);
+                if (!ItemStack.matches(craftingSlot.getItem(), crafting.get(slot))) {
+                    craftingSlot.set(crafting.get(slot).copy());
+                }
             }
-            player.setHealth(status.health());
-            player.setAbsorptionAmount(status.absorption());
-            player.getFoodData().setFoodLevel(status.food());
-            player.getFoodData().setSaturation(status.saturation());
-            player.experienceProgress = status.experienceProgress();
-            player.experienceLevel = status.experienceLevel();
-            player.totalExperience = status.totalExperience();
+            changedCrafting.clear();
+            if (statusPending) {
+                player.getInventory().setSelectedSlot(status.selectedSlot());
+                player.setHealth(status.health());
+                player.setAbsorptionAmount(status.absorption());
+                player.getFoodData().setFoodLevel(status.food());
+                player.getFoodData().setSaturation(status.saturation());
+                player.experienceProgress = status.experienceProgress();
+                player.experienceLevel = status.experienceLevel();
+                player.totalExperience = status.totalExperience();
+                statusPending = false;
+            }
             updateUseItem(player);
         }
     }
@@ -213,7 +242,7 @@ public final class ObserverView {
             return;
         }
         Minecraft client = Minecraft.getInstance();
-        updateInventory();
+        updateUseItem(player);
         state.hasPlayer = true;
         state.avatarRenderState = (AvatarRenderState) client.getEntityRenderDispatcher().extractEntity(player, partialTick);
         var hands = state.firstPersonHandsAndItems;
