@@ -75,7 +75,11 @@ public final class TSFItems {
     public static void initialize() {
         Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, TSF.id("main"), FabricCreativeModeTab.builder()
                 .title(Component.translatable("itemGroup.tsf"))
-                .icon(PHONE::getDefaultInstance)
+                .icon(() -> {
+                    ItemStack icon = PHONE.getDefaultInstance();
+                    icon.set(DataComponents.ITEM_MODEL, TSF.id("creative_tab_icon"));
+                    return icon;
+                })
                 .displayItems((parameters, output) -> {
                     output.accept(PHONE);
                     output.accept(HYPNOSIS_PROTECTION_TOTEM);

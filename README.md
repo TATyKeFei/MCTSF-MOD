@@ -55,6 +55,25 @@
 ./gradlew runClient` 或 `./gradlew runServer
 ```
 
+# 替换纹理与图标
+
+内置资源位于 `src/main/resources/assets/tsf/`，替换下表对应的 PNG 文件后运行 `./gradlew build`，新素材会随模组一起打包。每项使用独立文件，当前新增文件仍用手机图片占位。
+
+| 用途 | 相对于 `src/main/resources/assets/tsf/` 的路径 |
+| :--- | :--- |
+| 模组图标（Mod Menu 等模组列表） | `icon.png` |
+| TSF 创造模式分类页图标 | `textures/item/creative_tab_icon.png` |
+| 催眠反制图腾 | `textures/item/hypnosis_protection_totem.png` |
+| 附身反制图腾 | `textures/item/possession_protection_totem.png` |
+| 皮物反制图腾 | `textures/item/skin_protection_totem.png` |
+| TSF 反制图腾 | `textures/item/tsf_protection_totem.png` |
+| 肉体再生图腾 | `textures/item/body_regeneration_totem.png` |
+| 手机 | `textures/item/phone.png` |
+
+皮刀、拉链、皮物、空肉体和两种长矛的独立贴图也在 `textures/item/`，人格史莱姆在 `textures/entity/slime.png`。玩家皮物仍会使用对应玩家的皮肤。
+
+物品贴图推荐使用透明背景的正方形 PNG（16×16、32×32 等）；模组图标推荐 128×128 或 256×256。保留文件名即可，无须改代码。游戏内物品贴图还可通过普通资源包覆盖同名 `assets/tsf/` 路径并用 F3+T 重载；模组列表图标需要重新打包模组并重启游戏。
+
 # 服务端设置
 
 首次启动世界或服务端时生成 `config/tsf-server.json`; 修改后`/tsf config reload` 重载

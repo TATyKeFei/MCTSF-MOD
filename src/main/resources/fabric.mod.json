@@ -3,7 +3,7 @@
   "id": "tsf",
   "version": "${version}",
   "name": "TSF",
-  "icon": "assets/tsf/textures/item/phone.png",
+  "icon": "assets/tsf/icon.png",
   "description": "手机催眠、灵魂出窍与人格排泄药水、附身夺舍、折叠皮物放置、空肉体搬运、肉体再生与拉链饰品，支持服务端皮刀规则。",
   "authors": ["TATyKeFei"],
   "environment": "*",
