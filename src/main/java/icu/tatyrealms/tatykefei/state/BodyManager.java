@@ -70,6 +70,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.ResolvableProfile;
@@ -97,6 +98,7 @@ public final class BodyManager {
     private boolean saveRequested;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
     private final Map<UUID, HypnosisSession> hypnosisSessions = new HashMap<>();
+    private final Map<UUID, SpiritSpearHit> spiritSpearHits = new HashMap<>();
     private final Map<UUID, ItemEntity> slimeBottleDrops = new HashMap<>();
     private final Map<UUID, List<UUID>> lastSkinLayers = new HashMap<>();
     private final Map<UUID, UUID> natureBodies = new HashMap<>();
@@ -256,6 +258,7 @@ public final class BodyManager {
     }
 
     public void left(ServerPlayer player) {
+        spiritSpearHits.remove(player.getUUID());
         PlayerState state = state(player);
         natureSkins.capture(nativeBody(player));
         natureSkins.capture(appearance(player));
@@ -1180,7 +1183,31 @@ public final class BodyManager {
         }
     }
 
-    public void useSpiritSpear(ServerPlayer player, ServerPlayer target, InteractionHand hand) {
+    public boolean hitSpiritSpear(ServerPlayer player, ServerPlayer target, InteractionHand hand) {
+        ItemStack stack = player.getItemInHand(hand);
+        if (state(player).form != Form.SPIRIT || !player.isAlive() || player.isSpectator()
+                || hypnotized(player) || !spiritSpear(stack) || !near(player, target, spiritSpearReach(player, stack))
+                || state(target).form != Form.HUMAN || target.isSpectator()) {
+            return false;
+        }
+        return spiritSpearHits.putIfAbsent(player.getUUID(), new SpiritSpearHit(target.getUUID(), hand, stack.getItem())) == null;
+    }
+
+    private void processSpiritSpearHit(ServerPlayer player) {
+        SpiritSpearHit hit = spiritSpearHits.remove(player.getUUID());
+        if (hit != null && player.getItemInHand(hit.hand).is(hit.spear)) {
+            useSpiritSpear(player, server.getPlayerList().getPlayer(hit.target), hit.hand);
+        }
+    }
+
+    private record SpiritSpearHit(UUID target, InteractionHand hand, Item spear) {
+    }
+
+    private double spiritSpearReach(ServerPlayer player, ItemStack stack) {
+        return player.getAttackRangeWith(stack).effectiveMaxRange(player) + player.getKnownMovement().length() + 1;
+    }
+
+    private void useSpiritSpear(ServerPlayer player, ServerPlayer target, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
         if (!player.isAlive() || hypnotized(player) || !spiritSpear(stack) || !ready(player)) {
             return;
@@ -1190,14 +1217,14 @@ public final class BodyManager {
             return;
         }
         if (stack.is(TSFItems.POSSESSION_SPEAR)) {
-            attachSpirit(player, target);
+            attachSpirit(player, target, spiritSpearReach(player, stack));
         } else {
-            takeOver(player, target);
+            takeOver(player, target, spiritSpearReach(player, stack));
         }
     }
 
-    private void attachSpirit(ServerPlayer player, ServerPlayer target) {
-        if (!near(player, target, 5) || state(target).form != Form.HUMAN || target.isSpectator()) {
+    private void attachSpirit(ServerPlayer player, ServerPlayer target, double reach) {
+        if (!near(player, target, reach) || state(target).form != Form.HUMAN || target.isSpectator()) {
             message(player, "invalid_target");
             return;
         }
@@ -1255,7 +1282,7 @@ public final class BodyManager {
     }
 
     public void possess(ServerPlayer player, ServerPlayer target) {
-        if (state(player).form == Form.SPIRIT && !player.getMainHandItem().is(TSFItems.SNATCHING_SPEAR)) {
+        if (state(player).form == Form.SPIRIT) {
             message(player, "use_spirit_spear");
             return;
         }
@@ -1263,11 +1290,15 @@ public final class BodyManager {
     }
 
     private void takeOver(ServerPlayer player, ServerPlayer target) {
+        takeOver(player, target, 5);
+    }
+
+    private void takeOver(ServerPlayer player, ServerPlayer target, double reach) {
         if ((state(player).form != Form.SPIRIT && state(player).form != Form.SLIME) || player.isSpectator()) {
             message(player, "leave_first");
             return;
         }
-        if (!near(player, target, 5) || state(target).form != Form.HUMAN || target.isSpectator()) {
+        if (!near(player, target, reach) || state(target).form != Form.HUMAN || target.isSpectator()) {
             message(player, "invalid_target");
             return;
         }
@@ -2414,6 +2445,7 @@ public final class BodyManager {
         }
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             PlayerState state = state(player);
+            processSpiritSpearHit(player);
             if (pendingNatureRestores.remove(player.getUUID())) {
                 natureBodies.remove(player.getUUID());
                 updateNatureBody(player);

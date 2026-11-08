@@ -8,6 +8,9 @@ import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.network.chat.Component;
 import org.spongepowered.asm.mixin.Mixin;
@@ -19,6 +22,22 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(Player.class)
 public abstract class PlayerMixin implements FormHolder {
+    @Inject(method = "stabAttack", at = @At("HEAD"), cancellable = true)
+    private void tsf$spiritSpearHit(EquipmentSlot slot, Entity target, float damage, boolean dealsDamage,
+                                    boolean dealsKnockback, boolean dismounts, CallbackInfoReturnable<Boolean> callback) {
+        Player player = (Player) (Object) this;
+        ItemStack stack = player.getItemBySlot(slot);
+        if (BodyManager.spiritSpear(stack)) {
+            boolean accepted = player instanceof ServerPlayer attacker && target instanceof ServerPlayer victim
+                    && (slot == EquipmentSlot.MAINHAND || slot == EquipmentSlot.OFFHAND)
+                    && BodyManager.get().hitSpiritSpear(attacker, victim,
+                    slot == EquipmentSlot.MAINHAND ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND);
+            callback.setReturnValue(accepted);
+        } else if (tsf$getForm() == Form.SPIRIT) {
+            callback.setReturnValue(false);
+        }
+    }
+
     @Inject(method = "getDisplayName", at = @At("HEAD"), cancellable = true)
     private void tsf$displayIdentity(CallbackInfoReturnable<Component> callback) {
         if ((Object) this instanceof ServerPlayer player && BodyManager.get() != null) {
