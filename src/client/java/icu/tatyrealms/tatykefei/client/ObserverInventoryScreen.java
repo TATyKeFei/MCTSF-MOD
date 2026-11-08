@@ -27,8 +27,11 @@ public final class ObserverInventoryScreen extends InventoryScreen {
 
     @Override
     public void containerTick() {
-        if (ObserverView.target() != target) {
+        AbstractClientPlayer current = ObserverView.target();
+        if (current == null) {
             onClose();
+        } else if (current != target) {
+            minecraft.gui.setScreen(new ObserverInventoryScreen(current));
         }
     }
 

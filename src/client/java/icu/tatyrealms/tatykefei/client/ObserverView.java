@@ -15,6 +15,9 @@ import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.contextualbar.ContextualBar;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
@@ -109,8 +112,18 @@ public final class ObserverView {
                 || BodyManager.form(client.player) != Form.OBSERVER) {
             return null;
         }
-        return client.getCameraEntity() instanceof AbstractClientPlayer player && player.getUUID().equals(target)
+        return client.level.getPlayerByUUID(target) instanceof AbstractClientPlayer player
                 && BodyManager.form(player) == Form.HUMAN ? player : null;
+    }
+
+    public static Screen inventoryScreen(Screen screen) {
+        AbstractClientPlayer player = target();
+        if (player == null || !(screen instanceof InventoryScreen || screen instanceof CreativeModeInventoryScreen)
+                || screen instanceof ObserverInventoryScreen observer && observer.getMenu() == player.inventoryMenu) {
+            return screen;
+        }
+        updateInventory();
+        return new ObserverInventoryScreen(player);
     }
 
     public static ItemStack item(int slot) {
@@ -126,6 +139,12 @@ public final class ObserverView {
             handAnimation = null;
         } else {
             hands(player).tick(player);
+            Minecraft client = Minecraft.getInstance();
+            Screen screen = client.gui.screen();
+            Screen replacement = inventoryScreen(screen);
+            if (replacement != screen) {
+                client.gui.setScreen(replacement);
+            }
         }
     }
 
