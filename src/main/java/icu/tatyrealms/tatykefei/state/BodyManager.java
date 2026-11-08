@@ -410,6 +410,16 @@ public final class BodyManager {
             case HYPNOSIS_INTERACTION -> toggleHypnosis(player, target, HypnosisRestrictions.INTERACTION);
             case HYPNOSIS_LOOK -> toggleHypnosis(player, target, HypnosisRestrictions.LOOK);
             case HYPNOSIS_SPEECH -> toggleHypnosis(player, target, HypnosisRestrictions.SPEECH);
+            case OBSERVER_CHAT -> {
+                if (state(player).form == Form.HUMAN && !controlledObservers(player).isEmpty()) {
+                    state(player).observerChatPrivate = !state(player).observerChatPrivate;
+                    message(player, state(player).observerChatPrivate ? "observer_chat_private" : "observer_chat_public");
+                    for (ServerPlayer observer : controlledObservers(player)) {
+                        message(observer, state(player).observerChatPrivate ? "observer_chat_private_received" : "observer_chat_public_received");
+                    }
+                    changed();
+                }
+            }
             case PROJECT -> message(player, "use_projection_potion");
             case EXPEL_SELF -> message(player, "use_expulsion_potion");
             case LEAVE_ZIPPER -> {
@@ -2142,6 +2152,41 @@ public final class BodyManager {
         return false;
     }
 
+    private ServerPlayer speechController(ServerPlayer observer) {
+        PlayerState state = state(observer);
+        if (state.form != Form.OBSERVER || state.spiritHost != null || state.observedBody == null) {
+            return null;
+        }
+        ServerPlayer controller = controller(store.bodies.get(state.observedBody), new HashSet<>());
+        return controller == observer ? null : controller;
+    }
+
+    private List<ServerPlayer> controlledObservers(ServerPlayer player) {
+        return server.getPlayerList().getPlayers().stream().filter(observer -> speechController(observer) == player).toList();
+    }
+
+    public boolean allowChat(ServerPlayer player, PlayerChatMessage message) {
+        ServerPlayer controller = speechController(player);
+        return ObserverChat.allowChat(player, message, controller,
+                controller != null && state(controller).observerChatPrivate,
+                message.signedContent().startsWith("@!") ? controlledObservers(player) : List.of());
+    }
+
+    public boolean allowObserverCommand(ServerPlayer player, String command) {
+        ServerPlayer controller = speechController(player);
+        return ObserverChat.allowCommand(player, command, controller,
+                controller != null && state(controller).observerChatPrivate);
+    }
+
+    public boolean allowCommandMessage(ServerPlayer player) {
+        ServerPlayer controller = speechController(player);
+        if (controller != null && state(controller).observerChatPrivate) {
+            message(player, "observer_chat_private_only");
+            return false;
+        }
+        return true;
+    }
+
     private JsonElement encodeItem(ItemStack stack) {
         return ItemStack.OPTIONAL_CODEC.encodeStart(server.registryAccess().createSerializationContext(JsonOps.INSTANCE), stack).getOrThrow();
     }
@@ -2560,6 +2605,13 @@ public final class BodyManager {
 
     private List<VisualState> visuals() {
         List<VisualState> visuals = new ArrayList<>();
+        Set<UUID> controllers = new HashSet<>();
+        for (ServerPlayer observer : server.getPlayerList().getPlayers()) {
+            ServerPlayer controller = speechController(observer);
+            if (controller != null) {
+                controllers.add(controller.getUUID());
+            }
+        }
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             PlayerState state = state(player);
             List<SkinLayer> skins = layers(player);
@@ -2571,7 +2623,8 @@ public final class BodyManager {
                     state.zipperReturnForm != null, skinRecoverySeconds(player), state.slimeColor,
                     state.hypnotist, state.hypnotist == null ? 0 : state.hypnosisRestrictions,
                     appearance == null ? null : appearance.owner,
-                    appearance == null || appearance.natureSkin == null ? null : appearance.natureSkin.id));
+                    appearance == null || appearance.natureSkin == null ? null : appearance.natureSkin.id,
+                    state.observerChatPrivate, controllers.contains(player.getUUID())));
         }
         return visuals;
     }

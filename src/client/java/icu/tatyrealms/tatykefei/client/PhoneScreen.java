@@ -30,6 +30,7 @@ public final class PhoneScreen extends Screen {
     private Button slimeColors;
     private Button hypnosisControls;
     private Button skinManagement;
+    private Button observerChat;
 
     public PhoneScreen() {
         super(Component.translatable("screen.tsf.phone"));
@@ -96,7 +97,11 @@ public final class PhoneScreen extends Screen {
                 .bounds(buttonX, top + 110, buttonWidth, 20).build());
         skinManagement = addRenderableWidget(Button.builder(Component.translatable("screen.tsf.skin_management"),
                 button -> minecraft.gui.setScreen(new SkinLayersScreen(this)))
-                .bounds(buttonX, top + 134, buttonWidth, 20).build());
+                .bounds(buttonX, top + 134, (buttonWidth - 4) / 2, 20).build());
+        observerChat = addRenderableWidget(Button.builder(Component.empty(),
+                button -> TSFClient.send(Action.OBSERVER_CHAT, null))
+                .bounds(buttonX + (buttonWidth + 4) / 2, top + 134, (buttonWidth - 4) / 2, 20)
+                .tooltip(Tooltip.create(Component.translatable("screen.tsf.observer_chat_hint"))).build());
         int bottom = top + panelHeight - 67;
         int half = (panelWidth - 28) / 2;
         action("leave_zipper", "leave_zipper_hint", Action.LEAVE_ZIPPER, left + 12, bottom, panelWidth - 24);
@@ -137,6 +142,10 @@ public final class PhoneScreen extends Screen {
                 && minecraft.player.getUUID().equals(targetVisual.hypnotist());
         actions.get(1).active = free && targetPresent;
         VisualState visual = TSFClient.visual(minecraft.player.getUUID());
+        observerChat.visible = form == Form.HUMAN;
+        observerChat.active = free && visual != null && visual.controllingObservers();
+        observerChat.setMessage(Component.translatable(visual != null && visual.observerChatPrivate()
+                ? "screen.tsf.observer_chat_private" : "screen.tsf.observer_chat_public"));
         boolean recovery = visual != null && visual.skinRecoverySeconds() >= 0;
         actions.get(2).visible = visual != null && (visual.zipperControl() || recovery);
         actions.get(2).active = recovery ? visual.skinRecoverySeconds() == 0 : free && actions.get(2).visible;

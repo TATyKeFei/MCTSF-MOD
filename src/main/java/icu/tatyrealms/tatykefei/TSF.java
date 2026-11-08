@@ -96,10 +96,11 @@ public final class TSF implements ModInitializer {
             ProtectionTotems.clear();
         });
         ServerMessageEvents.ALLOW_CHAT_MESSAGE.register((message, sender, parameters) ->
-                !BodyManager.restricted(sender, HypnosisRestrictions.SPEECH));
+                !BodyManager.restricted(sender, HypnosisRestrictions.SPEECH) && BodyManager.get().allowChat(sender, message));
         ServerMessageEvents.ALLOW_COMMAND_MESSAGE.register((message, source, parameters) ->
                 !(source.getEntity() instanceof Player player)
-                        || !BodyManager.restricted(player, HypnosisRestrictions.SPEECH));
+                        || !BodyManager.restricted(player, HypnosisRestrictions.SPEECH)
+                        && (!(player instanceof ServerPlayer serverPlayer) || BodyManager.get().allowCommandMessage(serverPlayer)));
         ServerTickEvents.END_SERVER_TICK.register(server -> BodyManager.get().tick());
         ServerEntityEvents.ENTITY_LOAD.register((entity, level) -> BodyManager.get().entityLoaded(entity));
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> BodyManager.get().joined(handler.player));

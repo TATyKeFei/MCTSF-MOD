@@ -19,5 +19,6 @@ public enum Action {
     HYPNOSIS_LOOK,
     HYPNOSIS_SPEECH,
     OPEN_SKINS,
-    REPLACE_SKIN
+    REPLACE_SKIN,
+    OBSERVER_CHAT
 }

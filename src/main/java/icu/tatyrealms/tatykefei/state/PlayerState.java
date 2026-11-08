@@ -16,6 +16,7 @@ public final class PlayerState {
     public UUID observedBody;
     public UUID observerFallback;
     public UUID spiritHost;
+    public boolean observerChatPrivate;
     public UUID zipperReturnBody;
     public Form zipperReturnForm;
     public UUID expulsionBody;

@@ -3,6 +3,8 @@ package icu.tatyrealms.tatykefei.mixin;
 import icu.tatyrealms.tatykefei.state.BodyManager;
 import icu.tatyrealms.tatykefei.state.HypnosisRestrictions;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.network.protocol.game.ServerboundChatCommandSignedPacket;
+import net.minecraft.network.chat.LastSeenMessages;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import org.spongepowered.asm.mixin.Mixin;
@@ -15,6 +17,22 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class ServerGamePacketListenerMixin {
     @Shadow
     public ServerPlayer player;
+
+    @Inject(method = "performUnsignedChatCommand", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/commands/Commands;performCommand(Lcom/mojang/brigadier/ParseResults;Ljava/lang/String;)V"), cancellable = true)
+    private void tsf$observerUnsignedCommand(String command, CallbackInfo callback) {
+        if (!BodyManager.get().allowObserverCommand(player, command)) {
+            callback.cancel();
+        }
+    }
+
+    @Inject(method = "performSignedChatCommand", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/commands/Commands;performCommand(Lcom/mojang/brigadier/ParseResults;Ljava/lang/String;)V"), cancellable = true)
+    private void tsf$observerSignedCommand(ServerboundChatCommandSignedPacket packet, LastSeenMessages lastSeen, CallbackInfo callback) {
+        if (!BodyManager.get().allowObserverCommand(player, packet.command())) {
+            callback.cancel();
+        }
+    }
 
     @Inject(method = {"handleContainerClick", "handleContainerButtonClick", "handleSetCreativeModeSlot",
             "handleContainerSlotStateChanged", "handlePlaceRecipe", "handleSelectTrade"},
