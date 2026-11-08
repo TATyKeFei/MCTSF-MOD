@@ -1046,6 +1046,11 @@ public final class BodyManager {
             message(player, "already_form");
             return;
         }
+        if (state(player).form == Form.HUMAN
+                && BodyPhysics.findPosition(player.level(), player.position(), BODY_DIMENSIONS) == null) {
+            message(player, "no_space");
+            return;
+        }
         detach(player, form);
         message(player, form == Form.SPIRIT ? "projected" : "expelled");
         changed();
@@ -2210,6 +2215,11 @@ public final class BodyManager {
         if (body.entityId != null && level.getEntity(body.entityId) != null) {
             return;
         }
+        Vec3 destination = BodyPhysics.findPosition(level, new Vec3(body.x, body.y, body.z),
+                body.skinPlaced ? SKIN_DIMENSIONS : BODY_DIMENSIONS);
+        if (destination == null) {
+            return;
+        }
         Mannequin mannequin = EntityTypes.MANNEQUIN.create(level, EntitySpawnReason.TRIGGERED);
         if (mannequin == null) {
             throw new IllegalStateException("Unable to create TSF body");
@@ -2233,6 +2243,9 @@ public final class BodyManager {
         accessor.tsf$setProfile(profile(body));
         accessor.tsf$setImmovable(false);
         accessor.tsf$setHideDescription(true);
+        mannequin.noPhysics = false;
+        mannequin.setPos(destination);
+        locate(body, mannequin);
         for (var entry : Inventory.EQUIPMENT_SLOT_MAPPING.int2ObjectEntrySet()) {
             if (body.skinPlaced) {
                 break;
