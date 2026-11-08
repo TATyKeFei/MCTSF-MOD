@@ -1524,8 +1524,9 @@ public final class BodyManager {
         data.putString("tsf_body", body.id.toString());
         data.putString("tsf_body_token", body.packedToken.toString());
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(data));
-        stack.set(DataComponents.PROFILE, profile(body));
-        stack.set(DataComponents.CUSTOM_NAME, Component.translatable("item.tsf.named_body", body.name));
+        Body appearance = storedAppearance(body);
+        stack.set(DataComponents.PROFILE, profile(appearance));
+        stack.set(DataComponents.CUSTOM_NAME, Component.translatable("item.tsf.named_body", appearance.name));
         if (!player.getInventory().add(stack)) {
             player.drop(stack, false, Prediction.SERVER_ONLY);
         }
@@ -2054,6 +2055,16 @@ public final class BodyManager {
         return layers.isEmpty() ? store.bodies.get(state(player).body) : layers.getLast().body;
     }
 
+    private Body storedAppearance(Body body) {
+        for (int index = body.skinOrder.size() - 1; index >= 0; index--) {
+            Body skin = store.bodies.get(body.skinOrder.get(index));
+            if (skin != null && skin.skinned) {
+                return skin;
+            }
+        }
+        return body;
+    }
+
     public Component assumedName(ServerPlayer player) {
         Body appearance = appearance(player);
         return appearance == null || appearance.owner.equals(player.getUUID()) ? null : Component.literal(appearance.name);
@@ -2276,7 +2287,8 @@ public final class BodyManager {
         mannequin.setPose(Pose.SLEEPING);
         mannequin.setNoGravity(false);
         mannequin.setPermanentlyInvulnerable(true);
-        mannequin.setCustomName(Component.translatable(body.skinPlaced ? "item.tsf.named_skin" : "entity.tsf.empty_body", body.name));
+        Body appearance = body.skinPlaced ? body : storedAppearance(body);
+        mannequin.setCustomName(Component.translatable(body.skinPlaced ? "item.tsf.named_skin" : "entity.tsf.empty_body", appearance.name));
         mannequin.setCustomNameVisible(false);
         mannequin.addTag(BODY_TAG);
         ((EmptyBodyHolder) mannequin).tsf$setEmptyBody(true);
@@ -2285,7 +2297,7 @@ public final class BodyManager {
             ((EmptyBodyHolder) mannequin).tsf$setFoldedSkin(true);
         }
         MannequinAccessor accessor = (MannequinAccessor) mannequin;
-        accessor.tsf$setProfile(profile(body));
+        accessor.tsf$setProfile(profile(appearance));
         accessor.tsf$setImmovable(false);
         accessor.tsf$setHideDescription(true);
         mannequin.noPhysics = false;
@@ -2356,6 +2368,9 @@ public final class BodyManager {
             } else if (entity instanceof EmptyBodyHolder holder) {
                 holder.tsf$setEmptyBody(true);
                 holder.tsf$setFoldedSkin(body.skinPlaced);
+                Body appearance = body.skinPlaced ? body : storedAppearance(body);
+                ((MannequinAccessor) entity).tsf$setProfile(profile(appearance));
+                entity.setCustomName(Component.translatable(body.skinPlaced ? "item.tsf.named_skin" : "entity.tsf.empty_body", appearance.name));
                 entity.setCustomNameVisible(false);
                 entity.setNoGravity(false);
                 ((MannequinAccessor) entity).tsf$setImmovable(false);
