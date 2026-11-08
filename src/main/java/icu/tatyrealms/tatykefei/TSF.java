@@ -6,6 +6,8 @@ import icu.tatyrealms.tatykefei.compat.TrinketsCompat;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureCompat;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureHypnosis;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureTanks;
+import icu.tatyrealms.tatykefei.compat.NeedsOfNatureBodies;
+import icu.tatyrealms.tatykefei.compat.NeedsOfNatureSkins;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import icu.tatyrealms.tatykefei.network.Action;
 import icu.tatyrealms.tatykefei.network.ActionPayload;
@@ -62,6 +64,8 @@ public final class TSF implements ModInitializer {
         NeedsOfNatureCompat.initialize();
         NeedsOfNatureHypnosis.initialize();
         NeedsOfNatureTanks.initialize();
+        NeedsOfNatureBodies.initialize();
+        NeedsOfNatureSkins.initialize();
         PayloadTypeRegistry.serverboundPlay().register(ActionPayload.TYPE, ActionPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(StatePayload.TYPE, StatePayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(AnimationPayload.TYPE, AnimationPayload.CODEC);
@@ -106,6 +110,12 @@ public final class TSF implements ModInitializer {
             if (entity instanceof ServerPlayer player) {
                 BodyManager.get().died(player);
             }
+        });
+        ServerLivingEntityEvents.ALLOW_DEATH.register((entity, source, amount) -> {
+            if (entity instanceof ServerPlayer player) {
+                BodyManager.get().beforeDeath(player);
+            }
+            return true;
         });
         ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer, newPlayer, alive) -> BodyManager.get().respawned(newPlayer));
 

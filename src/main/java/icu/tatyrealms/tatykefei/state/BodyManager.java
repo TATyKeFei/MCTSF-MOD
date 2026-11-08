@@ -9,6 +9,8 @@ import icu.tatyrealms.tatykefei.compat.TrinketsCompat;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureCompat;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureHypnosis;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureTanks;
+import icu.tatyrealms.tatykefei.compat.NeedsOfNatureBodies;
+import icu.tatyrealms.tatykefei.compat.NeedsOfNatureSkins;
 import icu.tatyrealms.tatykefei.item.TSFItems;
 import net.minecraft.world.item.Items;
 import net.minecraft.core.particles.ParticleTypes;
@@ -97,6 +99,9 @@ public final class BodyManager {
     private final Map<UUID, HypnosisSession> hypnosisSessions = new HashMap<>();
     private final Map<UUID, ItemEntity> slimeBottleDrops = new HashMap<>();
     private final Map<UUID, List<UUID>> lastSkinLayers = new HashMap<>();
+    private final Map<UUID, UUID> natureBodies = new HashMap<>();
+    private final Set<UUID> pendingNatureRestores = new HashSet<>();
+    private final NeedsOfNatureSkins natureSkins = new NeedsOfNatureSkins();
     private final Set<UUID> pendingProjections = new HashSet<>();
     private final Map<UUID, ItemEntity> skinDrops = new HashMap<>();
     private final Map<UUID, Entity> bodyEntities = new HashMap<>();
@@ -236,6 +241,15 @@ public final class BodyManager {
             releaseSpiritAttachment(player);
         }
         applyForm(player);
+        Body initialAppearance = state.form == Form.HUMAN ? appearance(player) : store.bodies.get(state.observedBody);
+        if (initialAppearance != null && initialAppearance.natureAppearance == null
+                && (state.form == Form.HUMAN || player.getUUID().equals(initialAppearance.owner))) {
+            initialAppearance.natureAppearance = NeedsOfNatureBodies.capture(player);
+        }
+        updateNatureBody(player);
+        natureSkins.capture(nativeBody(player));
+        natureSkins.capture(initialAppearance);
+        pendingNatureRestores.add(player.getUUID());
         lastSkinLayers.put(player.getUUID(), layers(player).stream().map(layer -> layer.body.id).toList());
         visualsDirty = true;
         save();
@@ -243,6 +257,8 @@ public final class BodyManager {
 
     public void left(ServerPlayer player) {
         PlayerState state = state(player);
+        natureSkins.capture(nativeBody(player));
+        natureSkins.capture(appearance(player));
         ProtectionTotems.clear(player.getUUID());
         cancelHypnosis(player);
         NeedsOfNatureCompat.endSession(player);
@@ -251,6 +267,7 @@ public final class BodyManager {
             returnToBody(player);
         }
         placeWornSkins(player);
+        updateNatureBody(player);
         Body occupied = store.bodies.get(state.body);
         if (player.isAlive() && state.form == Form.HUMAN && occupied != null
                 && (!player.getUUID().equals(occupied.owner) || state.zipperReturnForm != null)) {
@@ -284,6 +301,10 @@ public final class BodyManager {
         cooldowns.remove(player.getUUID());
         pendingProjections.remove(player.getUUID());
         lastSkinLayers.remove(player.getUUID());
+        captureNatureBody(player);
+        natureBodies.remove(player.getUUID());
+        pendingNatureRestores.remove(player.getUUID());
+        natureSkins.forget(player);
         lastSkinRecoverySeconds.remove(player.getUUID());
         observerTargets.remove(player.getUUID());
         for (ServerPlayer other : server.getPlayerList().getPlayers()) {
@@ -1041,6 +1062,7 @@ public final class BodyManager {
         player.stopRiding();
         player.stopUsingItem();
         if (state.form == Form.HUMAN) {
+            captureNatureBody(player);
             saveAbilities(player, state);
             Body body = store.bodies.get(state.body);
             if (body == null) {
@@ -1082,6 +1104,7 @@ public final class BodyManager {
         clearHypnosis(player);
         cancelHypnosis(player);
         applyForm(player);
+        updateNatureBody(player);
         player.teleportTo(player.level(), player.getX(), player.getY() + 0.15, player.getZ(), Set.of(),
                 player.getYRot(), player.getXRot(), false);
     }
@@ -1561,6 +1584,7 @@ public final class BodyManager {
         body.owner = player.getUUID();
         body.name = player.getGameProfile().name();
         body.profile = ResolvableProfile.CODEC.encodeStart(JsonOps.INSTANCE, player.getProfile()).getOrThrow();
+        body.natureAppearance = freshNatureBody(player);
         locate(body, player);
         store.bodies.put(body.id, body);
         state(player).homeBody = body.id;
@@ -1625,6 +1649,7 @@ public final class BodyManager {
             }
         }
         NeedsOfNatureTanks.restore(player, body.natureTank);
+        updateNatureBody(player);
         refreshInventory(player);
         lastSkinLayers.put(player.getUUID(), layers(player).stream().map(layer -> layer.body.id).toList());
     }
@@ -2258,8 +2283,14 @@ public final class BodyManager {
         }
     }
 
+    public void beforeDeath(ServerPlayer player) {
+        captureNatureBody(player);
+    }
+
     public void died(ServerPlayer player) {
         PlayerState state = state(player);
+        natureBodies.remove(player.getUUID());
+        pendingNatureRestores.remove(player.getUUID());
         releaseZipperBody(player);
         state.zipperReturnBody = null;
         state.zipperReturnForm = null;
@@ -2331,6 +2362,7 @@ public final class BodyManager {
             message(player, "respawned");
         }
         changed();
+        pendingNatureRestores.add(player.getUUID());
     }
 
     public void recover(ServerPlayer player) {
@@ -2350,6 +2382,10 @@ public final class BodyManager {
             detach(occupant, Form.SLIME);
         }
         if (body.skinned) {
+            ServerPlayer wearer = controller(body, new HashSet<>());
+            if (wearer != null) {
+                captureNatureBody(wearer);
+            }
             removeBodyEntity(body);
             body.skinPlaced = false;
             body.skinned = false;
@@ -2378,6 +2414,10 @@ public final class BodyManager {
         }
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             PlayerState state = state(player);
+            if (pendingNatureRestores.remove(player.getUUID())) {
+                natureBodies.remove(player.getUUID());
+                updateNatureBody(player);
+            }
             if (!player.isUsingItem() || !player.getUseItem().is(TSFItems.PHONE)) {
                 cancelHypnosis(player);
             }
@@ -2436,6 +2476,10 @@ public final class BodyManager {
                 if (updateSkinLayers(player)) {
                     visualsDirty = true;
                 }
+                updateNatureBody(player);
+                if (natureSkins.capture(nativeBody(player)) | natureSkins.capture(appearance(player))) {
+                    visualsDirty = true;
+                }
             }
         }
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
@@ -2488,13 +2532,16 @@ public final class BodyManager {
                     appearance == null ? player.getGameProfile().name() : appearance.name,
                     appearance == null ? null : appearance.profile, state.hypnotist != null, wearing, skins.size(),
                     state.zipperReturnForm != null, skinRecoverySeconds(player), state.slimeColor,
-                    state.hypnotist, state.hypnotist == null ? 0 : state.hypnosisRestrictions));
+                    state.hypnotist, state.hypnotist == null ? 0 : state.hypnosisRestrictions,
+                    appearance == null ? null : appearance.owner,
+                    appearance == null || appearance.natureSkin == null ? null : appearance.natureSkin.id));
         }
         return visuals;
     }
 
     public void synchronize(ServerPlayer player, boolean openPhone) {
         if (ServerPlayNetworking.canSend(player, StatePayload.TYPE)) {
+            synchronizeNatureSkins(player, natureAppearances());
             ServerPlayNetworking.send(player, new StatePayload(GSON.toJson(visuals()), openPhone));
         }
     }
@@ -2505,10 +2552,23 @@ public final class BodyManager {
                     EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME), server.getPlayerList().getPlayers()));
         }
         String json = GSON.toJson(visuals());
+        List<Body> appearances = natureAppearances();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             if (ServerPlayNetworking.canSend(player, StatePayload.TYPE)) {
+                synchronizeNatureSkins(player, appearances);
                 ServerPlayNetworking.send(player, new StatePayload(json, false));
             }
+        }
+    }
+
+    private List<Body> natureAppearances() {
+        return server.getPlayerList().getPlayers().stream().map(this::appearance)
+                .filter(java.util.Objects::nonNull).toList();
+    }
+
+    private void synchronizeNatureSkins(ServerPlayer viewer, List<Body> appearances) {
+        for (Body body : appearances) {
+            natureSkins.synchronize(viewer, body);
         }
     }
 
@@ -2594,8 +2654,11 @@ public final class BodyManager {
 
     private void changed() {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            updateObserver(player);
             updateSkinLayers(player);
+            updateNatureBody(player);
+        }
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            updateObserver(player);
         }
         visualsDirty = true;
         save();
@@ -2644,6 +2707,56 @@ public final class BodyManager {
         }
     }
 
+    private NatureAppearance freshNatureBody(ServerPlayer player) {
+        if (!NeedsOfNatureBodies.available()) {
+            return null;
+        }
+        Body home = nativeBody(player);
+        NatureAppearance fresh = new NatureAppearance();
+        if (home.natureAppearance != null) {
+            fresh.gender = home.natureAppearance.gender;
+        }
+        return fresh;
+    }
+
+    private void captureNatureBody(ServerPlayer player) {
+        Body body = store.bodies.get(natureBodies.get(player.getUUID()));
+        if (body != null) {
+            if (natureSkins.capture(body)) {
+                visualsDirty = true;
+            }
+            NatureAppearance appearance = NeedsOfNatureBodies.capture(player);
+            if (appearance != null) {
+                body.natureAppearance = appearance;
+            }
+        }
+    }
+
+    private void updateNatureBody(ServerPlayer player) {
+        if (!NeedsOfNatureBodies.available() || !player.isAlive()) {
+            return;
+        }
+        Body body = appearance(player);
+        UUID next = body == null ? null : body.id;
+        UUID previous = natureBodies.get(player.getUUID());
+        if (natureBodies.containsKey(player.getUUID()) && java.util.Objects.equals(previous, next)) {
+            return;
+        }
+        captureNatureBody(player);
+        if (body != null && body.natureAppearance == null) {
+            body.natureAppearance = new NatureAppearance();
+            Body original = store.bodies.get(body.owner);
+            if (original != null && original.natureAppearance != null) {
+                body.natureAppearance.gender = original.natureAppearance.gender;
+            }
+        }
+        NeedsOfNatureBodies.restore(player, body == null ? null : body.natureAppearance);
+        if (natureSkins.capture(body)) {
+            visualsDirty = true;
+        }
+        natureBodies.put(player.getUUID(), next);
+    }
+
     private void updateBodyPositions() {
         for (var entry : List.copyOf(bodyEntities.entrySet())) {
             Body body = store.bodies.get(entry.getKey());
@@ -2677,6 +2790,7 @@ public final class BodyManager {
     private void submitSave() {
         updateBodyPositions();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            captureNatureBody(player);
             PlayerState state = state(player);
             Body body = store.bodies.get(state.body);
             if (state.form == Form.HUMAN && body != null && player.getUUID().equals(body.occupant)) {

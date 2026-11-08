@@ -32,6 +32,8 @@ public final class Body {
     public int food = 20;
     public float saturation = 5;
     public NatureTank natureTank;
+    public NatureAppearance natureAppearance;
+    public NatureSkin natureSkin;
     public int selectedSlot;
     public List<JsonElement> inventory = new ArrayList<>();
     public List<JsonElement> skinLayers = new ArrayList<>();

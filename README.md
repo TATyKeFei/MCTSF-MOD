@@ -14,9 +14,9 @@
 
 言论自由应该建立在尊重、不伤害他人的前提下
 
-# 模组依赖关系
+# 依赖关系
 
-| MOD              | 用途                                 | 依赖性 | 版本    |
+| 名称             | 用途                                 | 依赖性 | 版本    |
 | :---             | :---                                 | :---   | :---    |
 | Minecraft Java   | 游戏本体                             | 必须   | 26.3    |
 | Java             | 游戏编程语言运行环境                 | 必须   | JDK 25+ |
@@ -26,7 +26,7 @@
 | NeedsOfNature    | 用于添加附身、夺舍、穿皮等动画       | 可选 (推荐)  | 1.5.3-beta.2+26.3 +  |
 | LuckPerms        | 服务器权限管理                       | 可选 (推荐)  | 支持当前服务端版本就行 |
 
-## 不考虑支持的模组
+## 不考虑支持的东西
 
 我们不会联动适配这些模组
 
@@ -54,51 +54,6 @@
 # 开发启动
 ./gradlew runClient` 或 `./gradlew runServer
 ```
-
-# 替换纹理与图标
-
-内置资源位于 `src/main/resources/assets/tsf/`，替换下表对应的 PNG 文件后运行 `./gradlew build`，新素材会随模组一起打包。每项使用独立文件，当前新增文件仍用手机图片占位。
-
-| 用途 | 相对于 `src/main/resources/assets/tsf/` 的路径 |
-| :--- | :--- |
-| 模组图标（Mod Menu 等模组列表） | `icon.png` |
-| TSF 创造模式分类页图标 | `textures/item/creative_tab_icon.png` |
-| 催眠反制图腾 | `textures/item/hypnosis_protection_totem.png` |
-| 附身反制图腾 | `textures/item/possession_protection_totem.png` |
-| 皮物反制图腾 | `textures/item/skin_protection_totem.png` |
-| TSF 反制图腾 | `textures/item/tsf_protection_totem.png` |
-| 肉体再生图腾 | `textures/item/body_regeneration_totem.png` |
-| 手机 | `textures/item/phone.png` |
-
-皮刀、拉链、皮物、空肉体和两种长矛的独立贴图也在 `textures/item/`，人格史莱姆在 `textures/entity/slime.png`。玩家皮物仍会使用对应玩家的皮肤。
-
-物品贴图推荐使用透明背景的正方形 PNG（16×16、32×32 等）；模组图标推荐 128×128 或 256×256。保留文件名即可，无须改代码。游戏内物品贴图还可通过普通资源包覆盖同名 `assets/tsf/` 路径并用 F3+T 重载；模组列表图标需要重新打包模组并重启游戏。
-
-# 服务端设置
-
-TSF 的状态存档会合并同一 tick 内的重复保存请求，由独立线程格式化并原子写入；保存世界时会提交最新快照，要求刷新写入及停服时会等待保存完成。游戏实体和物品栏仍在主线程处理。旁观物品栏使用增量同步，多人游戏请同时更新客户端与服务端。
-
-首次启动世界或服务端时生成 `config/tsf-server.json`; 修改后`/tsf config reload` 重载
-
-多人游戏使用服务端文件，单人游戏使用当前实例的配置
-
-可选安装 **Mod Menu 21.0.0**，从“模组 → TSF → 设置”打开界面。进入世界后读取当前服务器的实际设置，管理员保存后立即生效；普通玩家只能查看。在主菜单修改时保存到本机配置，供下次启动单人世界或本机服务端使用。Mod Menu 无须安装在服务端。
-
-```json
-{
-  "skinKnifeEnabled": true,
-  "skinKnifeRequiresHypnosis": false,
-  "skinKnifeRequiresDowned": false,
-  "expulsionDelaySeconds": 3,
-  "deathLeavesBody": true
-}
-```
-
-- `skinKnifeEnabled`：是否允许皮刀将玩家或空肉体皮化。默认开启，关闭后仍允许皮刀复原已放置的皮物
-- `skinKnifeRequiresHypnosis`：开启后，目标必须被催眠才能皮化；空肉体须在催眠状态下被排出，避免通过先离体绕过规则
-- `skinKnifeRequiresDowned`：开启后，必须安装兼容的自然之需，目标必须正在播放其标记为 `defeated` 的倒地动画。皮化前会结束倒地动画，再安全转移肉体与物品；普通睡眠、潜行或 TSF 附身动画不满足条件。空肉体也须保留倒地状态下离体的记录。未安装自然之需时禁止皮化并提示缺少依赖
-- 两个前置条件默认关闭，可以分别开启；同时开启时须同时满足。`expulsionDelaySeconds` 控制人格排泄药水饮用后的延迟，范围 1～60 秒
-- `deathLeavesBody`：默认 `true`，死亡地点留空肉体并以史莱姆复活；设为 `false` 时不因该次死亡生成空肉体，正常以肉体形态复活。已有的史莱姆死亡后也恢复肉体；其他已经存在的空肉体保留。两种方式均遵循原版物品掉落及 `keepInventory` 规则，修改对之后发生的死亡生效
 
 # 许可证
 
