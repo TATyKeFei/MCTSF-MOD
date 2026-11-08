@@ -16,6 +16,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityMixin {
+    @Inject(method = "canBeSeenByAnyone", at = @At("HEAD"), cancellable = true)
+    private void tsf$spiritCannotBeTargeted(CallbackInfoReturnable<Boolean> callback) {
+        if ((Object) this instanceof Player player && BodyManager.form(player) == Form.SPIRIT) {
+            callback.setReturnValue(false);
+        }
+    }
+
     @Inject(method = "isPushable", at = @At("HEAD"), cancellable = true)
     private void tsf$bodyPushable(CallbackInfoReturnable<Boolean> callback) {
         if (BodyManager.emptyBody((Entity) (Object) this)) {
