@@ -1,5 +1,7 @@
 package icu.tatyrealms.tatykefei.client.mixin;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import icu.tatyrealms.tatykefei.client.NeedsOfNatureObserver;
 import icu.tatyrealms.tatykefei.client.TSFClient;
 import icu.tatyrealms.tatykefei.client.ObserverView;
 import icu.tatyrealms.tatykefei.state.BodyManager;
@@ -18,6 +20,13 @@ import net.minecraft.client.renderer.state.level.PlayerRenderState;
 
 @Mixin(LevelExtractor.class)
 public abstract class LevelExtractorMixin {
+    @ModifyExpressionValue(method = "extractVisibleEntities", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/Camera;entity()Lnet/minecraft/world/entity/Entity;", ordinal = 0))
+    private Entity tsf$showAnimatedObserverBody(Entity entity) {
+        return entity instanceof AbstractClientPlayer player && player == ObserverView.target()
+                && NeedsOfNatureObserver.rendersBody(player) ? null : entity;
+    }
+
     @Inject(method = "extractPlayerState", at = @At("TAIL"))
     private void tsf$observerHands(Camera camera, DeltaTracker delta, float partialTick, PlayerRenderState state, CallbackInfo callback) {
         ObserverView.extractHands(state, partialTick);

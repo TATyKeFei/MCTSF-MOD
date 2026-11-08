@@ -3,6 +3,7 @@ package icu.tatyrealms.tatykefei.client.mixin;
 import icu.tatyrealms.tatykefei.state.BodyManager;
 import icu.tatyrealms.tatykefei.state.Form;
 import icu.tatyrealms.tatykefei.client.ObserverView;
+import icu.tatyrealms.tatykefei.client.NeedsOfNatureObserver;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.FirstPersonHandsAndItemsRenderer;
 import org.spongepowered.asm.mixin.Mixin;
@@ -14,6 +15,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class FirstPersonRendererMixin {
     @Inject(method = "submitHandsWithItems", at = @At("HEAD"), cancellable = true)
     private void tsf$hideHands(CallbackInfo callback) {
+        if (NeedsOfNatureObserver.isAnimating(ObserverView.target())) {
+            callback.cancel();
+            return;
+        }
         var player = Minecraft.getInstance().player;
         if (player != null && BodyManager.form(player) != Form.HUMAN && ObserverView.target() == null
                 && !(BodyManager.form(player) == Form.SPIRIT

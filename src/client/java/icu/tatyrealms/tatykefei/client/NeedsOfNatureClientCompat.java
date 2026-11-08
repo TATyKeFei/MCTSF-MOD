@@ -22,6 +22,7 @@ public final class NeedsOfNatureClientCompat {
         if (!FabricLoader.getInstance().isModLoaded("needsofnature")) {
             return;
         }
+        NeedsOfNatureObserver.initialize();
         try {
             Class<?> selection = Class.forName("com.nonid.client.NonPlayerInteractionClient$AnimationSelectionScreen");
             Class<?> group = Class.forName("com.nonid.client.NonPlayerInteractionClient$CandidateGroup");
