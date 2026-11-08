@@ -2058,7 +2058,9 @@ public final class BodyManager {
             releaseSpiritAttachment(player);
             return true;
         }
-        applyForm(player);
+        if (form(player) != state.form || !player.isSpectator()) {
+            applyForm(player);
+        }
         if (target != null && !target.getUUID().equals(state.observerFallback)) {
             state.observerFallback = target.getUUID();
             visualsDirty = true;

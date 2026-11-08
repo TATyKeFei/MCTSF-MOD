@@ -51,8 +51,10 @@ public abstract class PlayerMixin implements FormHolder {
     @Override
     public void tsf$setForm(Form form) {
         Player player = (Player) (Object) this;
-        player.getEntityData().set(TSF_FORM, form.ordinal());
-        player.refreshDimensions();
+        if (player.getEntityData().get(TSF_FORM) != form.ordinal()) {
+            player.getEntityData().set(TSF_FORM, form.ordinal());
+            player.refreshDimensions();
+        }
     }
 
     @Override
