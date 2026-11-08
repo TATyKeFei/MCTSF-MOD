@@ -31,6 +31,10 @@ public abstract class MobMixin {
             mob.getBrain().eraseMemory(MemoryModuleType.LOOK_TARGET);
             mob.getBrain().eraseMemory(MemoryModuleType.CANT_REACH_WALK_TARGET_SINCE);
         }
+        if (mob.getBrain().hasMemoryValue(MemoryModuleType.ROAR_TARGET)
+                && tsf$isSpirit(mob.getBrain().getMemory(MemoryModuleType.ROAR_TARGET).orElse(null))) {
+            mob.getBrain().eraseMemory(MemoryModuleType.ROAR_TARGET);
+        }
         if (targetingSpirit || brainTargetingSpirit) {
             mob.getNavigation().stop();
             mob.setAggressive(false);

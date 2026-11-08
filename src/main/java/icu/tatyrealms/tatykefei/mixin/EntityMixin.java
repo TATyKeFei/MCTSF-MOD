@@ -15,6 +15,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(Entity.class)
 public abstract class EntityMixin {
+    @Inject(method = "isInvulnerable", at = @At("HEAD"), cancellable = true)
+    private void tsf$spiritInvulnerable(CallbackInfoReturnable<Boolean> callback) {
+        if ((Object) this instanceof Player player && BodyManager.form(player) == Form.SPIRIT) {
+            callback.setReturnValue(true);
+        }
+    }
+
     @Inject(method = "push(Lnet/minecraft/world/entity/Entity;)V", at = @At("HEAD"), cancellable = true)
     private void tsf$spiritCannotPush(Entity entity, CallbackInfo callback) {
         if ((Object) this instanceof Player player && BodyManager.form(player) == Form.SPIRIT
