@@ -25,14 +25,17 @@ public abstract class LivingEntityMixin {
 
     @Inject(method = "isPushable", at = @At("HEAD"), cancellable = true)
     private void tsf$bodyPushable(CallbackInfoReturnable<Boolean> callback) {
-        if (BodyManager.emptyBody((Entity) (Object) this)) {
+        if ((Object) this instanceof Player player && BodyManager.form(player) == Form.SPIRIT) {
+            callback.setReturnValue(false);
+        } else if (BodyManager.emptyBody((Entity) (Object) this)) {
             callback.setReturnValue(true);
         }
     }
 
     @Inject(method = "pushEntities", at = @At("HEAD"), cancellable = true)
     private void tsf$bodyCannotPush(CallbackInfo callback) {
-        if (BodyManager.emptyBody((Entity) (Object) this)) {
+        if ((Object) this instanceof Player player && BodyManager.form(player) == Form.SPIRIT
+                || BodyManager.emptyBody((Entity) (Object) this)) {
             callback.cancel();
         }
     }
