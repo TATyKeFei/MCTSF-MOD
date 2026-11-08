@@ -126,11 +126,8 @@ public final class TSF implements ModInitializer {
             if (entity instanceof Player && player.getItemInHand(hand).is(TSFItems.PHONE)) {
                 return TSFItems.PHONE.use(level, player, hand);
             }
-            if (entity instanceof Player && BodyManager.spiritSpear(player.getItemInHand(hand))) {
-                if (player instanceof ServerPlayer serverPlayer && entity instanceof ServerPlayer target) {
-                    BodyManager.get().useSpiritSpear(serverPlayer, target, hand);
-                }
-                return InteractionResult.SUCCESS;
+            if (BodyManager.spiritSpear(player.getItemInHand(hand))) {
+                return player.getItemInHand(hand).getItem().use(level, player, hand);
             }
             if (entity instanceof Player target && BodyManager.form(target) == Form.SLIME
                     && player.getItemInHand(hand).is(net.minecraft.world.item.Items.GLASS_BOTTLE)) {
@@ -177,12 +174,6 @@ public final class TSF implements ModInitializer {
             if (BodyManager.restricted(player, HypnosisRestrictions.INTERACTION)) {
                 return InteractionResult.FAIL;
             }
-            if (entity instanceof Player && BodyManager.spiritSpear(player.getItemInHand(hand))) {
-                if (player instanceof ServerPlayer serverPlayer && entity instanceof ServerPlayer target) {
-                    BodyManager.get().useSpiritSpear(serverPlayer, target, hand);
-                }
-                return InteractionResult.SUCCESS;
-            }
             if (BodyManager.foldedSkin(entity)) {
                 if (player instanceof ServerPlayer serverPlayer) {
                     BodyManager.get().hitSkin(serverPlayer, entity);
@@ -219,7 +210,12 @@ public final class TSF implements ModInitializer {
             }
             return InteractionResult.PASS;
         });
-        UseBlockCallback.EVENT.register((player, level, hand, hit) -> restricted(player) ? InteractionResult.FAIL : InteractionResult.PASS);
+        UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
+            if (BodyManager.form(player) == Form.SPIRIT && BodyManager.spiritSpear(player.getItemInHand(hand))) {
+                return player.getItemInHand(hand).getItem().use(level, player, hand);
+            }
+            return restricted(player) ? InteractionResult.FAIL : InteractionResult.PASS;
+        });
         AttackBlockCallback.EVENT.register((player, level, hand, position, direction) -> restricted(player) ? InteractionResult.FAIL : InteractionResult.PASS);
         PlayerBlockBreakEvents.BEFORE.register((level, player, position, state, blockEntity) -> !restricted(player));
         registerCommands();

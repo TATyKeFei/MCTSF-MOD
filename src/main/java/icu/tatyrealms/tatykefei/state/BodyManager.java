@@ -12,6 +12,7 @@ import icu.tatyrealms.tatykefei.compat.NeedsOfNatureTanks;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureBodies;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureSkins;
 import icu.tatyrealms.tatykefei.item.TSFItems;
+import icu.tatyrealms.tatykefei.item.SpiritSpearItem;
 import net.minecraft.world.item.Items;
 import net.minecraft.core.particles.ParticleTypes;
 import icu.tatyrealms.tatykefei.item.ProtectionTotems;
@@ -47,6 +48,7 @@ import net.minecraft.network.chat.ChatType;
 import net.minecraft.network.chat.PlayerChatMessage;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
 import net.minecraft.network.protocol.game.ClientboundSetHeldSlotPacket;
+import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
@@ -70,6 +72,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.ResolvableProfile;
@@ -97,6 +100,7 @@ public final class BodyManager {
     private boolean saveRequested;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
     private final Map<UUID, HypnosisSession> hypnosisSessions = new HashMap<>();
+    private final Map<UUID, SpiritDash> spiritDashes = new HashMap<>();
     private final Map<UUID, ItemEntity> slimeBottleDrops = new HashMap<>();
     private final Map<UUID, List<UUID>> lastSkinLayers = new HashMap<>();
     private final Map<UUID, UUID> natureBodies = new HashMap<>();
@@ -256,6 +260,7 @@ public final class BodyManager {
     }
 
     public void left(ServerPlayer player) {
+        cancelSpiritSpearDash(player);
         PlayerState state = state(player);
         natureSkins.capture(nativeBody(player));
         natureSkins.capture(appearance(player));
@@ -1130,6 +1135,9 @@ public final class BodyManager {
 
     private void applyForm(ServerPlayer player) {
         PlayerState state = state(player);
+        if (state.form != Form.SPIRIT) {
+            cancelSpiritSpearDash(player);
+        }
         ((FormHolder) player).tsf$setForm(state.form);
         if (state.form == Form.OBSERVER && !player.isSpectator()) {
             player.setGameMode(GameType.SPECTATOR);
@@ -1180,20 +1188,83 @@ public final class BodyManager {
         }
     }
 
-    public void useSpiritSpear(ServerPlayer player, ServerPlayer target, InteractionHand hand) {
+    public boolean beginSpiritSpearDash(ServerPlayer player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
-        if (!player.isAlive() || hypnotized(player) || !spiritSpear(stack) || !ready(player)) {
+        if (state(player).form != Form.SPIRIT || player.isSpectator() || !player.isAlive()
+                || hypnotized(player) || !spiritSpear(stack) || spiritDashes.containsKey(player.getUUID())
+                || player.getCooldowns().isOnCooldown(stack) || !NeedsOfNatureCompat.canChangeBody(player) || !ready(player)) {
+            return false;
+        }
+        spiritDashes.put(player.getUUID(), new SpiritDash(player.level(), hand, stack.getItem(),
+                player.position(), ticks + SpiritSpearItem.DASH_TICKS));
+        player.setDeltaMovement(player.getLookAngle().scale(SpiritSpearItem.DASH_SPEED));
+        player.connection.send(new ClientboundSetEntityMotionPacket(player));
+        return true;
+    }
+
+    public void cancelSpiritSpearDash(ServerPlayer player) {
+        if (spiritDashes.remove(player.getUUID()) != null) {
+            player.setDeltaMovement(Vec3.ZERO);
+            player.connection.send(new ClientboundSetEntityMotionPacket(player));
+        }
+    }
+
+    private void tickSpiritSpearDash(ServerPlayer player) {
+        SpiritDash dash = spiritDashes.get(player.getUUID());
+        if (dash == null) {
             return;
         }
-        if (state(player).form != Form.SPIRIT || player.isSpectator()) {
-            message(player, "spear_spirit_only");
+        Vec3 movement = player.position().subtract(dash.position);
+        if (state(player).form != Form.SPIRIT || !player.isAlive() || player.isSpectator() || hypnotized(player)
+                || player.level() != dash.level || !player.isUsingItem() || player.getUsedItemHand() != dash.hand
+                || !player.getItemInHand(dash.hand).is(dash.spear) || movement.lengthSqr() > 16 || ticks > dash.until) {
+            cancelSpiritSpearDash(player);
+            if (spiritSpear(player.getUseItem())) {
+                player.stopUsingItem();
+            }
             return;
         }
-        if (stack.is(TSFItems.POSSESSION_SPEAR)) {
-            attachSpirit(player, target);
+        ServerPlayer target = movement.lengthSqr() < 1.0E-6 ? null : spiritSpearHit(player, dash.position);
+        if (target != null) {
+            cancelSpiritSpearDash(player);
+            player.stopUsingItem();
+            if (dash.spear == TSFItems.POSSESSION_SPEAR) {
+                attachSpirit(player, target);
+            } else {
+                takeOver(player, target);
+            }
+        } else if (player.horizontalCollision || player.verticalCollision || ticks >= dash.until) {
+            cancelSpiritSpearDash(player);
+            player.stopUsingItem();
         } else {
-            takeOver(player, target);
+            player.setDeltaMovement(player.getLookAngle().scale(SpiritSpearItem.DASH_SPEED));
+            spiritDashes.put(player.getUUID(), new SpiritDash(dash.level, dash.hand, dash.spear, player.position(), dash.until));
         }
+    }
+
+    private ServerPlayer spiritSpearHit(ServerPlayer player, Vec3 start) {
+        Vec3 end = player.position();
+        AABB area = player.getBoundingBox().expandTowards(start.subtract(end)).inflate(0.1);
+        ServerPlayer closest = null;
+        double closestDistance = Double.MAX_VALUE;
+        for (Entity entity : player.level().getEntities(player, area, candidate -> candidate instanceof ServerPlayer target
+                && target.isAlive() && !target.isSpectator() && form(target) == Form.HUMAN)) {
+            ServerPlayer target = (ServerPlayer) entity;
+            AABB contact = target.getBoundingBox().inflate(player.getBbWidth() * 0.5 + 0.1, 0, player.getBbWidth() * 0.5 + 0.1)
+                    .expandTowards(0, -player.getBbHeight(), 0);
+            Vec3 hit = contact.contains(start) ? start : contact.clip(start, end).orElse(null);
+            if (hit != null && near(player, target, 5)) {
+                double distance = start.distanceToSqr(hit);
+                if (distance < closestDistance) {
+                    closest = target;
+                    closestDistance = distance;
+                }
+            }
+        }
+        return closest;
+    }
+
+    private record SpiritDash(ServerLevel level, InteractionHand hand, Item spear, Vec3 position, int until) {
     }
 
     private void attachSpirit(ServerPlayer player, ServerPlayer target) {
@@ -1255,7 +1326,7 @@ public final class BodyManager {
     }
 
     public void possess(ServerPlayer player, ServerPlayer target) {
-        if (state(player).form == Form.SPIRIT && !player.getMainHandItem().is(TSFItems.SNATCHING_SPEAR)) {
+        if (state(player).form == Form.SPIRIT) {
             message(player, "use_spirit_spear");
             return;
         }
@@ -2422,6 +2493,7 @@ public final class BodyManager {
                 cancelHypnosis(player);
             }
             updateSpiritSpears(player);
+            tickSpiritSpearDash(player);
             if (state.expulsionAt != 0 && server.overworld().getGameTime() >= state.expulsionAt) {
                 if (!player.isAlive() || state.form != Form.HUMAN || !java.util.Objects.equals(state.body, state.expulsionBody)) {
                     state.expulsionAt = 0;
