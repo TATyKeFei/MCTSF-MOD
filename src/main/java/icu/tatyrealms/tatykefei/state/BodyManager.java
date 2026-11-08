@@ -101,7 +101,8 @@ public final class BodyManager {
     private final Map<UUID, ItemEntity> skinDrops = new HashMap<>();
     private final Map<UUID, Entity> bodyEntities = new HashMap<>();
     private final Map<UUID, Integer> lastSkinRecoverySeconds = new HashMap<>();
-    private final Map<UUID, String> observerInventories = new HashMap<>();
+    private final Map<UUID, ServerPlayer> observerTargets = new HashMap<>();
+    private final Map<UUID, ObserverSync> observerSnapshots = new HashMap<>();
     private boolean visualsDirty;
     private int ticks;
 
@@ -284,7 +285,7 @@ public final class BodyManager {
         pendingProjections.remove(player.getUUID());
         lastSkinLayers.remove(player.getUUID());
         lastSkinRecoverySeconds.remove(player.getUUID());
-        observerInventories.remove(player.getUUID());
+        observerTargets.remove(player.getUUID());
         for (ServerPlayer other : server.getPlayerList().getPlayers()) {
             if (other != player) {
                 updateObserver(other);
@@ -2439,9 +2440,6 @@ public final class BodyManager {
             if (updateObserver(player)) {
                 visualsDirty = true;
             }
-            if (ticks % 5 == 0) {
-                synchronizeObserver(player);
-            }
             int remaining = skinRecoverySeconds(player);
             Integer previous = lastSkinRecoverySeconds.put(player.getUUID(), remaining);
             if (previous == null || previous != remaining) {
@@ -2450,6 +2448,9 @@ public final class BodyManager {
                     message(player, "skin_recovery_ready");
                 }
             }
+        }
+        if (ticks % 5 == 0) {
+            synchronizeObservers();
         }
         if (visualsDirty || recoveryChanged) {
             if (visualsDirty) {
@@ -2515,32 +2516,39 @@ public final class BodyManager {
         player.connection.send(new ClientboundSetHeldSlotPacket(player.getInventory().getSelectedSlot()));
     }
 
-    private void synchronizeObserver(ServerPlayer player) {
-        if (!ServerPlayNetworking.canSend(player, ObserverPayload.TYPE)) {
-            return;
-        }
-        ServerPlayer target = state(player).form == Form.OBSERVER && player.getCamera() instanceof ServerPlayer camera
-                && camera != player && state(camera).form == Form.HUMAN ? camera : null;
-        ObserverInventory inventory = null;
-        if (target != null) {
-            List<JsonElement> items = new ArrayList<>();
-            for (int slot = 0; slot < target.getInventory().getContainerSize(); slot++) {
-                items.add(encodeItem(target.getInventory().getItem(slot)));
+    private void synchronizeObservers() {
+        Set<UUID> updated = new HashSet<>();
+        var operations = server.registryAccess().createSerializationContext(JsonOps.INSTANCE);
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (!ServerPlayNetworking.canSend(player, ObserverPayload.TYPE)) {
+                observerTargets.remove(player.getUUID());
+                continue;
             }
-            List<JsonElement> crafting = new ArrayList<>();
-            for (int slot = 0; slot < 5; slot++) {
-                crafting.add(encodeItem(target.inventoryMenu.getSlot(slot).getItem()));
+            ServerPlayer target = state(player).form == Form.OBSERVER && player.getCamera() instanceof ServerPlayer camera
+                    && camera != player && state(camera).form == Form.HUMAN ? camera : null;
+            if (target == null) {
+                if (observerTargets.remove(player.getUUID()) != null) {
+                    ServerPlayNetworking.send(player, new ObserverPayload("null"));
+                }
+                continue;
             }
-            inventory = new ObserverInventory(target.getUUID(), items, crafting, target.getInventory().getSelectedSlot(),
-                    target.getHealth(), target.getAbsorptionAmount(), target.getFoodData().getFoodLevel(),
-                    target.getFoodData().getSaturationLevel(), target.experienceProgress, target.experienceLevel,
-                    target.totalExperience, target.isUsingItem() ? target.getUsedItemHand() : null,
-                    target.getUseItemRemainingTicks());
+            ObserverSync sync = observerSnapshots.computeIfAbsent(target.getUUID(), ObserverSync::new);
+            if (updated.add(target.getUUID())) {
+                ObserverInventory.Status status = new ObserverInventory.Status(target.getInventory().getSelectedSlot(),
+                        target.getHealth(), target.getAbsorptionAmount(), target.getFoodData().getFoodLevel(),
+                        target.getFoodData().getSaturationLevel(), target.experienceProgress, target.experienceLevel,
+                        target.totalExperience, target.isUsingItem() ? target.getUsedItemHand() : null,
+                        target.getUseItemRemainingTicks());
+                sync.update(target.getInventory(), slot -> target.inventoryMenu.getSlot(slot).getItem(), status,
+                        stack -> ItemStack.OPTIONAL_CODEC.encodeStart(operations, stack).getOrThrow());
+            }
+            String json = observerTargets.get(player.getUUID()) == target ? sync.deltaJson() : sync.fullJson();
+            if (json != null) {
+                ServerPlayNetworking.send(player, new ObserverPayload(json));
+            }
+            observerTargets.put(player.getUUID(), target);
         }
-        String json = GSON.toJson(inventory);
-        if (!json.equals(observerInventories.put(player.getUUID(), json))) {
-            ServerPlayNetworking.send(player, new ObserverPayload(json));
-        }
+        observerSnapshots.keySet().retainAll(updated);
     }
 
     private void updateSkinDrops() {

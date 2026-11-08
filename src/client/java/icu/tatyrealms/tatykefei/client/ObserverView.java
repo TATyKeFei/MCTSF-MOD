@@ -1,6 +1,7 @@
 package icu.tatyrealms.tatykefei.client;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
 import com.mojang.serialization.JsonOps;
 import icu.tatyrealms.tatykefei.client.mixin.LivingEntityUseAccessor;
 import icu.tatyrealms.tatykefei.network.ObserverInventory;
@@ -8,6 +9,7 @@ import icu.tatyrealms.tatykefei.state.BodyManager;
 import icu.tatyrealms.tatykefei.state.Form;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -42,25 +44,37 @@ public final class ObserverView {
     public static void receive(String json) {
         ObserverInventory inventory = GSON.fromJson(json, ObserverInventory.class);
         Minecraft client = Minecraft.getInstance();
-        if (inventory == null || !inventory.target().equals(target) || client.level == null) {
+        if (inventory == null || client.level == null) {
             clear();
+            return;
         }
-        if (inventory != null && client.level != null) {
+        if (inventory.full()) {
+            if (!inventory.target().equals(target)) {
+                clear();
+            }
             target = inventory.target();
-            snapshot = inventory;
-            receivedTick = client.level.getGameTime();
-            useItemPending = inventory.useItemHand() != null;
-            var operations = client.level.registryAccess().createSerializationContext(JsonOps.INSTANCE);
-            List<ItemStack> decoded = new ArrayList<>();
-            for (var item : inventory.items()) {
-                decoded.add(ItemStack.OPTIONAL_CODEC.parse(operations, item).getOrThrow());
+            items = new ArrayList<>();
+            crafting = new ArrayList<>();
+        } else if (!inventory.target().equals(target)) {
+            return;
+        }
+        snapshot = inventory;
+        receivedTick = client.level.getGameTime();
+        useItemPending = inventory.status().useItemHand() != null;
+        decodeChanges(items, inventory.items());
+        decodeChanges(crafting, inventory.crafting());
+    }
+
+    private static void decodeChanges(List<ItemStack> decoded, Map<Integer, JsonElement> changes) {
+        if (changes.isEmpty()) {
+            return;
+        }
+        var operations = Minecraft.getInstance().level.registryAccess().createSerializationContext(JsonOps.INSTANCE);
+        for (var entry : changes.entrySet()) {
+            while (decoded.size() <= entry.getKey()) {
+                decoded.add(ItemStack.EMPTY);
             }
-            items = decoded;
-            List<ItemStack> grid = new ArrayList<>();
-            for (var item : inventory.crafting()) {
-                grid.add(ItemStack.OPTIONAL_CODEC.parse(operations, item).getOrThrow());
-            }
-            crafting = grid;
+            decoded.set(entry.getKey(), ItemStack.OPTIONAL_CODEC.parse(operations, entry.getValue()).getOrThrow());
         }
     }
 
@@ -111,6 +125,7 @@ public final class ObserverView {
     public static void updateInventory() {
         AbstractClientPlayer player = target();
         if (player != null) {
+            var status = snapshot.status();
             for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
                 ItemStack item = item(slot);
                 ItemStack current = player.getInventory().getItem(slot);
@@ -122,17 +137,17 @@ public final class ObserverView {
                     }
                 }
             }
-            player.getInventory().setSelectedSlot(snapshot.selectedSlot());
+            player.getInventory().setSelectedSlot(status.selectedSlot());
             for (int slot = 0; slot < Math.min(crafting.size(), 5); slot++) {
                 player.inventoryMenu.getSlot(slot).set(crafting.get(slot).copy());
             }
-            player.setHealth(snapshot.health());
-            player.setAbsorptionAmount(snapshot.absorption());
-            player.getFoodData().setFoodLevel(snapshot.food());
-            player.getFoodData().setSaturation(snapshot.saturation());
-            player.experienceProgress = snapshot.experienceProgress();
-            player.experienceLevel = snapshot.experienceLevel();
-            player.totalExperience = snapshot.totalExperience();
+            player.setHealth(status.health());
+            player.setAbsorptionAmount(status.absorption());
+            player.getFoodData().setFoodLevel(status.food());
+            player.getFoodData().setSaturation(status.saturation());
+            player.experienceProgress = status.experienceProgress();
+            player.experienceLevel = status.experienceLevel();
+            player.totalExperience = status.totalExperience();
             updateUseItem(player);
         }
     }
@@ -141,9 +156,9 @@ public final class ObserverView {
         if (player.isUsingItem()) {
             ItemStack item = player.getItemInHand(player.getUsedItemHand());
             LivingEntityUseAccessor accessor = (LivingEntityUseAccessor) player;
-            if (useItemPending && snapshot.useItemHand() == player.getUsedItemHand()) {
+            if (useItemPending && snapshot.status().useItemHand() == player.getUsedItemHand()) {
                 long elapsed = Math.max(0, player.level().getGameTime() - receivedTick);
-                accessor.tsf$setUseItemRemaining((int) Math.max(0, snapshot.useItemRemainingTicks() - elapsed));
+                accessor.tsf$setUseItemRemaining((int) Math.max(0, snapshot.status().useItemRemainingTicks() - elapsed));
                 useItemPending = false;
             } else if (!ItemStack.isSameItem(player.getUseItem(), item)) {
                 accessor.tsf$setUseItemRemaining(item.getUseDuration(player));
