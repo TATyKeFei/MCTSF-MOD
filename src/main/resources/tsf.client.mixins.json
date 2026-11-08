@@ -2,6 +2,6 @@
   "required": true,
   "package": "icu.tatyrealms.tatykefei.client.mixin",
   "compatibilityLevel": "JAVA_25",
-  "client": ["ClientPlayerMixin", "LocalPlayerMixin", "PlayerInfoMixin", "LevelExtractorMixin", "AvatarRendererMixin", "AvatarRenderStateMixin", "PlayerModelMixin", "KeyboardInputMixin", "FirstPersonRendererMixin", "ItemModelResolverMixin", "ItemStackRenderStateMixin", "ItemLayerRenderStateMixin", "SlimeRenderStateMixin", "LivingEntityRendererMixin", "SlimeRendererMixin", "SlimeOuterLayerMixin", "GameRendererMixin", "CameraMixin", "HudMixin", "GuiMixin", "NeedsOfNatureSelectionMixin", "LivingEntityUseAccessor"],
+  "client": ["ClientPlayerMixin", "ClientPacketListenerMixin", "LocalPlayerMixin", "PlayerInfoMixin", "LevelExtractorMixin", "AvatarRendererMixin", "AvatarRenderStateMixin", "PlayerModelMixin", "KeyboardInputMixin", "FirstPersonRendererMixin", "ItemModelResolverMixin", "ItemStackRenderStateMixin", "ItemLayerRenderStateMixin", "SlimeRenderStateMixin", "LivingEntityRendererMixin", "SlimeRendererMixin", "SlimeOuterLayerMixin", "GameRendererMixin", "CameraMixin", "HudMixin", "GuiMixin", "NeedsOfNatureSelectionMixin", "LivingEntityUseAccessor"],
   "injectors": {"defaultRequire": 1}
 }
