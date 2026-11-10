@@ -1203,27 +1203,32 @@ public final class BodyManager {
         }
     }
 
-    public void useSpiritSpear(ServerPlayer player, ServerPlayer target, InteractionHand hand) {
+    public boolean hitSpiritSpear(ServerPlayer player, ServerPlayer target, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
-        if (!player.isAlive() || hypnotized(player) || !spiritSpear(stack) || !ready(player)) {
-            return;
-        }
-        if (state(player).form != Form.SPIRIT || player.isSpectator()) {
-            message(player, "spear_spirit_only");
-            return;
+        if (!player.isAlive() || player.isSpectator() || hypnotized(player)
+                || restricted(player, HypnosisRestrictions.INTERACTION) || state(player).form != Form.SPIRIT
+                || !spiritSpear(stack) || !player.isUsingItem() || player.getUsedItemHand() != hand
+                || !validPossessionTarget(player, target) || !ready(player)) {
+            return false;
         }
         if (stack.is(TSFItems.POSSESSION_SPEAR)) {
             attachSpirit(player, target);
         } else {
-            takeOver(player, target);
+            takeOver(player, target, true);
         }
+        boolean affected = state(player).form != Form.SPIRIT;
+        if (affected) {
+            player.stopUsingItem();
+        }
+        return affected;
+    }
+
+    private boolean validPossessionTarget(ServerPlayer player, ServerPlayer target) {
+        return target != null && player != target && target.isAlive() && player.level() == target.level()
+                && state(target).form == Form.HUMAN && !target.isSpectator();
     }
 
     private void attachSpirit(ServerPlayer player, ServerPlayer target) {
-        if (!near(player, target, 5) || state(target).form != Form.HUMAN || target.isSpectator()) {
-            message(player, "invalid_target");
-            return;
-        }
         if (!NeedsOfNatureCompat.canChangeBody(player) || !NeedsOfNatureCompat.canChangeBody(target)) {
             return;
         }
@@ -1278,19 +1283,19 @@ public final class BodyManager {
     }
 
     public void possess(ServerPlayer player, ServerPlayer target) {
-        if (state(player).form == Form.SPIRIT && !player.getMainHandItem().is(TSFItems.SNATCHING_SPEAR)) {
+        if (state(player).form == Form.SPIRIT) {
             message(player, "use_spirit_spear");
             return;
         }
-        takeOver(player, target);
+        takeOver(player, target, false);
     }
 
-    private void takeOver(ServerPlayer player, ServerPlayer target) {
+    private void takeOver(ServerPlayer player, ServerPlayer target, boolean spearHit) {
         if ((state(player).form != Form.SPIRIT && state(player).form != Form.SLIME) || player.isSpectator()) {
             message(player, "leave_first");
             return;
         }
-        if (!near(player, target, 5) || state(target).form != Form.HUMAN || target.isSpectator()) {
+        if (!validPossessionTarget(player, target) || !spearHit && !near(player, target, 5)) {
             message(player, "invalid_target");
             return;
         }
