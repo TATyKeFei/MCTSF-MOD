@@ -1,39 +1,39 @@
-# Repository Guidelines
+# 仓库贡献指南
 
-## Project Structure & Module Organization
+## 项目结构与模块划分
 
-TSF is a Fabric mod for Minecraft 26.3, targeting Java 25. Dependency and mod versions are defined in `gradle.properties`.
+TSF 是面向 Minecraft 26.3 的 Fabric 模组，使用 Java 25。依赖和模组版本统一配置在 `gradle.properties`。
 
-- `src/main/java/icu/tatyrealms/tatykefei/`: shared and server code, including `item/`, `state/`, `network/`, `compat/`, and `mixin/`.
-- `src/client/java/icu/tatyrealms/tatykefei/client/`: screens, rendering, observer synchronization, and client mixins.
-- `src/main/resources/assets/tsf/`: built-in textures, item models, translations, and mod icon.
-- `src/main/resources/data/`: recipes, animation definitions, and Trinkets slot definitions and tags.
-- `.github/workflows/build.yml`: CI build and JAR artifact upload. `build/` and `run/` are generated directories.
+- `src/main/java/icu/tatyrealms/tatykefei/`：公共及服务端代码，按物品（`item/`）、状态（`state/`）、网络（`network/`）、兼容（`compat/`）和注入（`mixin/`）划分。
+- `src/client/java/icu/tatyrealms/tatykefei/client/`：界面、渲染、旁观同步及客户端 Mixin。
+- `src/main/resources/assets/tsf/`：内置纹理、物品模型、翻译和模组图标。
+- `src/main/resources/data/`：配方、动画定义及 Trinkets 饰品槽定义和标签。
+- `.github/workflows/build.yml`：自动构建并上传 JAR 产物。`build/` 和 `run/` 为生成目录。
 
-## Build, Test, and Development Commands
+## 构建、测试与开发命令
 
-Use JDK 25 and the checked-in Gradle wrapper:
+使用 JDK 25 和仓库自带的 Gradle Wrapper：
 
-- `./gradlew build`: compile both source sets, run configured checks, and package JARs in `build/libs/`.
-- `./gradlew test`: run tests when present; currently reports `NO-SOURCE`.
-- `./gradlew runClient`: launch the development client.
-- `./gradlew runServer`: launch the development server; accept its EULA before use.
-- `./gradlew --offline build`: build using cached dependencies after initial setup.
+- `./gradlew build`：编译公共及客户端代码，执行已配置的检查，将 JAR 输出至 `build/libs/`。
+- `./gradlew test`：运行测试；目前没有测试源码，结果为 `NO-SOURCE`。
+- `./gradlew runClient`：启动开发客户端。
+- `./gradlew runServer`：启动开发服务端；使用前需接受其 EULA。
+- `./gradlew --offline build`：首次配置完成后，使用已缓存的依赖离线构建。
 
-Distribute the regular JAR, not the `-sources.jar` artifact.
+发布时选择普通 JAR；`-sources.jar` 是源码包。
 
-## Coding Style & Naming Conventions
+## 代码风格与命名约定
 
-Use four-space Java indentation, same-line opening braces, and UTF-8. Keep packages under `icu.tatyrealms.tatykefei`. Use PascalCase types, camelCase members, UPPER_SNAKE_CASE constants, and `tsf$` prefixes for mixin additions. Resource identifiers use the `tsf` namespace and snake_case paths. Update both `zh_cn.json` and `en_us.json` for new user-facing text. Follow surrounding JSON formatting; no formatter or linter is configured.
+Java 使用四空格缩进、同行左花括号及 UTF-8 编码。包名统一以 `icu.tatyrealms.tatykefei` 开头。类型名使用 PascalCase，成员使用 camelCase，常量使用 UPPER_SNAKE_CASE，Mixin 新增成员使用 `tsf$` 前缀。资源标识使用 `tsf` 命名空间和 snake_case 路径。新增界面文本时同步更新 `zh_cn.json` 与 `en_us.json`。JSON 格式遵循相邻文件；目前未配置格式化或静态检查工具。
 
-## Testing Guidelines
+## 测试要求
 
-There is no automated test suite, configured testing framework, or coverage threshold. Run `./gradlew build` and manually verify affected behavior. Use two clients for possession, observer inventory, chat, and disconnect changes. Check rendering in relevant display contexts. Verify optional integrations with and without Trinkets Updated and NeedsOfNature. Report checks performed and any untested behavior.
+目前没有自动化测试套件、已配置的测试框架或覆盖率要求。修改后运行 `./gradlew build`，并手动验证受影响的行为。附身、旁观物品栏、聊天和断线相关修改需使用两个客户端验证；渲染修改需检查相关展示场景。兼容修改需分别验证安装和未安装 Trinkets Updated、NeedsOfNature 的情况。提交说明中记录已执行的检查及尚未验证的行为。
 
-## Compatibility & State Management
+## 兼容与状态管理
 
-Keep client classes out of shared code. Optional integrations must tolerate absent mods. Mutate Minecraft state on its owning game thread; background persistence should receive detached snapshots. Server settings live in `config/tsf-server.json`.
+公共代码不得引用客户端专用类。可选兼容功能必须能够在对应模组缺失时正常运行。Minecraft 状态修改应在所属游戏线程执行；后台持久化仅接收与实时状态分离的快照。服务端配置位于 `config/tsf-server.json`。
 
-## Commit & Pull Request Guidelines
+## 提交与合并请求规范
 
-History favors concise Chinese subjects describing a concrete change, such as `修复展示框中肉体和皮物被压扁及悬空的问题`. Commit each completed task separately; preserve unrelated edits and do not push without explicit instruction. Keep the mod version unchanged unless requested. PRs should explain resulting behavior, reference relevant issues, list validation, and include screenshots for visual changes.
+提交记录通常使用简洁的中文标题描述具体改动，例如 `修复展示框中肉体和皮物被压扁及悬空的问题`。每完成一项任务单独提交，保留无关修改，未经明确要求不得推送。除非用户要求，否则保持模组版本号不变。合并请求应说明修改后的行为、关联相关议题、列出验证结果；涉及视觉变化时附上截图。
