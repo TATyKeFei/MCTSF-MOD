@@ -36,7 +36,7 @@ public final class ProtectionTotems {
     public static Item[] items(Kind kind) {
         Item specific = switch (kind) {
             case HYPNOSIS -> TSFItems.HYPNOSIS_PROTECTION_TOTEM;
-            case POSSESSION -> TSFItems.POSSESSION_PROTECTION_TOTEM;
+            case POSSESSION -> TSFItems.LIN_ZHENGYING_TALISMAN;
             case SKIN -> TSFItems.SKIN_PROTECTION_TOTEM;
         };
         return new Item[]{specific, TSFItems.TSF_PROTECTION_TOTEM};
