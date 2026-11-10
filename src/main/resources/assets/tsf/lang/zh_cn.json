@@ -1,7 +1,7 @@
 {
-  "screen.tsf.observer_chat_private": "旁观：私聊",
-  "screen.tsf.observer_chat_public": "旁观：公开",
-  "screen.tsf.observer_chat_hint": "设置被你控制的旁观者发言范围。私聊模式下普通聊天仅发给你；输入 @!内容 可与对方私聊。",
+  "screen.tsf.observer_chat_private": "旁观私聊：开启",
+  "screen.tsf.observer_chat_public": "旁观私聊：关闭",
+  "screen.tsf.observer_chat_hint": "开启后，被你控制的旁观者普通聊天仅发给你；关闭后允许公开发言，输入 @!内容 仍可私聊",
   "chat.tsf.observer_private": "[人格私聊] %s：%s",
   "message.tsf.observer_chat_no_target": "当前没有可接收人格私聊的控制者或旁观者。",
   "message.tsf.observer_chat_private_only": "当前仅可与控制者私聊；直接输入聊天内容，或使用 /msg 控制者名字 内容。",

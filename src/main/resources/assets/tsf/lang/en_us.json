@@ -1,7 +1,7 @@
 {
-  "screen.tsf.observer_chat_private": "Chat: Private",
-  "screen.tsf.observer_chat_public": "Chat: Public",
-  "screen.tsf.observer_chat_hint": "Choose whether your controlled observers can speak publicly or only to you. Use @!message for private conversation.",
+  "screen.tsf.observer_chat_private": "Observer private chat: On",
+  "screen.tsf.observer_chat_public": "Observer private chat: Off",
+  "screen.tsf.observer_chat_hint": "When enabled, your controlled observers' normal chat is sent only to you. When disabled, public chat is allowed; @!message still sends a private message.",
   "chat.tsf.observer_private": "[Mind chat] %s: %s",
   "message.tsf.observer_chat_no_target": "There is no controller or controlled observer available for private conversation.",
   "message.tsf.observer_chat_private_only": "You may only speak to your controller. Type normally, or use /msg controller message.",

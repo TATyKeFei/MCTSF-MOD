@@ -38,6 +38,8 @@ public final class PhoneScreen extends Screen {
     private int controlsX;
     private int controlsWidth;
     private int speechY;
+    private int observerChatY;
+    private int navigationY;
     private int footerY;
     private int refreshTicks;
     private int speechCooldown;
@@ -49,8 +51,6 @@ public final class PhoneScreen extends Screen {
     private Button observerChat;
     private Button slimeColors;
     private Button leave;
-    private Button returnToBody;
-    private Button undress;
 
     public PhoneScreen() {
         super(Component.translatable("screen.tsf.phone"));
@@ -62,22 +62,23 @@ public final class PhoneScreen extends Screen {
             return;
         }
         panelWidth = Math.min(438, width - 16);
-        panelHeight = Math.min(344, height - 16);
+        panelHeight = Math.min(330, height - 16);
         left = (width - panelWidth) / 2;
         top = (height - panelHeight) / 2;
         modelWidth = (panelWidth - 36) * 2 / 5;
         controlsX = left + modelWidth + 24;
         controlsWidth = panelWidth - modelWidth - 36;
-        footerY = top + panelHeight - 56;
+        footerY = top + panelHeight - 32;
+        navigationY = footerY - 34;
         restrictions.clear();
         if (selected == null && minecraft.hitResult instanceof EntityHitResult hit && hit.getEntity() instanceof Player target) {
             selected = target.getUUID();
         }
         previous = addRenderableWidget(Button.builder(Component.literal("<"), button -> select(-1))
-                .bounds(left + 12, footerY - 22, 20, 20)
+                .bounds(left + 12, navigationY, 20, 20)
                 .tooltip(Tooltip.create(Component.translatable("screen.tsf.previous_target"))).build());
         next = addRenderableWidget(Button.builder(Component.literal(">"), button -> select(1))
-                .bounds(left + modelWidth - 8, footerY - 22, 20, 20)
+                .bounds(left + modelWidth - 8, navigationY, 20, 20)
                 .tooltip(Tooltip.create(Component.translatable("screen.tsf.next_target"))).build());
 
         int columns = panelHeight < 300 ? 2 : 1;
@@ -86,11 +87,14 @@ public final class PhoneScreen extends Screen {
         for (int index = 0; index < FLAGS.length; index++) {
             Action action = RESTRICTION_ACTIONS[index];
             restrictions.add(addRenderableWidget(Button.builder(Component.empty(), button -> TSFClient.send(action, selected))
-                    .bounds(controlsX + index % columns * (buttonWidth + 4), top + 56 + index / columns * 24,
+                    .bounds(controlsX + index % columns * (buttonWidth + 4), top + 42 + index / columns * 24,
                             buttonWidth, 20).tooltip(rangeHint).build()));
         }
-        int releaseY = top + 56 + (FLAGS.length / columns) * 24;
-        release = action("release", "release_hint", Action.RELEASE, controlsX, releaseY, controlsWidth);
+        int releaseY = top + 42 + (FLAGS.length / columns) * 24;
+        release = addRenderableWidget(Button.builder(Component.translatable("screen.tsf.release"),
+                button -> TSFClient.send(Action.RELEASE, selected))
+                .bounds(controlsX, releaseY, controlsWidth, 20)
+                .tooltip(Tooltip.create(Component.translatable("screen.tsf.release_hint"))).build());
         speechY = releaseY + 36;
         String draft = speech == null ? "" : speech.getValue();
         speech = addRenderableWidget(new EditBox(font, controlsX, speechY, controlsWidth - 48, 20,
@@ -106,10 +110,11 @@ public final class PhoneScreen extends Screen {
         }).bounds(controlsX + controlsWidth - 44, speechY, 44, 20).build());
         speech.setResponder(value -> updateActions());
 
-        int half = (panelWidth - 28) / 2;
+        observerChatY = speechY + 28;
         observerChat = addRenderableWidget(Button.builder(Component.empty(), button -> TSFClient.send(Action.OBSERVER_CHAT, null))
-                .bounds(left + 12, footerY, half, 20)
+                .bounds(controlsX, observerChatY, controlsWidth, 20)
                 .tooltip(Tooltip.create(Component.translatable("screen.tsf.observer_chat_hint"))).build());
+        int half = (panelWidth - 28) / 2;
         slimeColors = addRenderableWidget(Button.builder(Component.translatable("screen.tsf.slime_color"),
                 button -> minecraft.gui.setScreen(new SlimeColorScreen(this)))
                 .bounds(left + 12, footerY, half, 20).build());
@@ -118,18 +123,7 @@ public final class PhoneScreen extends Screen {
             TSFClient.send(visual != null && visual.skinRecoverySeconds() >= 0 ? Action.RESTORE_SKIN : Action.LEAVE_ZIPPER, null);
             onClose();
         }).bounds(left + 16 + half, footerY, half, 20).build());
-        returnToBody = action("return", "return_hint", Action.RETURN, left + 12, footerY + 24, half);
-        undress = action("undress", "undress_hint", Action.UNDRESS, left + 16 + half, footerY + 24, half);
         refresh();
-    }
-
-    private Button action(String name, String hint, Action action, int x, int y, int buttonWidth) {
-        return addRenderableWidget(Button.builder(Component.translatable("screen.tsf." + name), button -> {
-            TSFClient.send(action, action == Action.RELEASE ? selected : null);
-            if (action == Action.RETURN) {
-                onClose();
-            }
-        }).bounds(x, y, buttonWidth, 20).tooltip(Tooltip.create(Component.translatable("screen.tsf." + hint))).build());
     }
 
     private void select(int direction) {
@@ -176,7 +170,7 @@ public final class PhoneScreen extends Screen {
     }
 
     private void updateActions() {
-        if (minecraft.player == null || undress == null) {
+        if (minecraft.player == null || leave == null) {
             return;
         }
         Form form = BodyManager.form(minecraft.player);
@@ -215,8 +209,6 @@ public final class PhoneScreen extends Screen {
                 : Component.translatable("screen.tsf.leave_zipper"));
         leave.setTooltip(Tooltip.create(Component.translatable(recovery
                 ? "screen.tsf.restore_skin_hint" : "screen.tsf.leave_zipper_hint")));
-        returnToBody.active = !BodyManager.hypnotized(minecraft.player);
-        undress.active = free && visual != null && visual.wearingSkin();
     }
 
     @Override
@@ -238,16 +230,10 @@ public final class PhoneScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         panel(graphics, left, top, panelWidth, panelHeight);
         graphics.text(font, title, left + 12, top + 10, TEXT_COLOR, false);
-        if (minecraft.player != null) {
-            VisualState visual = TSFClient.visual(minecraft.player.getUUID());
-            Component form = Component.translatable("form.tsf." + BodyManager.form(minecraft.player).name().toLowerCase(java.util.Locale.ROOT));
-            String bodyName = visual == null ? minecraft.player.getGameProfile().name() : visual.bodyName();
-            text(graphics, Component.translatable("screen.tsf.status", form, bodyName), left + 12, top + 25, panelWidth - 24);
-        }
-        text(graphics, Component.translatable("screen.tsf.hypnotized_players"), left + 12, top + 42, modelWidth);
-        text(graphics, Component.translatable("screen.tsf.target_actions"), controlsX, top + 42, controlsWidth);
-        int previewTop = top + 56;
-        int previewBottom = footerY - 48;
+        text(graphics, Component.translatable("screen.tsf.hypnotized_players"), left + 12, top + 28, modelWidth);
+        text(graphics, Component.translatable("screen.tsf.target_actions"), controlsX, top + 28, controlsWidth);
+        int previewTop = top + 42;
+        int previewBottom = navigationY - 26;
         inset(graphics, left + 12, previewTop, modelWidth, previewBottom - previewTop);
         Player target = selectedPlayer();
         if (target != null) {
@@ -256,9 +242,9 @@ public final class PhoneScreen extends Screen {
                     0.0625F, mouseX, mouseY, target);
             VisualState visual = TSFClient.visual(target.getUUID());
             centeredText(graphics, Component.literal(visual == null ? target.getGameProfile().name() : visual.bodyName()),
-                    left + 12, footerY - 44, modelWidth);
+                    left + 12, previewBottom + 4, modelWidth);
             centeredText(graphics, Component.translatable("screen.tsf.target_distance", (int) Math.ceil(target.distanceTo(minecraft.player))),
-                    left + 12, footerY - 33, modelWidth);
+                    left + 12, previewBottom + 15, modelWidth);
         } else {
             int y = previewTop + 6;
             for (var line : font.split(Component.translatable("screen.tsf.no_hypnotized_players"), modelWidth - 12)) {
@@ -267,10 +253,10 @@ public final class PhoneScreen extends Screen {
             }
         }
         Component page = Component.translatable("screen.tsf.target_page", selectedIndex() + 1, targets.size());
-        centeredText(graphics, page, left + 34, footerY - 16, modelWidth - 44);
+        centeredText(graphics, page, left + 34, navigationY + 6, modelWidth - 44);
         text(graphics, Component.translatable("screen.tsf.control_speech"), controlsX, speechY - 12, controlsWidth);
         if (panelHeight >= 300) {
-            int y = speechY + 26;
+            int y = observerChatY + 26;
             for (var line : font.split(Component.translatable("screen.tsf.hypnosis_range"), controlsWidth)) {
                 if (y + font.lineHeight > footerY - 10) {
                     break;
@@ -279,8 +265,10 @@ public final class PhoneScreen extends Screen {
                 y += font.lineHeight;
             }
         }
-        graphics.fill(left + 12, footerY - 6, left + panelWidth - 12, footerY - 5, 0xFF8B8B8B);
-        graphics.fill(left + 12, footerY - 5, left + panelWidth - 12, footerY - 4, 0xFFFFFFFF);
+        if (slimeColors.visible || leave.visible) {
+            graphics.fill(left + 12, footerY - 6, left + panelWidth - 12, footerY - 5, 0xFF8B8B8B);
+            graphics.fill(left + 12, footerY - 5, left + panelWidth - 12, footerY - 4, 0xFFFFFFFF);
+        }
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
     }
 
