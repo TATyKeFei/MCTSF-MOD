@@ -2,13 +2,18 @@ package icu.tatyrealms.tatykefei.state;
 
 import icu.tatyrealms.tatykefei.TSFServerConfig;
 import icu.tatyrealms.tatykefei.block.BodyDisplayBlock;
-import icu.tatyrealms.tatykefei.mixin.MannequinAccessor;
 import icu.tatyrealms.tatykefei.network.BodyDragPayload;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import org.slf4j.LoggerFactory;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.MinecraftServer;
@@ -24,14 +29,64 @@ import net.minecraft.world.level.block.state.properties.AttachFace;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
-public final class BodyRigManager {
+public final class BodyRigManager implements AutoCloseable {
+    private static final int MAX_SUBMISSIONS_PER_TICK = 32;
+    private static final long SNAPSHOT_BUDGET_NANOS = 1_500_000;
+    private static final double SLEEP_DISPLACEMENT_SQUARED = 0.002 * 0.002;
+    private static final int SLEEP_SAMPLES = 20;
     private final BodyManager manager;
-    private final Map<UUID, BodyRigPhysics> simulations = new HashMap<>();
+    private final Map<UUID, Simulation> simulations = new HashMap<>();
+    private final AsyncBodyPhysics worker = new AsyncBodyPhysics();
+    private final BodyCollisionCache collisions = new BodyCollisionCache();
     private final Map<UUID, Grab> grabs = new HashMap<>();
     private long time;
     private boolean physicsEnabled = TSFServerConfig.get().bodyLimbPhysics;
 
+    private static final class Simulation {
+        final Entity entity;
+        BodyRigPhysics physics = new BodyRigPhysics();
+        BodyCollisionCache.Snapshot snapshot;
+        Future<AsyncBodyPhysics.Result> pending;
+        BodyRigPose input;
+        Vec3 submittedPosition;
+        Vec3 observedPosition;
+        Grab submittedGrab;
+        boolean onGround;
+        boolean sleeping;
+        boolean paused;
+        int quietSamples;
+        int interval = 1;
+        long nextStep;
+        long submittedAt;
+        long lastSync;
+
+        Simulation(Entity entity) {
+            this.entity = entity;
+            observedPosition = entity.position();
+            onGround = entity.onGround();
+        }
+
+        void cancel() {
+            if (pending != null) {
+                pending.cancel(true);
+                pending = null;
+            }
+            input = null;
+        }
+
+        void wake(BodyRigPose pose) {
+            sleeping = false;
+            quietSamples = 0;
+            nextStep = 0;
+            physics.reset(pose, entity.position());
+        }
+    }
+
+    private record Candidate(Body body, Simulation simulation, Grab grab, Vec3 target) {
+    }
+
     private static final class Grab {
+        UUID player;
         Body body;
         Entity entity;
         int part;
@@ -175,7 +230,7 @@ public final class BodyRigManager {
     }
 
     public void forget(Body body) {
-        simulations.remove(body.id);
+        discardSimulation(body.id);
         grabs.entrySet().removeIf(entry -> entry.getValue().body == body);
         body.displayMounted = false;
         body.displayFace = null;
@@ -184,7 +239,10 @@ public final class BodyRigManager {
 
     public void drag(ServerPlayer player, BodyDragPayload payload) {
         if (payload.operation() == BodyDragPayload.STOP) {
-            if (grabs.remove(player.getUUID()) != null) {
+            Grab ended = grabs.remove(player.getUUID());
+            if (ended != null) {
+                discardSimulation(ended.body.id);
+                synchronizePose(ended.body, ended.entity);
                 manager.rigChanged();
             }
             return;
@@ -229,6 +287,7 @@ public final class BodyRigManager {
             return;
         }
         Grab grab = new Grab();
+        grab.player = player.getUUID();
         grab.body = body;
         grab.entity = entity;
         grab.part = part;
@@ -236,7 +295,7 @@ public final class BodyRigManager {
         grab.updated = time;
         grab.offset = body.rigPose.point(BodyRigPose.node(part)).subtract(eye.add(player.getLookAngle().scale(grab.distance)).subtract(entity.position()));
         grabs.put(player.getUUID(), grab);
-        simulations.computeIfAbsent(body.id, ignored -> new BodyRigPhysics()).reset(body.rigPose, entity.position());
+        discardSimulation(body.id);
     }
 
     private static boolean visible(ServerPlayer player, Vec3 target) {
@@ -245,51 +304,125 @@ public final class BodyRigManager {
         return hit.getType() == HitResult.Type.MISS || hit.getLocation().distanceToSqr(target) < 0.04;
     }
 
-    public void tick(MinecraftServer server, Collection<Body> bodies, Map<UUID, Entity> entities) {
+    public void blockChanged(ServerLevel level, BlockPos pos) {
+        collisions.changed(level, pos);
+    }
+
+    private void discardSimulation(UUID body) {
+        Simulation removed = simulations.remove(body);
+        if (removed != null) {
+            removed.cancel();
+        }
+    }
+
+    private static void synchronizePose(Body body, Entity entity) {
+        EmptyBodyHolder holder = (EmptyBodyHolder) entity;
+        String encoded = body.rigPose.encode();
+        if (!encoded.equals(holder.tsf$rigPose())) {
+            holder.tsf$setRigPose(encoded);
+            if (body.displayMounted) {
+                entity.setBoundingBox(body.rigPose.bounds().move(entity.position()));
+            }
+        }
+    }
+
+    public void tick(MinecraftServer server, Map<UUID, Body> bodies, Map<UUID, Entity> entities) {
         time++;
         boolean enabled = TSFServerConfig.get().bodyLimbPhysics;
         boolean configChanged = enabled != physicsEnabled;
         physicsEnabled = enabled;
-        int activeGrabs = grabs.size();
+        if (configChanged) {
+            simulations.values().forEach(Simulation::cancel);
+            simulations.clear();
+        }
         grabs.entrySet().removeIf(entry -> {
             Grab grab = entry.getValue();
             ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
-            return player == null || !allowed(player) || !player.isShiftKeyDown() || !player.getMainHandItem().isEmpty()
+            boolean invalid = player == null || !allowed(player) || !player.isShiftKeyDown() || !player.getMainHandItem().isEmpty()
                     || player.level() != grab.entity.level() || grab.entity.isRemoved() || !grab.body.displayMounted
                     || player.distanceToSqr(grab.entity) > 49 || time - grab.updated > 10;
+            if (invalid) {
+                discardSimulation(grab.body.id);
+                manager.rigChanged();
+            }
+            return invalid;
         });
-        if (activeGrabs != grabs.size()) {
-            manager.rigChanged();
-        }
-        for (Body body : List.copyOf(bodies)) {
-            Entity entity = entities.get(body.id);
-            if (entity == null || entity.isRemoved() || body.skinPlaced) {
+        Map<UUID, Grab> held = new HashMap<>();
+        grabs.values().forEach(grab -> held.put(grab.body.id, grab));
+        List<Candidate> candidates = new ArrayList<>();
+        for (var entry : List.copyOf(entities.entrySet())) {
+            Body body = bodies.get(entry.getKey());
+            Entity entity = entry.getValue();
+            if (body == null || entity.isRemoved() || body.skinPlaced || !entity.getUUID().equals(body.entityId)) {
+                discardSimulation(entry.getKey());
                 continue;
             }
             if (body.displayMounted) {
                 BlockPos pos = BlockPos.of(body.displayPosition);
                 if (!entity.level().getBlockState(pos).is(BodyDisplayBlock.INSTANCE)) {
-                    removeDisplay((ServerLevel) entity.level(), pos, bodies);
+                    removeDisplay((ServerLevel) entity.level(), pos, bodies.values());
                     continue;
                 }
-                entity.setNoGravity(true);
-                entity.setDeltaMovement(Vec3.ZERO);
-                entity.setPos(body.x, body.y, body.z);
+                // Fixed stands need no repeated position updates or bounding-box reconstruction.
+                if (entity.position().distanceToSqr(new Vec3(body.x, body.y, body.z)) > 1.0E-8) {
+                    entity.setPos(body.x, body.y, body.z);
+                }
+                if (!entity.getDeltaMovement().equals(Vec3.ZERO)) {
+                    entity.setDeltaMovement(Vec3.ZERO);
+                }
             }
             ensurePose(body);
             EmptyBodyHolder holder = (EmptyBodyHolder) entity;
             if (configChanged || holder.tsf$rigPose().isEmpty() && (body.displayMounted || enabled)) {
                 prepare(body, entity);
             }
-            Grab grab = grabs.values().stream().filter(value -> value.body == body).findFirst().orElse(null);
-            boolean simulate = TSFServerConfig.get().bodyLimbPhysics && !body.displayMounted;
-            if (simulate || grab != null) {
+            Grab grab = held.get(body.id);
+            if (body.displayMounted && grab == null || !body.displayMounted && !enabled) {
+                discardSimulation(body.id);
+                continue;
+            }
+            Simulation state = simulations.computeIfAbsent(body.id, ignored -> new Simulation(entity));
+            if (state.entity != entity) {
+                discardSimulation(body.id);
+                continue;
+            }
+            boolean moved = state.observedPosition.distanceToSqr(entity.position()) > 0.000025
+                    || state.onGround != entity.onGround();
+            if (moved) {
+                state.observedPosition = entity.position();
+                state.onGround = entity.onGround();
+                state.sleeping = false;
+                state.quietSamples = 0;
+                state.nextStep = Math.min(state.nextStep, time);
+            }
+            boolean changed = state.snapshot != null && !collisions.valid(state.snapshot, time);
+            if (changed) {
+                state.cancel();
+                state.snapshot = null;
+                state.wake(body.rigPose);
+            }
+            int interval = grab == null ? interval(server, entity) : 1;
+            if (interval == 0) {
+                state.cancel();
+                state.paused = true;
+                continue;
+            }
+            if (state.paused) {
+                state.paused = false;
+                state.wake(body.rigPose);
+            }
+            if (interval < state.interval) {
+                state.nextStep = Math.min(state.nextStep, time);
+            }
+            state.interval = interval;
+            collect(body, state, grab);
+            if (!state.sleeping && state.pending == null && time >= state.nextStep) {
                 Vec3 target = Vec3.ZERO;
                 if (grab != null) {
-                    ServerPlayer player = server.getPlayerList().getPlayer(grabs.entrySet().stream()
-                            .filter(entry -> entry.getValue() == grab).findFirst().orElseThrow().getKey());
+                    ServerPlayer player = server.getPlayerList().getPlayer(grab.player);
                     Vec3 worldTarget = player.getEyePosition().add(player.getLookAngle().scale(grab.distance));
                     if (!visible(player, worldTarget)) {
+                        state.cancel();
                         continue;
                     }
                     target = worldTarget.subtract(entity.position()).add(grab.offset);
@@ -297,18 +430,117 @@ public final class BodyRigManager {
                         target = target.normalize().scale(3.5);
                     }
                 }
-                simulations.computeIfAbsent(body.id, ignored -> new BodyRigPhysics()).step(entity, body.rigPose,
-                        grab == null ? -1 : grab.part, target, simulate, body.displayMounted ? BlockPos.of(body.displayPosition) : null);
-                if (time % 2 == 0 || grab != null) {
-                    holder.tsf$setRigPose(body.rigPose.encode());
-                    if (body.displayMounted) {
-                        entity.setBoundingBox(body.rigPose.bounds().move(entity.position()));
-                    }
-                }
-            } else {
-                simulations.remove(body.id);
+                candidates.add(new Candidate(body, state, grab, target));
             }
         }
-        simulations.keySet().removeIf(id -> !entities.containsKey(id));
+        // The oldest due body goes first, so a large crowd cannot starve later entries.
+        candidates.sort(Comparator.<Candidate>comparingInt(candidate -> candidate.grab == null ? 1 : 0)
+                .thenComparingLong(candidate -> candidate.simulation.nextStep));
+        long deadline = System.nanoTime() + SNAPSHOT_BUDGET_NANOS;
+        int submitted = 0;
+        int attempted = 0;
+        int pending = (int) simulations.values().stream().filter(state -> state.pending != null).count();
+        for (Candidate candidate : candidates) {
+            if (submitted >= MAX_SUBMISSIONS_PER_TICK || pending >= AsyncBodyPhysics.MAX_PENDING
+                    || attempted > 0 && System.nanoTime() >= deadline) {
+                break;
+            }
+            attempted++;
+            Body body = candidate.body;
+            Simulation state = candidate.simulation;
+            Entity entity = state.entity;
+            Vec3 pelvis = entity.position().add(body.rigPose.point(0));
+            if (state.snapshot == null || !state.snapshot.covers(pelvis)) {
+                state.snapshot = collisions.capture((ServerLevel) entity.level(), pelvis,
+                        body.displayMounted ? BlockPos.of(body.displayPosition) : null, time);
+            }
+            if (state.snapshot == null) {
+                state.nextStep = time + 20;
+                continue;
+            }
+            state.pending = worker.submit(body.rigPose, state.physics, entity.position(), state.snapshot.boxes,
+                    candidate.grab == null ? -1 : candidate.grab.part, candidate.target, !body.displayMounted);
+            if (state.pending == null) {
+                break;
+            }
+            state.input = body.rigPose;
+            state.submittedGrab = candidate.grab;
+            state.submittedPosition = entity.position();
+            state.submittedAt = time;
+            state.nextStep = time + state.interval;
+            submitted++;
+            pending++;
+        }
+        simulations.entrySet().removeIf(entry -> {
+            if (!entities.containsKey(entry.getKey())) {
+                entry.getValue().cancel();
+                return true;
+            }
+            return false;
+        });
+    }
+
+    private static int interval(MinecraftServer server, Entity entity) {
+        double nearest = Double.POSITIVE_INFINITY;
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (player.level() == entity.level() && !player.isSpectator()) {
+                nearest = Math.min(nearest, player.distanceToSqr(entity));
+            }
+        }
+        return nearest <= 32 * 32 ? 1 : nearest <= 64 * 64 ? 4 : nearest <= 96 * 96 ? 10 : 0;
+    }
+
+    private void collect(Body body, Simulation state, Grab grab) {
+        if (state.pending == null) {
+            return;
+        }
+        if (time - state.submittedAt > 10 || state.input != body.rigPose || state.submittedGrab != grab
+                || state.submittedPosition.distanceToSqr(state.entity.position()) > 0.25 * 0.25) {
+            state.cancel();
+            state.wake(body.rigPose);
+            return;
+        }
+        if (!state.pending.isDone()) {
+            return; // Never wait for the worker on the game thread.
+        }
+        try {
+            AsyncBodyPhysics.Result result = state.pending.get();
+            if (!result.pose().valid()) {
+                state.wake(body.rigPose);
+                return;
+            }
+            body.rigPose = result.pose();
+            state.physics = result.physics();
+            if (grab == null && state.entity.onGround() && result.displacement() < SLEEP_DISPLACEMENT_SQUARED) {
+                state.quietSamples++;
+                state.sleeping = state.quietSamples >= SLEEP_SAMPLES;
+            } else {
+                state.quietSamples = 0;
+            }
+            if (grab != null || state.sleeping || time - state.lastSync >= 2) {
+                synchronizePose(body, state.entity);
+                state.lastSync = time;
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException exception) {
+            LoggerFactory.getLogger("TSF").error("Empty body physics failed", exception.getCause());
+            state.wake(body.rigPose);
+            state.nextStep = time + 20;
+        } catch (CancellationException exception) {
+            state.wake(body.rigPose);
+        } finally {
+            state.pending = null;
+            state.input = null;
+        }
+    }
+
+    @Override
+    public void close() {
+        simulations.values().forEach(Simulation::cancel);
+        simulations.clear();
+        grabs.clear();
+        collisions.clear();
+        worker.close();
     }
 }

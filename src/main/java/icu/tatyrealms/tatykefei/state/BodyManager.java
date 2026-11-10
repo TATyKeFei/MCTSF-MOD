@@ -136,6 +136,7 @@ public final class BodyManager {
             } catch (IOException exception) {
                 throw new IllegalStateException("Unable to finish saving TSF state: " + manager.path, exception);
             } finally {
+                manager.bodyRigs.close();
                 instance = null;
             }
         }
@@ -1603,6 +1604,10 @@ public final class BodyManager {
         bodyRigs.removeDisplay(level, pos, store.bodies.values());
     }
 
+    public void bodyBlockChanged(ServerLevel level, BlockPos pos) {
+        bodyRigs.blockChanged(level, pos);
+    }
+
     public void dragBody(ServerPlayer player, icu.tatyrealms.tatykefei.network.BodyDragPayload payload) {
         bodyRigs.drag(player, payload);
     }
@@ -2544,7 +2549,7 @@ public final class BodyManager {
     public void tick() {
         ticks++;
         boolean recoveryChanged = false;
-        bodyRigs.tick(server, store.bodies.values(), bodyEntities);
+        bodyRigs.tick(server, store.bodies, bodyEntities);
         updateBodyPositions();
         updateSkinDrops();
         for (UUID id : List.copyOf(pendingProjections)) {

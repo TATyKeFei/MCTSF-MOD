@@ -1,7 +1,6 @@
 package icu.tatyrealms.tatykefei.state;
 
-import net.minecraft.world.entity.Entity;
-import net.minecraft.core.BlockPos;
+import java.util.List;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -9,7 +8,13 @@ import net.minecraft.world.phys.Vec3;
 public final class BodyRigPhysics {
     private final Vec3[] previous = new Vec3[BodyRigPose.COUNT];
     private Vec3 lastPosition;
-    private BlockPos ignoredBlock;
+
+    public BodyRigPhysics copy() {
+        BodyRigPhysics copy = new BodyRigPhysics();
+        System.arraycopy(previous, 0, copy.previous, 0, previous.length);
+        copy.lastPosition = lastPosition;
+        return copy;
+    }
 
     public void reset(BodyRigPose pose, Vec3 position) {
         for (int node = 0; node < previous.length; node++) {
@@ -18,17 +23,16 @@ public final class BodyRigPhysics {
         lastPosition = position;
     }
 
-    public void step(Entity entity, BodyRigPose pose, int grabbedPart, Vec3 target, boolean simulate, BlockPos stand) {
-        ignoredBlock = stand;
+    public void step(Vec3 position, List<AABB> collisions, BodyRigPose pose, int grabbedPart, Vec3 target, boolean simulate) {
         if (lastPosition == null) {
-            reset(pose, entity.position());
+            reset(pose, position);
         }
-        Vec3 movement = entity.position().subtract(lastPosition);
+        Vec3 movement = position.subtract(lastPosition);
         if (movement.lengthSqr() > 4) {
-            reset(pose, entity.position());
+            reset(pose, position);
             movement = Vec3.ZERO;
         }
-        lastPosition = entity.position();
+        lastPosition = position;
         Vec3 pelvis = pose.point(0);
         if (simulate) {
             for (int node = 1; node < previous.length; node++) {
@@ -49,15 +53,18 @@ public final class BodyRigPhysics {
                 Vec3 delta = target.subtract(old);
                 pose.set(node, old.add(delta.scale(0.65)));
             }
+            if (Thread.currentThread().isInterrupted()) {
+                return;
+            }
             constrain(pose);
             if (simulate || node >= 0) {
-                collide(entity, pose);
+                collide(position, collisions, pose);
             }
         }
         // Collision projections must never leave stretched limbs in the rendered pose.
         constrain(pose);
         if (!simulate) {
-            reset(pose, entity.position());
+            reset(pose, position);
         }
     }
 
@@ -98,13 +105,11 @@ public final class BodyRigPhysics {
         pose.set(node, joint.add(direction.scale(length)));
     }
 
-    private void collide(Entity entity, BodyRigPose pose) {
-        Vec3 origin = entity.position();
+    private void collide(Vec3 origin, List<AABB> collisions, BodyRigPose pose) {
         // Resolve probes along each solid limb, including the head's centre and torso.
         for (int part = 0; part < 6; part++) {
-            BodyRigPose.Part bone = pose.part(part);
-            Vec3 anchor = bone.anchor();
-            Vec3 end = bone.end();
+            Vec3 anchor = pose.joint(part);
+            Vec3 end = pose.point(part == BodyRigPose.TORSO_PART ? 0 : BodyRigPose.node(part));
             int node = BodyRigPose.node(part);
             double radius = part == BodyRigPose.HEAD_PART ? 0.225
                     : part == BodyRigPose.TORSO_PART ? 0.14 : 0.115;
@@ -113,7 +118,7 @@ public final class BodyRigPhysics {
             for (int sample = 0; sample < samples; sample++) {
                 double amount = (sample + 0.5) / samples;
                 Vec3 center = origin.add(anchor.lerp(end, amount)).add(correction);
-                correction = correction.add(resolve(entity, center, radius));
+                correction = correction.add(resolve(collisions, center, radius));
             }
             if (correction.lengthSqr() > 1.0E-10) {
                 if (correction.length() > 0.2) {
@@ -125,33 +130,29 @@ public final class BodyRigPhysics {
         }
     }
 
-    private Vec3 resolve(Entity entity, Vec3 point, double radius) {
+    private static Vec3 resolve(List<AABB> collisions, Vec3 point, double radius) {
         AABB bounds = new AABB(point, point).inflate(radius);
         Vec3 resolved = Vec3.ZERO;
-        for (BlockPos block : BlockPos.betweenClosed(BlockPos.containing(bounds.minX, bounds.minY, bounds.minZ),
-                BlockPos.containing(bounds.maxX, bounds.maxY, bounds.maxZ))) {
-            if (block.equals(ignoredBlock)) {
+        for (AABB box : collisions) {
+            AABB probe = bounds.move(resolved);
+            if (!box.intersects(probe)) {
                 continue;
             }
-            for (AABB local : entity.level().getBlockState(block).getCollisionShape(entity.level(), block).toAabbs()) {
-                AABB box = local.move(block);
-                AABB probe = bounds.move(resolved);
-                if (!box.intersects(probe)) {
-                    continue;
-                }
-                double[] exits = {box.minX - probe.maxX, box.maxX - probe.minX,
-                        box.minY - probe.maxY, box.maxY - probe.minY,
-                        box.minZ - probe.maxZ, box.maxZ - probe.minZ};
-                int best = 0;
-                for (int index = 1; index < exits.length; index++) {
-                    if (Math.abs(exits[index]) < Math.abs(exits[best])) {
-                        best = index;
-                    }
-                }
-                double value = exits[best] + Math.copySign(0.0001, exits[best]);
-                resolved = resolved.add(best < 2 ? value : 0, best >= 2 && best < 4 ? value : 0, best >= 4 ? value : 0);
+            double x = nearer(box.minX - probe.maxX, box.maxX - probe.minX);
+            double y = nearer(box.minY - probe.maxY, box.maxY - probe.minY);
+            double z = nearer(box.minZ - probe.maxZ, box.maxZ - probe.minZ);
+            if (Math.abs(x) < Math.abs(y) && Math.abs(x) < Math.abs(z)) {
+                resolved = resolved.add(x + Math.copySign(0.0001, x), 0, 0);
+            } else if (Math.abs(y) <= Math.abs(z)) {
+                resolved = resolved.add(0, y + Math.copySign(0.0001, y), 0);
+            } else {
+                resolved = resolved.add(0, 0, z + Math.copySign(0.0001, z));
             }
         }
         return resolved;
+    }
+
+    private static double nearer(double negative, double positive) {
+        return Math.abs(negative) < Math.abs(positive) ? negative : positive;
     }
 }
