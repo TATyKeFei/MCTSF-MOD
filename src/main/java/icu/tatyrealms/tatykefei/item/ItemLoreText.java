@@ -17,7 +17,7 @@ public final class ItemLoreText {
     public static ItemLore translated(String... keys) {
         return new ItemLore(Arrays.stream(keys).map(key -> {
             // Keep the translation unresolved so each client uses its own language.
-            var text = MINI_MESSAGE.deserialize("<gray><lang:" + key + "></gray>");
+            var text = MINI_MESSAGE.deserialize("<gray><italic:false><lang:" + key + "></italic></gray>");
             return ComponentSerialization.CODEC.parse(JsonOps.INSTANCE, SERIALIZER.serializeToTree(text)).getOrThrow();
         }).toList());
     }
