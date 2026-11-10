@@ -2,6 +2,7 @@ package icu.tatyrealms.tatykefei.state;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
+import com.mojang.authlib.GameProfile;
 import com.mojang.serialization.JsonOps;
 import icu.tatyrealms.tatykefei.TSF;
 import icu.tatyrealms.tatykefei.TSFServerConfig;
@@ -37,6 +38,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
@@ -95,6 +98,7 @@ public final class BodyManager {
     private final Path path;
     private final StateStore store;
     private final AsyncStateWriter stateWriter;
+    private final BodyProfileLookup bodyProfiles;
     private boolean saveRequested;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
     private final Map<UUID, HypnosisSession> hypnosisSessions = new HashMap<>();
@@ -121,6 +125,7 @@ public final class BodyManager {
             throw new IllegalStateException("TSF 存档读取失败，请检查 " + path, exception);
         }
         stateWriter = new AsyncStateWriter(path);
+        bodyProfiles = new BodyProfileLookup(server.services().profileRepository(), server.services().sessionService());
         instance = this;
     }
 
@@ -136,6 +141,7 @@ public final class BodyManager {
             } catch (IOException exception) {
                 throw new IllegalStateException("Unable to finish saving TSF state: " + manager.path, exception);
             } finally {
+                manager.bodyProfiles.close();
                 manager.bodyRigs.close();
                 instance = null;
             }
@@ -1517,12 +1523,25 @@ public final class BodyManager {
     }
 
     public void giveBody(ServerPlayer player, ServerPlayer recipient) {
+        giveBody(player.getUUID(), player.getGameProfile().name(), player.getProfile(), freshNatureBody(player), recipient);
+    }
+
+    public CompletableFuture<Optional<GameProfile>> resolveBodyProfile(String name, UUID id) {
+        return bodyProfiles.resolve(name, id);
+    }
+
+    public void giveBody(GameProfile profile, ServerPlayer recipient) {
+        giveBody(profile.id(), profile.name(), ResolvableProfile.createResolved(profile),
+                NeedsOfNatureBodies.available() ? new NatureAppearance() : null, recipient);
+    }
+
+    private void giveBody(UUID owner, String name, ResolvableProfile profile, NatureAppearance appearance, ServerPlayer recipient) {
         Body body = new Body();
         body.id = UUID.randomUUID();
-        body.owner = player.getUUID();
-        body.name = player.getGameProfile().name();
-        body.profile = ResolvableProfile.CODEC.encodeStart(JsonOps.INSTANCE, player.getProfile()).getOrThrow();
-        body.natureAppearance = freshNatureBody(player);
+        body.owner = owner;
+        body.name = name;
+        body.profile = ResolvableProfile.CODEC.encodeStart(JsonOps.INSTANCE, profile).getOrThrow();
+        body.natureAppearance = appearance;
         locate(body, recipient);
         ItemStack stack = packBody(body);
         store.bodies.put(body.id, body);

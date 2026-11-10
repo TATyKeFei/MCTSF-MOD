@@ -8,6 +8,7 @@ import icu.tatyrealms.tatykefei.compat.NeedsOfNatureHypnosis;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureTanks;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureBodies;
 import icu.tatyrealms.tatykefei.compat.NeedsOfNatureSkins;
+import icu.tatyrealms.tatykefei.command.GiveBodyCommand;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import icu.tatyrealms.tatykefei.network.Action;
 import icu.tatyrealms.tatykefei.network.ActionPayload;
@@ -40,7 +41,6 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.minecraft.commands.Commands;
-import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.resources.Identifier;
 import net.minecraft.network.chat.Component;
@@ -315,14 +315,7 @@ public final class TSF implements ModInitializer {
                                     }
                                     return 1;
                                 }))
-                        .then(Commands.literal("givebody")
-                                .requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
-                                .then(Commands.argument("player", EntityArgument.player())
-                                        .executes(context -> giveBody(context.getSource(), EntityArgument.getPlayer(context, "player"),
-                                                context.getSource().getPlayerOrException()))
-                                        .then(Commands.argument("recipient", EntityArgument.player()).executes(context ->
-                                                giveBody(context.getSource(), EntityArgument.getPlayer(context, "player"),
-                                                        EntityArgument.getPlayer(context, "recipient"))))))
+                        .then(GiveBodyCommand.create())
                         .then(Commands.literal("recover")
                                 .requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
                                 .executes(context -> {
@@ -333,12 +326,5 @@ public final class TSF implements ModInitializer {
                                     BodyManager.get().recover(EntityArgument.getPlayer(context, "player"));
                                     return 1;
                                 })))));
-    }
-
-    private static int giveBody(CommandSourceStack source, ServerPlayer player, ServerPlayer recipient) {
-        BodyManager.get().giveBody(player, recipient);
-        source.sendSuccess(() -> Component.translatable("message.tsf.body_given", player.getGameProfile().name(),
-                recipient.getGameProfile().name()), true);
-        return 1;
     }
 }
