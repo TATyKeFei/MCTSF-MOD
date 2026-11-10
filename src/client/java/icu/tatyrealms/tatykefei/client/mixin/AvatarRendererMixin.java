@@ -8,6 +8,7 @@ import icu.tatyrealms.tatykefei.client.render.BodyAnimationPose;
 import com.mojang.blaze3d.vertex.PoseStack;
 import icu.tatyrealms.tatykefei.client.render.EmptyBodyPose;
 import icu.tatyrealms.tatykefei.client.render.EmptyBodyRenderState;
+import icu.tatyrealms.tatykefei.client.render.EmptyBodyShadow;
 import icu.tatyrealms.tatykefei.client.render.FoldedSkinPose;
 import icu.tatyrealms.tatykefei.network.VisualState;
 import icu.tatyrealms.tatykefei.state.BodyManager;
@@ -71,6 +72,7 @@ public abstract class AvatarRendererMixin {
             state.rightArmPose = HumanoidModel.ArmPose.EMPTY;
             state.isUsingItem = false;
         }
+        ((EmptyBodyRenderState) state).tsf$setShadow(EmptyBodyShadow.from(state));
         if (avatar instanceof Player player) {
             if (BodyManager.form(player) == Form.SPIRIT) {
                 state.nameTag = null;

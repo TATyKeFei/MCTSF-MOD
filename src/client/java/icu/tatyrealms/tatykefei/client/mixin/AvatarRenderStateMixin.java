@@ -1,6 +1,7 @@
 package icu.tatyrealms.tatykefei.client.mixin;
 
 import icu.tatyrealms.tatykefei.client.render.EmptyBodyRenderState;
+import icu.tatyrealms.tatykefei.client.render.EmptyBodyShadow;
 import icu.tatyrealms.tatykefei.client.render.AnimatedAvatarRenderState;
 import icu.tatyrealms.tatykefei.client.render.BodyAnimationPose;
 import icu.tatyrealms.tatykefei.state.BodyRigPose;
@@ -10,6 +11,19 @@ import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(AvatarRenderState.class)
 public abstract class AvatarRenderStateMixin implements EmptyBodyRenderState, AnimatedAvatarRenderState {
+    @Unique
+    private EmptyBodyShadow tsf$shadow;
+
+    @Override
+    public EmptyBodyShadow tsf$shadow() {
+        return tsf$shadow;
+    }
+
+    @Override
+    public void tsf$setShadow(EmptyBodyShadow shadow) {
+        tsf$shadow = shadow;
+    }
+
     @Unique
     private BodyRigPose tsf$rig;
 

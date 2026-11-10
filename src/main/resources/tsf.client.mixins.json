@@ -2,7 +2,7 @@
   "required": true,
   "package": "icu.tatyrealms.tatykefei.client.mixin",
   "compatibilityLevel": "JAVA_25",
-  "client": ["BodyDragInputMixin", "BodyDragScrollMixin", "ClientPlayerMixin", "ClientPacketListenerMixin", "LocalPlayerMixin", "PlayerInfoMixin", "LevelExtractorMixin", "AvatarRendererMixin", "AvatarRenderStateMixin", "PlayerModelMixin", "KeyboardInputMixin", "FirstPersonRendererMixin", "ItemModelResolverMixin", "ItemStackRenderStateMixin", "ItemLayerRenderStateMixin", "SlimeRenderStateMixin", "LivingEntityRendererMixin", "SlimeRendererMixin", "SlimeOuterLayerMixin", "GameRendererMixin", "CameraMixin", "HudMixin", "GuiMixin", "NeedsOfNatureSelectionMixin", "NeedsOfNatureSkinMixin", "LivingEntityUseAccessor"],
+  "client": ["BodyDragInputMixin", "BodyDragScrollMixin", "ClientPlayerMixin", "ClientPacketListenerMixin", "LocalPlayerMixin", "PlayerInfoMixin", "LevelExtractorMixin", "EntityRendererMixin", "EntityRenderDispatcherMixin", "AvatarRendererMixin", "AvatarRenderStateMixin", "PlayerModelMixin", "KeyboardInputMixin", "FirstPersonRendererMixin", "ItemModelResolverMixin", "ItemStackRenderStateMixin", "ItemLayerRenderStateMixin", "SlimeRenderStateMixin", "LivingEntityRendererMixin", "SlimeRendererMixin", "SlimeOuterLayerMixin", "GameRendererMixin", "CameraMixin", "HudMixin", "GuiMixin", "NeedsOfNatureSelectionMixin", "NeedsOfNatureSkinMixin", "LivingEntityUseAccessor"],
   "mixins": ["InventoryScreenMixin"],
   "injectors": {"defaultRequire": 1}
 }

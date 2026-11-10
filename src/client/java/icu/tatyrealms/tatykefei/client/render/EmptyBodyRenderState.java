@@ -14,4 +14,8 @@ public interface EmptyBodyRenderState {
     BodyRigPose tsf$rig();
 
     void tsf$setRig(BodyRigPose pose);
+
+    EmptyBodyShadow tsf$shadow();
+
+    void tsf$setShadow(EmptyBodyShadow shadow);
 }
