@@ -181,7 +181,6 @@
   "message.tsf.expelled": "Your personality became a slime. Use the phone item or /tsf for controls, or right-click a body to enter.",
   "message.tsf.leave_first": "Drink a Soul Projection Potion or Personality Expulsion Potion before entering another body. Zipper wearers allow direct empty-handed entry.",
   "message.tsf.cannot_carry_body": "Only embodied players and personality slimes can carry empty bodies.",
-  "message.tsf.body_picked_up": "Picked up %s's empty body. Use it on a block to place it.",
   "message.tsf.body_given": "Gave one empty body of %s to %s.",
   "message.tsf.body_profile_loading": "Looking up the official profile and skin for %s.",
   "message.tsf.body_profile_invalid": "Enter a Minecraft account name or a full UUID with hyphens.",

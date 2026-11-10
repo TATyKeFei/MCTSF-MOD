@@ -1565,7 +1565,6 @@ public final class BodyManager {
             player.drop(stack, false, Prediction.SERVER_ONLY);
         }
         refreshInventory(player);
-        message(player, "body_picked_up", body.name);
         changed();
     }
 

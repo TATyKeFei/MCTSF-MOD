@@ -181,7 +181,6 @@
   "message.tsf.expelled": "你的人格已排出，变成史莱姆。使用手机物品或 /tsf 打开手机，右键进入肉体",
   "message.tsf.leave_first": "请先饮用灵魂出窍药水或人格排泄药水，再进入肉体; 佩戴拉链的肉体可空手直接进入",
   "message.tsf.cannot_carry_body": "只有肉体或人格史莱姆形态可以搬运空肉体",
-  "message.tsf.body_picked_up": "已拾取 %s 的空肉体，右键方块可放下",
   "message.tsf.body_given": "已将 %s 的一具空肉体给予 %s",
   "message.tsf.body_profile_loading": "正在查询 %s 的正版档案和皮肤",
   "message.tsf.body_profile_invalid": "请输入正版用户名或带连字符的完整 UUID",
