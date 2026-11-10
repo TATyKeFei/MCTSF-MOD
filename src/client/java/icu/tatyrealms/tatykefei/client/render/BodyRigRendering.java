@@ -8,7 +8,7 @@ import java.util.WeakHashMap;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.player.PlayerModel;
 import net.minecraft.world.entity.Entity;
-import org.joml.Vector3f;
+import org.joml.Matrix3f;
 
 public final class BodyRigRendering {
     private static final Map<Entity, Sample> SAMPLES = new WeakHashMap<>();
@@ -67,10 +67,18 @@ public final class BodyRigRendering {
             part.x = (float) (bone.anchor().x * 16 / BodyRigPose.SCALE);
             part.y = (float) (bone.anchor().y * 16 / BodyRigPose.SCALE);
             part.z = (float) (bone.anchor().z * 16 / BodyRigPose.SCALE);
-            Vector3f angles = bone.rotation().getEulerAnglesZYX(new Vector3f());
-            part.xRot = angles.x;
-            part.yRot = angles.y;
-            part.zRot = angles.z;
+            Matrix3f rotation = new Matrix3f().rotation(bone.rotation());
+            double horizontal = Math.hypot(rotation.m00(), rotation.m01());
+            part.yRot = (float) Math.atan2(-rotation.m02(), horizontal);
+            if (horizontal < 1.0E-6) {
+                // At +/-90 degrees yaw, X and Z describe the same rotation axis.
+                // Preserve their combined rotation instead of dropping the upright flip.
+                part.xRot = (float) Math.atan2(-rotation.m21(), rotation.m11());
+                part.zRot = 0;
+            } else {
+                part.xRot = (float) Math.atan2(rotation.m12(), rotation.m22());
+                part.zRot = (float) Math.atan2(rotation.m01(), rotation.m00());
+            }
         }
     }
 }
