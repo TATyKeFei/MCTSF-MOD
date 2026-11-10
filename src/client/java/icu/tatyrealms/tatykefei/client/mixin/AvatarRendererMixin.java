@@ -2,6 +2,7 @@ package icu.tatyrealms.tatykefei.client.mixin;
 
 import icu.tatyrealms.tatykefei.client.TSFClient;
 import icu.tatyrealms.tatykefei.client.BodyAnimations;
+import icu.tatyrealms.tatykefei.client.render.BodyRigRendering;
 import icu.tatyrealms.tatykefei.client.render.AnimatedAvatarRenderState;
 import icu.tatyrealms.tatykefei.client.render.BodyAnimationPose;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -31,6 +32,8 @@ public abstract class AvatarRendererMixin {
         if (((EmptyBodyRenderState) state).tsf$isEmptyBody()) {
             if (((EmptyBodyRenderState) state).tsf$isFoldedSkin()) {
                 FoldedSkinPose.applyWorld(poses, bodyRotation);
+            } else if (((EmptyBodyRenderState) state).tsf$rig() != null) {
+                BodyRigRendering.applyWorld(poses);
             } else {
                 EmptyBodyPose.apply(poses, bodyRotation);
             }
@@ -51,6 +54,7 @@ public abstract class AvatarRendererMixin {
         boolean emptyBody = BodyManager.emptyBody(avatar);
         ((EmptyBodyRenderState) state).tsf$setEmptyBody(emptyBody);
         ((EmptyBodyRenderState) state).tsf$setFoldedSkin(BodyManager.foldedSkin(avatar));
+        ((EmptyBodyRenderState) state).tsf$setRig(emptyBody ? BodyRigRendering.frame(avatar, partialTick) : null);
         ((AnimatedAvatarRenderState) state).tsf$setAnimation(avatar instanceof Player player
                 && BodyManager.form(player) == Form.HUMAN ? BodyAnimations.frame(player.getUUID(), partialTick) : null);
         if (emptyBody) {

@@ -18,6 +18,7 @@ import icu.tatyrealms.tatykefei.network.ObserverPayload;
 import icu.tatyrealms.tatykefei.network.SkinLayersPayload;
 import icu.tatyrealms.tatykefei.network.HypnosisProgressPayload;
 import icu.tatyrealms.tatykefei.network.HypnosisSpeechPayload;
+import icu.tatyrealms.tatykefei.network.BodyDragPayload;
 import icu.tatyrealms.tatykefei.state.HypnosisRestrictions;
 import icu.tatyrealms.tatykefei.state.BodyManager;
 import icu.tatyrealms.tatykefei.state.Form;
@@ -73,6 +74,7 @@ public final class TSF implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(SkinLayersPayload.TYPE, SkinLayersPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(HypnosisProgressPayload.TYPE, HypnosisProgressPayload.CODEC);
         PayloadTypeRegistry.serverboundPlay().register(HypnosisSpeechPayload.TYPE, HypnosisSpeechPayload.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(BodyDragPayload.TYPE, BodyDragPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(SettingsPayload.TYPE, SettingsPayload.CODEC);
         PayloadTypeRegistry.serverboundPlay().register(SettingsPayload.TYPE, SettingsPayload.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(SettingsPayload.TYPE, (payload, context) -> {
@@ -82,6 +84,8 @@ public final class TSF implements ModInitializer {
                 (payload, context) -> BodyManager.get().handle(context.player(), payload));
         ServerPlayNetworking.registerGlobalReceiver(HypnosisSpeechPayload.TYPE,
                 (payload, context) -> BodyManager.get().speakAsHypnotized(context.player(), payload));
+        ServerPlayNetworking.registerGlobalReceiver(BodyDragPayload.TYPE,
+                (payload, context) -> BodyManager.get().dragBody(context.player(), payload));
         ServerLifecycleEvents.SERVER_STARTING.register(server -> {
             try {
                 TSFServerConfig.reload();

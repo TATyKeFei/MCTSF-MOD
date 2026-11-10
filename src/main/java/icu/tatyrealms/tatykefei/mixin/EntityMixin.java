@@ -3,6 +3,8 @@ package icu.tatyrealms.tatykefei.mixin;
 import icu.tatyrealms.tatykefei.state.EmptyBodyHolder;
 import icu.tatyrealms.tatykefei.state.BodyManager;
 import icu.tatyrealms.tatykefei.state.BodyPhysics;
+import icu.tatyrealms.tatykefei.state.BodyRigPose;
+import net.minecraft.world.phys.AABB;
 import icu.tatyrealms.tatykefei.state.Form;
 import icu.tatyrealms.tatykefei.state.HypnosisRestrictions;
 import net.minecraft.world.entity.player.Player;
@@ -25,7 +27,8 @@ public abstract class EntityMixin {
     @Inject(method = "move", at = @At("HEAD"))
     private void tsf$bodyBlockCollision(MoverType mover, Vec3 movement, CallbackInfo callback) {
         Entity entity = (Entity) (Object) this;
-        if (!BodyManager.emptyBody(entity) || entity.level().isClientSide()) {
+        if (!BodyManager.emptyBody(entity) || entity.level().isClientSide()
+                || entity instanceof EmptyBodyHolder holder && holder.tsf$isMounted()) {
             return;
         }
         entity.noPhysics = false;
@@ -43,6 +46,16 @@ public abstract class EntityMixin {
             entity.setPos(destination);
             entity.setDeltaMovement(Vec3.ZERO);
             tsf$lastClearBodyPosition = destination;
+        }
+    }
+
+    @Inject(method = "makeBoundingBox(Lnet/minecraft/world/phys/Vec3;)Lnet/minecraft/world/phys/AABB;", at = @At("HEAD"), cancellable = true)
+    private void tsf$mountedBounds(Vec3 position, CallbackInfoReturnable<AABB> callback) {
+        if ((Object) this instanceof EmptyBodyHolder holder && holder.tsf$isMounted()) {
+            BodyRigPose pose = BodyRigPose.decode(holder.tsf$rigPose());
+            if (pose != null) {
+                callback.setReturnValue(pose.bounds().move(position));
+            }
         }
     }
 
@@ -81,6 +94,12 @@ public abstract class EntityMixin {
         Entity entity = (Entity) (Object) this;
         if (entity instanceof EmptyBodyHolder holder && holder.tsf$isEmptyBody()) {
             var dimensions = holder.tsf$isFoldedSkin() ? BodyManager.SKIN_DIMENSIONS : BodyManager.BODY_DIMENSIONS;
+            if (holder.tsf$isMounted()) {
+                BodyRigPose pose = BodyRigPose.decode(holder.tsf$rigPose());
+                if (pose != null) {
+                    entity.setBoundingBox(pose.bounds().move(entity.position()));
+                }
+            }
             if (Math.abs(entity.getBbWidth() - dimensions.width()) > 0.01F
                     || Math.abs(entity.getBbHeight() - dimensions.height()) > 0.01F) {
                 entity.refreshDimensions();

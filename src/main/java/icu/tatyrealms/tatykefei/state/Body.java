@@ -28,6 +28,10 @@ public final class Body {
     public double y;
     public double z;
     public float yaw;
+    public boolean displayMounted;
+    public long displayPosition;
+    public String displayFace;
+    public BodyRigPose rigPose;
     public float health = 20;
     public int food = 20;
     public float saturation = 5;

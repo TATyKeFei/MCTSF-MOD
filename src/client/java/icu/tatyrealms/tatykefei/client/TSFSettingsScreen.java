@@ -53,34 +53,36 @@ public final class TSFSettingsScreen extends Screen {
     private void buttons() {
         clearWidgets();
         int left = (width - 300) / 2;
-        int top = Math.max(8, (height - 244) / 2);
-        toggle("skin_knife", settings.skinKnifeEnabled, left, top + 28,
+        int top = Math.max(8, (height - 236) / 2);
+        toggle("skin_knife", settings.skinKnifeEnabled, left, top + 24,
                 () -> settings.skinKnifeEnabled = !settings.skinKnifeEnabled);
-        toggle("requires_hypnosis", settings.skinKnifeRequiresHypnosis, left, top + 52,
+        toggle("requires_hypnosis", settings.skinKnifeRequiresHypnosis, left, top + 46,
                 () -> settings.skinKnifeRequiresHypnosis = !settings.skinKnifeRequiresHypnosis);
-        toggle("requires_downed", settings.skinKnifeRequiresDowned, left, top + 76,
+        toggle("requires_downed", settings.skinKnifeRequiresDowned, left, top + 68,
                 () -> settings.skinKnifeRequiresDowned = !settings.skinKnifeRequiresDowned);
         Button death = addRenderableWidget(Button.builder(Component.translatable("screen.tsf.death_mode",
                 Component.translatable(settings.deathLeavesBody ? "screen.tsf.death_slime" : "screen.tsf.death_normal")), button -> {
             settings.deathLeavesBody = !settings.deathLeavesBody;
             buttons();
-        }).bounds(left, top + 100, 300, 20).build());
+        }).bounds(left, top + 90, 300, 20).build());
         death.active = editable;
         Button delay = addRenderableWidget(Button.builder(Component.translatable("screen.tsf.expulsion_delay", settings.expulsionDelaySeconds), button -> {
             settings.expulsionDelaySeconds = settings.expulsionDelaySeconds % 60 + 1;
             buttons();
-        }).bounds(left, top + 124, 300, 20).build());
+        }).bounds(left, top + 112, 300, 20).build());
         delay.active = editable;
         Button layers = addRenderableWidget(Button.builder(Component.translatable("screen.tsf.max_skin_layers", settings.maxSkinLayers), button -> {
             settings.maxSkinLayers = settings.maxSkinLayers % 64 + 1;
             buttons();
-        }).bounds(left, top + 148, 300, 20).build());
+        }).bounds(left, top + 134, 300, 20).build());
         layers.active = editable;
+        toggle("body_limb_physics", settings.bodyLimbPhysics, left, top + 156,
+                () -> settings.bodyLimbPhysics = !settings.bodyLimbPhysics);
         Button save = addRenderableWidget(Button.builder(Component.translatable("screen.tsf.settings_save"), button -> save())
-                .bounds(left, top + 194, 146, 20).build());
+                .bounds(left, top + 202, 146, 20).build());
         save.active = editable;
         addRenderableWidget(Button.builder(Component.translatable("gui.back"), button -> onClose())
-                .bounds(left + 154, top + 194, 146, 20).build());
+                .bounds(left + 154, top + 202, 146, 20).build());
     }
 
     private void toggle(String key, boolean enabled, int left, int top, Runnable change) {
@@ -108,9 +110,9 @@ public final class TSFSettingsScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         graphics.fill(0, 0, width, height, 0xE0101A2A);
-        int top = Math.max(8, (height - 244) / 2);
+        int top = Math.max(8, (height - 236) / 2);
         graphics.centeredText(font, title, width / 2, top + 8, 0xFFE6F2FF);
-        graphics.centeredText(font, status, width / 2, top + 174, 0xFFB5D6F4);
+        graphics.centeredText(font, status, width / 2, top + 186, 0xFFB5D6F4);
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
     }
 

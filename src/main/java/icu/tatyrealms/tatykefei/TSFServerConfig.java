@@ -18,6 +18,7 @@ public final class TSFServerConfig {
     public int expulsionDelaySeconds = 3;
     public boolean deathLeavesBody = true;
     public int maxSkinLayers = 16;
+    public boolean bodyLimbPhysics = true;
 
     public static TSFServerConfig parse(String json) throws IOException {
         try {

@@ -82,6 +82,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 public final class BodyManager {
+    private final BodyRigManager bodyRigs = new BodyRigManager(this);
     public static final String BODY_TAG = "tsf_empty_body";
     public static final String SKIN_TAG = "tsf_folded_skin";
     public static final EntityDimensions BODY_DIMENSIONS = EntityDimensions.fixed(1.0F, 0.275F).withEyeHeight(0.1375F);
@@ -1357,6 +1358,8 @@ public final class BodyManager {
             } else {
                 enterEmptyZipper(player, body, destination);
             }
+        } else if (player.isShiftKeyDown() && body.displayMounted && player.getMainHandItem().isEmpty()) {
+            message(player, "body_display_edit");
         } else if (player.isShiftKeyDown()) {
             pickUpBody(player, body);
         } else if (player.getMainHandItem().is(TSFItems.SKIN_KNIFE)) {
@@ -1512,11 +1515,29 @@ public final class BodyManager {
         changed();
     }
 
-    private void pickUpBody(ServerPlayer player, Body body) {
+    void pickUpBody(ServerPlayer player, Body body) {
         if ((state(player).form != Form.HUMAN && state(player).form != Form.SLIME) || player.isSpectator()) {
             message(player, "cannot_carry_body");
             return;
         }
+        ItemStack stack = packBody(body);
+        if (!player.getInventory().add(stack)) {
+            player.drop(stack, false, Prediction.SERVER_ONLY);
+        }
+        refreshInventory(player);
+        message(player, "body_picked_up", body.name);
+        changed();
+    }
+
+    void dropDisplayBody(ServerLevel level, Body body) {
+        ItemStack stack = packBody(body);
+        ItemEntity item = new ItemEntity(level, body.x, body.y, body.z, stack);
+        item.setDefaultPickUpDelay();
+        level.addFreshEntity(item);
+        save();
+    }
+
+    private ItemStack packBody(Body body) {
         removeBodyEntity(body);
         body.packedToken = UUID.randomUUID();
         ItemStack stack = new ItemStack(TSFItems.EMPTY_BODY);
@@ -1527,12 +1548,7 @@ public final class BodyManager {
         Body appearance = storedAppearance(body);
         stack.set(DataComponents.PROFILE, profile(appearance));
         stack.set(DataComponents.CUSTOM_NAME, Component.translatable("item.tsf.named_body", appearance.name));
-        if (!player.getInventory().add(stack)) {
-            player.drop(stack, false, Prediction.SERVER_ONLY);
-        }
-        refreshInventory(player);
-        message(player, "body_picked_up", body.name);
-        changed();
+        return stack;
     }
 
     public boolean placeBody(ServerPlayer player, UseOnContext context) {
@@ -1570,6 +1586,29 @@ public final class BodyManager {
         message(player, "body_placed", body.name);
         changed();
         return true;
+    }
+
+    public Body packedBody(ItemStack stack) {
+        Body body = linkedBody(stack);
+        String token = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag().getStringOr("tsf_body_token", "");
+        return stack.is(TSFItems.EMPTY_BODY) && body != null && body.packedToken != null && !body.skinned
+                && body.occupant == null && body.packedToken.toString().equals(token) ? body : null;
+    }
+
+    public void interactDisplay(ServerPlayer player, BlockPos pos, InteractionHand hand) {
+        bodyRigs.interactDisplay(player, pos, hand, store.bodies.values());
+    }
+
+    public void removeDisplay(ServerLevel level, BlockPos pos) {
+        bodyRigs.removeDisplay(level, pos, store.bodies.values());
+    }
+
+    public void dragBody(ServerPlayer player, icu.tatyrealms.tatykefei.network.BodyDragPayload payload) {
+        bodyRigs.drag(player, payload);
+    }
+
+    void rigChanged() {
+        save();
     }
 
     private void consumePlacedItem(ServerPlayer player, UseOnContext context) {
@@ -2262,7 +2301,7 @@ public final class BodyManager {
         return null;
     }
 
-    private void spawnBody(Body body) {
+    void spawnBody(Body body) {
         if (body.packedToken != null || body.zipperCarrier != null || body.skinned && !body.skinPlaced || body.occupant != null) {
             return;
         }
@@ -2271,8 +2310,8 @@ public final class BodyManager {
         if (body.entityId != null && level.getEntity(body.entityId) != null) {
             return;
         }
-        Vec3 destination = BodyPhysics.findPosition(level, new Vec3(body.x, body.y, body.z),
-                body.skinPlaced ? SKIN_DIMENSIONS : BODY_DIMENSIONS);
+        Vec3 destination = body.displayMounted ? new Vec3(body.x, body.y, body.z)
+                : BodyPhysics.findPosition(level, new Vec3(body.x, body.y, body.z), body.skinPlaced ? SKIN_DIMENSIONS : BODY_DIMENSIONS);
         if (destination == null) {
             return;
         }
@@ -2285,7 +2324,7 @@ public final class BodyManager {
         mannequin.setYBodyRot(body.yaw);
         mannequin.setYHeadRot(body.yaw);
         mannequin.setPose(Pose.SLEEPING);
-        mannequin.setNoGravity(false);
+        mannequin.setNoGravity(body.displayMounted);
         mannequin.setPermanentlyInvulnerable(true);
         Body appearance = body.skinPlaced ? body : storedAppearance(body);
         mannequin.setCustomName(Component.translatable(body.skinPlaced ? "item.tsf.named_skin" : "entity.tsf.empty_body", appearance.name));
@@ -2298,7 +2337,7 @@ public final class BodyManager {
         }
         MannequinAccessor accessor = (MannequinAccessor) mannequin;
         accessor.tsf$setProfile(profile(appearance));
-        accessor.tsf$setImmovable(false);
+        accessor.tsf$setImmovable(body.displayMounted);
         accessor.tsf$setHideDescription(true);
         mannequin.noPhysics = false;
         mannequin.setPos(destination);
@@ -2315,10 +2354,14 @@ public final class BodyManager {
             mannequin.setItemSlot(EquipmentSlot.MAINHAND, decodeItem(body.inventory.get(body.selectedSlot)));
         }
         body.entityId = mannequin.getUUID();
-        level.addFreshEntity(mannequin);
+        bodyRigs.prepare(body, mannequin);
+        if (!level.addFreshEntity(mannequin)) {
+            body.entityId = null;
+        }
     }
 
     private void removeBodyEntity(Body body) {
+        bodyRigs.forget(body);
         Entity loaded = bodyEntities.remove(body.id);
         if (loaded != null && !loaded.isRemoved()) {
             locate(body, loaded);
@@ -2372,8 +2415,9 @@ public final class BodyManager {
                 ((MannequinAccessor) entity).tsf$setProfile(profile(appearance));
                 entity.setCustomName(Component.translatable(body.skinPlaced ? "item.tsf.named_skin" : "entity.tsf.empty_body", appearance.name));
                 entity.setCustomNameVisible(false);
-                entity.setNoGravity(false);
-                ((MannequinAccessor) entity).tsf$setImmovable(false);
+                entity.setNoGravity(body.displayMounted);
+                ((MannequinAccessor) entity).tsf$setImmovable(body.displayMounted);
+                bodyRigs.prepare(body, entity);
                 bodyEntities.put(body.id, entity);
                 locate(body, entity);
             }
@@ -2500,6 +2544,7 @@ public final class BodyManager {
     public void tick() {
         ticks++;
         boolean recoveryChanged = false;
+        bodyRigs.tick(server, store.bodies.values(), bodyEntities);
         updateBodyPositions();
         updateSkinDrops();
         for (UUID id : List.copyOf(pendingProjections)) {

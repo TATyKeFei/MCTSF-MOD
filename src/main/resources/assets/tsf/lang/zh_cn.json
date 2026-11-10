@@ -207,5 +207,11 @@
   "message.tsf.invalid_skin": "无法使用这件皮物：请确认肉体形态、皮物状态和附近空间",
   "message.tsf.skin_unfolded": "已将 %s 的皮物展开为空肉体",
   "message.tsf.respawned": "你以人格史莱姆重生。按 U 返回自己的空肉体，使用手机物品或 /tsf 打开手机",
-  "message.tsf.occupant_offline": "占据该肉体的玩家已离线，请在其上线后恢复"
+  "message.tsf.occupant_offline": "占据该肉体的玩家已离线，请在其上线后恢复",
+  "block.tsf.body_display": "肉体展示架",
+  "item.tsf.body_display": "肉体展示架",
+  "tooltip.tsf.body_display": "可放置在墙面、地板或天花板，手持肉体右键放入，潜行右键取回",
+  "message.tsf.body_display_insert": "手持肉体右键放入展示架",
+  "message.tsf.body_display_edit": "空手按住 Shift 和右键抓取部位，移动视角调整，滚轮调整距离，松开右键固定姿势",
+  "screen.tsf.body_limb_physics": "空肉体肢体物理：%s"
 }

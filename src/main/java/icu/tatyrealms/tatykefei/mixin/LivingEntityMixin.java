@@ -28,7 +28,7 @@ public abstract class LivingEntityMixin {
         if ((Object) this instanceof Player player && BodyManager.form(player) == Form.SPIRIT) {
             callback.setReturnValue(false);
         } else if (BodyManager.emptyBody((Entity) (Object) this)) {
-            callback.setReturnValue(true);
+            callback.setReturnValue(!((EmptyBodyHolder) this).tsf$isMounted());
         }
     }
 
@@ -51,7 +51,7 @@ public abstract class LivingEntityMixin {
         if (BodyManager.emptyBody(self) || BodyManager.emptyBody(entity)) {
             Entity body = BodyManager.emptyBody(self) ? self : entity;
             Entity source = body == self ? entity : self;
-            if (!body.noPhysics && !source.noPhysics && !source.isSpectator()) {
+            if (!((EmptyBodyHolder) body).tsf$isMounted() && !body.noPhysics && !source.noPhysics && !source.isSpectator()) {
                 double offsetX = body.getX() - source.getX();
                 double offsetZ = body.getZ() - source.getZ();
                 double distance = Math.sqrt(offsetX * offsetX + offsetZ * offsetZ);

@@ -1,6 +1,7 @@
 package icu.tatyrealms.tatykefei.item;
 
 import icu.tatyrealms.tatykefei.TSF;
+import icu.tatyrealms.tatykefei.block.BodyDisplayBlock;
 import icu.tatyrealms.tatykefei.state.BodyManager;
 import java.util.function.Function;
 import java.util.Optional;
@@ -46,6 +47,9 @@ public final class TSFItems {
     public static final Item SKIN_KNIFE = register("skin_knife", Item::new);
     public static final Item SKIN_SUIT = register("skin_suit", SkinSuitItem::new);
     public static final Item EMPTY_BODY = register("empty_body", EmptyBodyItem::new);
+    public static final Item BODY_DISPLAY = register("body_display", properties -> new net.minecraft.world.item.BlockItem(
+            BodyDisplayBlock.INSTANCE, properties.stacksTo(64).component(DataComponents.LORE,
+                    new ItemLore(List.of(Component.translatable("tooltip.tsf.body_display"))))));
     public static final Item BODY_REGENERATION_TOTEM = register("body_regeneration_totem", BodyRegenerationTotemItem::new);
     public static final Item SOUL_PROJECTION_POTION = register("soul_projection_potion", properties -> new BodyPotionItem(properties, false));
     public static final Item PERSONALITY_EXPULSION_POTION = register("personality_expulsion_potion", properties -> new BodyPotionItem(properties, true));
@@ -91,6 +95,7 @@ public final class TSFItems {
                     output.accept(SKIN_KNIFE);
                     output.accept(SKIN_SUIT);
                     output.accept(EMPTY_BODY);
+                    output.accept(BODY_DISPLAY);
                     output.accept(BODY_REGENERATION_TOTEM);
                     output.accept(SOUL_PROJECTION_POTION);
                     output.accept(PERSONALITY_EXPULSION_POTION);

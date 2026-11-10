@@ -207,5 +207,11 @@
   "message.tsf.invalid_skin": "Cannot use this suit. Check your form, the suit's state and nearby space.",
   "message.tsf.skin_unfolded": "Unfolded %s's empty body.",
   "message.tsf.respawned": "You respawned as a personality slime. Press U to return to your body; use the phone item or /tsf to open the phone.",
-  "message.tsf.occupant_offline": "The body's occupant is offline. Recover it after they reconnect."
+  "message.tsf.occupant_offline": "The body's occupant is offline. Recover it after they reconnect.",
+  "block.tsf.body_display": "Body Display Stand",
+  "item.tsf.body_display": "Body Display Stand",
+  "tooltip.tsf.body_display": "Place on walls, floors or ceilings; use a body to mount it and sneak-use the stand to retrieve it",
+  "message.tsf.body_display_insert": "Use the stand while holding a body to mount it",
+  "message.tsf.body_display_edit": "With an empty hand, hold Shift and Use to grab a part; aim to pose, scroll to adjust distance, release Use to fix the pose",
+  "screen.tsf.body_limb_physics": "Empty body limb physics: %s"
 }

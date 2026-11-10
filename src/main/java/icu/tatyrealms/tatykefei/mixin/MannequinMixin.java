@@ -32,7 +32,7 @@ public abstract class MannequinMixin implements EmptyBodyHolder, Leashable {
 
     @Override
     public boolean canBeLeashed() {
-        return tsf$isEmptyBody() && !tsf$isFoldedSkin();
+        return tsf$isEmptyBody() && !tsf$isFoldedSkin() && !tsf$isMounted();
     }
 
     @Inject(method = "addAdditionalSaveData", at = @At("TAIL"))
@@ -44,11 +44,24 @@ public abstract class MannequinMixin implements EmptyBodyHolder, Leashable {
     private static final EntityDataAccessor<Boolean> TSF_BODY = SynchedEntityData.defineId(Mannequin.class, EntityDataSerializers.BOOLEAN);
     @Unique
     private static final EntityDataAccessor<Boolean> TSF_SKIN = SynchedEntityData.defineId(Mannequin.class, EntityDataSerializers.BOOLEAN);
+    @Unique
+    private static final EntityDataAccessor<String> TSF_RIG = SynchedEntityData.defineId(Mannequin.class, EntityDataSerializers.STRING);
 
     @Inject(method = "defineSynchedData", at = @At("TAIL"))
     private void tsf$defineData(SynchedEntityData.Builder builder, CallbackInfo callback) {
         builder.define(TSF_BODY, false);
         builder.define(TSF_SKIN, false);
+        builder.define(TSF_RIG, "");
+    }
+
+    @Override
+    public String tsf$rigPose() {
+        return ((Mannequin) (Object) this).getEntityData().get(TSF_RIG);
+    }
+
+    @Override
+    public void tsf$setRigPose(String pose) {
+        ((Mannequin) (Object) this).getEntityData().set(TSF_RIG, pose);
     }
 
     @Override

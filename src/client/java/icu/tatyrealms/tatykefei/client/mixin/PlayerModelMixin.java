@@ -2,6 +2,7 @@ package icu.tatyrealms.tatykefei.client.mixin;
 
 import icu.tatyrealms.tatykefei.client.render.AnimatedAvatarRenderState;
 import icu.tatyrealms.tatykefei.client.render.BodyAnimationPose;
+import icu.tatyrealms.tatykefei.client.render.BodyRigRendering;
 import icu.tatyrealms.tatykefei.client.render.EmptyBodyPose;
 import icu.tatyrealms.tatykefei.client.render.EmptyBodyRenderState;
 import icu.tatyrealms.tatykefei.client.render.FoldedSkinPose;
@@ -20,6 +21,8 @@ public abstract class PlayerModelMixin {
         if (((EmptyBodyRenderState) state).tsf$isEmptyBody()) {
             if (((EmptyBodyRenderState) state).tsf$isFoldedSkin()) {
                 FoldedSkinPose.applyModel(model);
+            } else if (((EmptyBodyRenderState) state).tsf$rig() != null) {
+                BodyRigRendering.applyModel(model, ((EmptyBodyRenderState) state).tsf$rig());
             } else {
                 EmptyBodyPose.applyModel(model);
             }

@@ -79,6 +79,7 @@ public final class TSFClient implements ClientModInitializer {
             }
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            BodyDragging.tick(client);
             BodyAnimations.tick(client);
             HypnosisProgress.tick(client);
             ObserverView.tick();
@@ -105,6 +106,7 @@ public final class TSFClient implements ClientModInitializer {
             VISUALS.clear();
             PROFILES.clear();
             SLIMES.clear();
+            BodyDragging.stop();
             BodyAnimations.clear();
             HypnosisProgress.clear();
             ObserverView.clear();

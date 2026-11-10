@@ -1,0 +1,53 @@
+{
+  "variants": {
+    "face=floor,facing=north": {
+      "model": "tsf:block/body_display"
+    },
+    "face=floor,facing=east": {
+      "model": "tsf:block/body_display",
+      "y": 90
+    },
+    "face=floor,facing=south": {
+      "model": "tsf:block/body_display",
+      "y": 180
+    },
+    "face=floor,facing=west": {
+      "model": "tsf:block/body_display",
+      "y": 270
+    },
+    "face=wall,facing=north": {
+      "model": "tsf:block/body_display_wall"
+    },
+    "face=wall,facing=east": {
+      "model": "tsf:block/body_display_wall",
+      "y": 90
+    },
+    "face=wall,facing=south": {
+      "model": "tsf:block/body_display_wall",
+      "y": 180
+    },
+    "face=wall,facing=west": {
+      "model": "tsf:block/body_display_wall",
+      "y": 270
+    },
+    "face=ceiling,facing=north": {
+      "model": "tsf:block/body_display",
+      "x": 180
+    },
+    "face=ceiling,facing=east": {
+      "model": "tsf:block/body_display",
+      "x": 180,
+      "y": 90
+    },
+    "face=ceiling,facing=south": {
+      "model": "tsf:block/body_display",
+      "x": 180,
+      "y": 180
+    },
+    "face=ceiling,facing=west": {
+      "model": "tsf:block/body_display",
+      "x": 180,
+      "y": 270
+    }
+  }
+}

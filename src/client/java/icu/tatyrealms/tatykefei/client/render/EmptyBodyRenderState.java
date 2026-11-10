@@ -1,5 +1,7 @@
 package icu.tatyrealms.tatykefei.client.render;
 
+import icu.tatyrealms.tatykefei.state.BodyRigPose;
+
 public interface EmptyBodyRenderState {
     boolean tsf$isEmptyBody();
 
@@ -8,4 +10,8 @@ public interface EmptyBodyRenderState {
     boolean tsf$isFoldedSkin();
 
     void tsf$setFoldedSkin(boolean foldedSkin);
+
+    BodyRigPose tsf$rig();
+
+    void tsf$setRig(BodyRigPose pose);
 }
