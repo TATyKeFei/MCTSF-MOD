@@ -59,8 +59,6 @@ public final class TSFClient implements ClientModInitializer {
             }
         });
         KeyMapping.Category controls = KeyMapping.Category.register(TSF.id("controls"));
-        KeyMapping phone = KeyMappingHelper.registerKeyMapping(new KeyMapping("key.tsf.phone", InputConstants.Type.KEYBOARD,
-                InputConstants.KEY_R, controls));
         KeyMapping undress = KeyMappingHelper.registerKeyMapping(new KeyMapping("key.tsf.undress", InputConstants.Type.KEYBOARD,
                 InputConstants.KEY_U, controls));
         ClientPlayNetworking.registerGlobalReceiver(StatePayload.TYPE, (payload, context) -> {
@@ -92,11 +90,6 @@ public final class TSFClient implements ClientModInitializer {
                         float target = player.isShiftKeyDown() || player.isCrouching() ? -0.6F : 0.0F;
                         slime.squish += (target - slime.squish) * 0.35F;
                     }
-                }
-            }
-            while (phone.consumeClick()) {
-                if (client.player != null && client.gui.screen() == null) {
-                    send(Action.OPEN, null);
                 }
             }
             while (undress.consumeClick()) {
