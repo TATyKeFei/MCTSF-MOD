@@ -28,7 +28,6 @@ import net.minecraft.world.item.LingeringPotionItem;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.level.block.DispenserBlock;
 import net.minecraft.world.item.component.Consumables;
-import net.minecraft.world.item.component.ItemLore;
 import net.minecraft.world.item.alchemy.PotionContents;
 import java.util.List;
 import net.minecraft.world.item.context.UseOnContext;
@@ -41,15 +40,15 @@ public final class TSFItems {
     public static final Item SKIN_PROTECTION_TOTEM = protection("skin_protection_totem", 5);
     public static final Item TSF_PROTECTION_TOTEM = protection("tsf_protection_totem", 15);
     public static final Item POSSESSION_SPEAR = register("possession_spear", properties -> new SpiritSpearItem(properties
-            .component(DataComponents.LORE, new ItemLore(List.of(Component.translatable("tooltip.tsf.possession_spear"))))));
+            .component(DataComponents.LORE, ItemLoreText.translated("tooltip.tsf.possession_spear"))));
     public static final Item SNATCHING_SPEAR = register("snatching_spear", properties -> new SpiritSpearItem(properties
-            .component(DataComponents.LORE, new ItemLore(List.of(Component.translatable("tooltip.tsf.snatching_spear"))))));
+            .component(DataComponents.LORE, ItemLoreText.translated("tooltip.tsf.snatching_spear"))));
     public static final Item SKIN_KNIFE = register("skin_knife", Item::new);
     public static final Item SKIN_SUIT = register("skin_suit", SkinSuitItem::new);
     public static final Item EMPTY_BODY = register("empty_body", EmptyBodyItem::new);
     public static final Item BODY_DISPLAY = register("body_display", properties -> new net.minecraft.world.item.BlockItem(
             BodyDisplayBlock.INSTANCE, properties.stacksTo(64).component(DataComponents.LORE,
-                    new ItemLore(List.of(Component.translatable("tooltip.tsf.body_display"))))));
+                    ItemLoreText.translated("tooltip.tsf.body_display"))));
     public static final Item BODY_REGENERATION_TOTEM = register("body_regeneration_totem", BodyRegenerationTotemItem::new);
     public static final Item SOUL_PROJECTION_POTION = register("soul_projection_potion", properties -> new BodyPotionItem(properties, false));
     public static final Item PERSONALITY_EXPULSION_POTION = register("personality_expulsion_potion", properties -> new BodyPotionItem(properties, true));
@@ -73,7 +72,7 @@ public final class TSFItems {
 
     private static Item protection(String name, int uses) {
         return register(name, properties -> new Item(properties.durability(uses)
-                .component(DataComponents.LORE, new ItemLore(List.of(Component.translatable("tooltip.tsf." + name))))));
+                .component(DataComponents.LORE, ItemLoreText.translated("tooltip.tsf." + name))));
     }
 
     public static void initialize() {
@@ -133,8 +132,8 @@ public final class TSFItems {
         return properties.component(DataComponents.POTION_CONTENTS, new PotionContents(Optional.empty(),
                         Optional.of(expulsion ? 0x76C853 : 0x81C6ED),
                         List.of(new MobEffectInstance(expulsion ? BodyPotionEffects.PERSONALITY_EXPULSION : BodyPotionEffects.SOUL_PROJECTION, 1)), Optional.empty()))
-                .component(DataComponents.LORE, new ItemLore(List.of(Component.translatable(expulsion
-                        ? "tooltip.tsf.personality_expulsion_potion" : "tooltip.tsf.soul_projection_potion"))));
+                .component(DataComponents.LORE, ItemLoreText.translated(expulsion
+                        ? "tooltip.tsf.personality_expulsion_potion" : "tooltip.tsf.soul_projection_potion"));
     }
 
     private static final class SkinSuitItem extends Item {
@@ -180,8 +179,7 @@ public final class TSFItems {
 
     private static final class BodyRegenerationTotemItem extends Item {
         private BodyRegenerationTotemItem(Properties properties) {
-            super(properties.component(DataComponents.LORE, new ItemLore(List.of(
-                    Component.translatable("tooltip.tsf.body_regeneration_totem")))));
+            super(properties.component(DataComponents.LORE, ItemLoreText.translated("tooltip.tsf.body_regeneration_totem")));
         }
 
         @Override
@@ -255,8 +253,7 @@ public final class TSFItems {
 
     private static final class ZipperItem extends Item {
         private ZipperItem(Properties properties) {
-            super(properties.component(DataComponents.LORE, new ItemLore(List.of(
-                    Component.translatable("tooltip.tsf.zipper_slot"), Component.translatable("tooltip.tsf.zipper")))));
+            super(properties.component(DataComponents.LORE, ItemLoreText.translated("tooltip.tsf.zipper_slot", "tooltip.tsf.zipper")));
         }
 
         @Override

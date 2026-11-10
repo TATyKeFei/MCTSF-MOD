@@ -23,10 +23,18 @@ dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+    implementation include("net.kyori:adventure-text-minimessage:${project.adventure_version}")
+    implementation include("net.kyori:adventure-text-serializer-gson:${project.adventure_version}")
+    include "net.kyori:adventure-api:${project.adventure_version}"
+    include "net.kyori:adventure-key:${project.adventure_version}"
+    include "net.kyori:adventure-text-serializer-json:${project.adventure_version}"
+    include "net.kyori:adventure-text-serializer-commons:${project.adventure_version}"
+    include "net.kyori:option:${project.adventure_option_version}"
     compileOnly "com.terraformersmc:modmenu:21.0.0"
 }
 
 repositories {
+    mavenCentral()
     maven { url 'https://maven.terraformersmc.com/releases/' }
 }
 
