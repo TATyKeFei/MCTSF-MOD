@@ -1516,6 +1516,21 @@ public final class BodyManager {
         changed();
     }
 
+    public void giveBody(ServerPlayer player, ServerPlayer recipient) {
+        Body body = new Body();
+        body.id = UUID.randomUUID();
+        body.owner = player.getUUID();
+        body.name = player.getGameProfile().name();
+        body.profile = ResolvableProfile.CODEC.encodeStart(JsonOps.INSTANCE, player.getProfile()).getOrThrow();
+        body.natureAppearance = freshNatureBody(player);
+        locate(body, recipient);
+        ItemStack stack = packBody(body);
+        store.bodies.put(body.id, body);
+        recipient.getInventory().placeItemBackInInventory(stack, Prediction.SERVER_ONLY);
+        refreshInventory(recipient);
+        save();
+    }
+
     void pickUpBody(ServerPlayer player, Body body) {
         if ((state(player).form != Form.HUMAN && state(player).form != Form.SLIME) || player.isSpectator()) {
             message(player, "cannot_carry_body");

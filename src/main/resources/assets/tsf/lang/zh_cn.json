@@ -182,6 +182,7 @@
   "message.tsf.leave_first": "请先饮用灵魂出窍药水或人格排泄药水，再进入肉体; 佩戴拉链的肉体可空手直接进入",
   "message.tsf.cannot_carry_body": "只有肉体或人格史莱姆形态可以搬运空肉体",
   "message.tsf.body_picked_up": "已拾取 %s 的空肉体，右键方块可放下",
+  "message.tsf.body_given": "已将 %s 的一具空肉体给予 %s",
   "message.tsf.invalid_body_item": "这具空肉体无法放置，可能已被放下或管理员恢复",
   "message.tsf.body_placed": "已放下 %s 的空肉体",
   "message.tsf.body_packed": "你的空肉体已被收起，需要先放下才能返回",

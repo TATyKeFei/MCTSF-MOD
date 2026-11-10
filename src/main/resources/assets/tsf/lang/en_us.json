@@ -182,6 +182,7 @@
   "message.tsf.leave_first": "Drink a Soul Projection Potion or Personality Expulsion Potion before entering another body. Zipper wearers allow direct empty-handed entry.",
   "message.tsf.cannot_carry_body": "Only embodied players and personality slimes can carry empty bodies.",
   "message.tsf.body_picked_up": "Picked up %s's empty body. Use it on a block to place it.",
+  "message.tsf.body_given": "Gave one empty body of %s to %s.",
   "message.tsf.invalid_body_item": "This body cannot be placed. It may already be placed or recovered by an administrator.",
   "message.tsf.body_placed": "Placed %s's empty body.",
   "message.tsf.body_packed": "Your empty body is packed away. Place it before returning.",
