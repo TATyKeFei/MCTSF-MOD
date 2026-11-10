@@ -1,7 +1,7 @@
-AGENTS.md
 .gradle/
 build/
 docs/
 run/
 out/
 *.iml
+AGENTS.md
