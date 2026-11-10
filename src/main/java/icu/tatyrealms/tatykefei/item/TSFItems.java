@@ -22,6 +22,7 @@ import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.ToolMaterial;
 import net.minecraft.world.item.ArrowItem;
 import net.minecraft.world.item.SplashPotionItem;
 import net.minecraft.world.item.LingeringPotionItem;
@@ -43,7 +44,8 @@ public final class TSFItems {
             .component(DataComponents.LORE, ItemLoreText.translated("tooltip.tsf.possession_spear"))));
     public static final Item SNATCHING_SPEAR = register("snatching_spear", properties -> new SpiritSpearItem(properties
             .component(DataComponents.LORE, ItemLoreText.translated("tooltip.tsf.snatching_spear"))));
-    public static final Item SKIN_KNIFE = register("skin_knife", Item::new);
+    public static final Item SKIN_KNIFE = register("skin_knife", properties -> new Item(properties
+            .sword(ToolMaterial.IRON, 3.0F, -2.4F)));
     public static final Item SKIN_SUIT = register("skin_suit", SkinSuitItem::new);
     public static final Item EMPTY_BODY = register("empty_body", EmptyBodyItem::new);
     public static final Item BODY_DISPLAY = register("body_display", properties -> new net.minecraft.world.item.BlockItem(

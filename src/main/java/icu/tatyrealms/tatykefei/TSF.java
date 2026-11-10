@@ -204,12 +204,6 @@ public final class TSF implements ModInitializer {
                     || BodyManager.emptyBody(entity)) {
                 return InteractionResult.FAIL;
             }
-            if (player.getMainHandItem().is(TSFItems.SKIN_KNIFE) && entity instanceof Player) {
-                if (player instanceof ServerPlayer serverPlayer && entity instanceof ServerPlayer target) {
-                    BodyManager.get().skinPlayer(serverPlayer, target);
-                }
-                return InteractionResult.SUCCESS;
-            }
             return InteractionResult.PASS;
         });
         UseItemCallback.EVENT.register((player, level, hand) -> {
