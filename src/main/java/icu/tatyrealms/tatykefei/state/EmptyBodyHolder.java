@@ -17,7 +17,9 @@ public interface EmptyBodyHolder {
 
     boolean tsf$poseable();
 
-    void tsf$setDisplayOptions(boolean showName, boolean poseable);
+    boolean tsf$showCape();
+
+    void tsf$setDisplayOptions(boolean showName, boolean poseable, boolean showCape);
 
     default boolean tsf$isMounted() {
         return tsf$isEmptyBody() && tsf$rigPose().startsWith("m,");

@@ -221,6 +221,7 @@
   "screen.tsf.body_display": "肉体展示架设置",
   "screen.tsf.display_name": "显示名牌：%s",
   "screen.tsf.display_poseable": "允许摆弄：%s",
+  "screen.tsf.display_cape": "显示披风：%s",
   "screen.tsf.display_edit": "调整姿势",
   "screen.tsf.display_reset": "重置姿势",
   "message.tsf.body_display_editing": "姿势编辑：空手按住右键拖动部位，滚轮调整距离，Esc 结束",

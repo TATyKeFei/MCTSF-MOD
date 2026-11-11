@@ -60,6 +60,7 @@ public abstract class AvatarRendererMixin {
                 && BodyManager.form(player) == Form.HUMAN ? BodyAnimations.frame(player.getUUID(), partialTick) : null);
         if (emptyBody) {
             if (avatar instanceof icu.tatyrealms.tatykefei.state.EmptyBodyHolder holder && holder.tsf$isMounted()) {
+                state.showCape &= holder.tsf$showCape();
                 state.nameTag = holder.tsf$showDisplayName() && state.distanceToCameraSq < 4096 ? avatar.getDisplayName() : null;
                 var pose = ((EmptyBodyRenderState) state).tsf$rig();
                 if (pose != null) {

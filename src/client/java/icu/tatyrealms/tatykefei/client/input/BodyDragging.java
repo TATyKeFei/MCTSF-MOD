@@ -47,7 +47,7 @@ public final class BodyDragging {
         }
         stop();
         if (ClientPlayNetworking.canSend(BodyDisplayPayload.TYPE)) {
-            ClientPlayNetworking.send(new BodyDisplayPayload(display.pos(), BodyDisplayPayload.STOP_EDIT, false, false, -1));
+            ClientPlayNetworking.send(new BodyDisplayPayload(display.pos(), BodyDisplayPayload.STOP_EDIT, false, false, true, -1));
         }
         clear();
         return true;

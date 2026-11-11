@@ -20,6 +20,7 @@ public final class BodyDisplayBlockEntity extends BlockEntity {
             new BlockEntityType<>(BodyDisplayBlockEntity::new, Set.of(BodyDisplayBlock.INSTANCE)));
     private boolean showName;
     private boolean poseable = true;
+    private boolean showCape = true;
 
     public BodyDisplayBlockEntity(BlockPos pos, BlockState state) {
         super(TYPE, pos, state);
@@ -36,9 +37,14 @@ public final class BodyDisplayBlockEntity extends BlockEntity {
         return poseable;
     }
 
-    public void configure(boolean showName, boolean poseable) {
+    public boolean showCape() {
+        return showCape;
+    }
+
+    public void configure(boolean showName, boolean poseable, boolean showCape) {
         this.showName = showName;
         this.poseable = poseable;
+        this.showCape = showCape;
         setChanged();
         if (level != null) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
@@ -50,6 +56,7 @@ public final class BodyDisplayBlockEntity extends BlockEntity {
         super.saveAdditional(output);
         output.putBoolean("show_name", showName);
         output.putBoolean("poseable", poseable);
+        output.putBoolean("show_cape", showCape);
     }
 
     @Override
@@ -57,6 +64,7 @@ public final class BodyDisplayBlockEntity extends BlockEntity {
         super.loadAdditional(input);
         showName = input.getBooleanOr("show_name", false);
         poseable = input.getBooleanOr("poseable", true);
+        showCape = input.getBooleanOr("show_cape", true);
     }
 
     @Override

@@ -221,6 +221,7 @@
   "screen.tsf.body_display": "Body Display Settings",
   "screen.tsf.display_name": "Show Name: %s",
   "screen.tsf.display_poseable": "Allow Posing: %s",
+  "screen.tsf.display_cape": "Show Cape: %s",
   "screen.tsf.display_edit": "Adjust Pose",
   "screen.tsf.display_reset": "Reset Pose",
   "message.tsf.body_display_editing": "Pose editing: hold Use with an empty hand to drag parts, scroll for distance, Esc to finish",
