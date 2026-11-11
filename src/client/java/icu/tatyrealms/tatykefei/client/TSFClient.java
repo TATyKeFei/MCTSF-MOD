@@ -3,6 +3,7 @@ package icu.tatyrealms.tatykefei.client;
 import icu.tatyrealms.tatykefei.client.compat.needsofnature.NeedsOfNatureClientCompat;
 import icu.tatyrealms.tatykefei.client.hud.HypnosisProgress;
 import icu.tatyrealms.tatykefei.client.input.BodyDragging;
+import icu.tatyrealms.tatykefei.client.input.BodyExitInput;
 import icu.tatyrealms.tatykefei.client.observer.ObserverView;
 import icu.tatyrealms.tatykefei.client.render.BodyAnimations;
 import icu.tatyrealms.tatykefei.client.screen.PhoneScreen;
@@ -117,11 +118,7 @@ public final class TSFClient implements ClientModInitializer {
                     }
                 }
             }
-            while (undress.consumeClick()) {
-                if (client.player != null && client.gui.screen() == null) {
-                    send(Action.EXIT, null);
-                }
-            }
+            BodyExitInput.tick(client, undress);
             if (client.player != null && BodyManager.form(client.player) == Form.SPIRIT) {
                 client.player.noPhysics = false;
             }
@@ -134,6 +131,7 @@ public final class TSFClient implements ClientModInitializer {
             BodyAnimations.clear();
             HypnosisProgress.clear();
             ObserverView.clear();
+            BodyExitInput.clear();
         });
     }
 

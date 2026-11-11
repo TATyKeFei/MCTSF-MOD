@@ -1291,8 +1291,13 @@ public final class BodyManager {
             return;
         }
         Body body = store.bodies.get(state(player).body);
-        if (state(player).form != Form.HUMAN || state(player).zipperReturnForm != null
-                || body != null && !player.getUUID().equals(body.owner)) {
+        if (state(player).form == Form.SPIRIT) {
+            return;
+        }
+        if (state(player).form == Form.HUMAN && state(player).zipperReturnForm == null
+                && body != null && !player.getUUID().equals(body.owner)) {
+            depart(player, Form.SPIRIT);
+        } else if (state(player).form != Form.HUMAN || state(player).zipperReturnForm != null) {
             returnToBody(player);
         } else {
             undress(player);
