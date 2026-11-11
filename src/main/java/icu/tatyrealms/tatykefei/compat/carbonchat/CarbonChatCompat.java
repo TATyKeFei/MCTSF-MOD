@@ -11,6 +11,7 @@ import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.loader.api.FabricLoader;
+import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.minecraft.network.chat.ChatType;
@@ -25,6 +26,7 @@ public final class CarbonChatCompat {
     private static Object chatHandler;
     private static Method handleChat;
     private static Method playerId;
+    private static Class<?> consolePlayer;
     private static boolean warned;
     private static final ThreadLocal<UUID> FORCED_SPEAKER = new ThreadLocal<>();
 
@@ -47,6 +49,7 @@ public final class CarbonChatCompat {
             handleChat = handler.getClass().getMethod("allowChatMessage", PlayerChatMessage.class,
                     ServerPlayer.class, ChatType.Bound.class);
             playerId = Class.forName("net.draycia.carbon.api.users.CarbonPlayer").getMethod("uuid");
+            consolePlayer = Class.forName("net.draycia.carbon.common.users.ConsoleCarbonPlayer");
             chatHandler = handler;
             LoggerFactory.getLogger("TSF").info("Enabled CarbonChat integration");
         } catch (ReflectiveOperationException | LinkageError exception) {
@@ -81,6 +84,17 @@ public final class CarbonChatCompat {
             warn(exception);
             return original;
         }
+    }
+
+    public static void deliverConsoleMessage(Audience recipient, Component message) {
+        if (isConsole(recipient)) {
+            // Fabric's handler renders this wrapper, but only sends to raw command sources and players.
+            recipient.sendMessage(message);
+        }
+    }
+
+    private static boolean isConsole(Audience recipient) {
+        return consolePlayer != null && consolePlayer.isInstance(recipient);
     }
 
     public static boolean speakAsHypnotized(ServerPlayer actor, ServerPlayer target, String text) {
