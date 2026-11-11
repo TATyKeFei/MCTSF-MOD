@@ -12,6 +12,7 @@ import java.util.function.BooleanSupplier;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TextComponent;
 import net.minecraft.network.chat.ChatType;
 import net.minecraft.network.chat.PlayerChatMessage;
 import net.minecraft.server.MinecraftServer;
@@ -19,7 +20,7 @@ import net.minecraft.server.level.ServerPlayer;
 import org.slf4j.LoggerFactory;
 
 public final class CarbonChatCompat {
-    private static volatile Map<UUID, Component> names = Map.of();
+    private static volatile Map<UUID, TextComponent> names = Map.of();
     private static volatile MinecraftServer server;
     private static Object chatHandler;
     private static Method handleChat;
@@ -57,7 +58,7 @@ public final class CarbonChatCompat {
         if (!FabricLoader.getInstance().isModLoaded("carbonchat")) {
             return;
         }
-        Map<UUID, Component> next = new HashMap<>();
+        Map<UUID, TextComponent> next = new HashMap<>();
         for (VisualState visual : visuals) {
             if (visual.form() == Form.HUMAN && visual.appearanceOwner() != null
                     && !visual.appearanceOwner().equals(visual.player())) {
@@ -70,6 +71,16 @@ public final class CarbonChatCompat {
 
     public static Component assumedName(UUID player) {
         return names.get(player);
+    }
+
+    public static String assumedUsername(Object sender, String original) {
+        try {
+            TextComponent name = names.get((UUID) playerId.invoke(sender));
+            return name == null ? original : name.content();
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError exception) {
+            warn(exception);
+            return original;
+        }
     }
 
     public static boolean speakAsHypnotized(ServerPlayer actor, ServerPlayer target, String text) {
