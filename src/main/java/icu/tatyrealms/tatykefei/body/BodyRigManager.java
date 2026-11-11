@@ -113,7 +113,8 @@ public final class BodyRigManager implements AutoCloseable {
     }
 
     public void interactDisplay(ServerPlayer player, BlockPos pos, InteractionHand hand, Collection<Body> bodies) {
-        if (!allowed(player) || player.distanceToSqr(Vec3.atCenterOf(pos)) > 36
+        if (!player.isAlive() || player.isSpectator() || BodyManager.hypnotized(player)
+                || player.distanceToSqr(Vec3.atCenterOf(pos)) > 36
                 || !player.level().mayInteract(player, pos) || !player.getAbilities().mayBuild) {
             return;
         }
@@ -123,11 +124,18 @@ public final class BodyRigManager implements AutoCloseable {
         }
         Body occupied = displayed(player.level(), pos, bodies);
         if (occupied != null) {
+            if (hand != InteractionHand.MAIN_HAND || manager.interactDisplayedBody(player, occupied)
+                    || !allowed(player)) {
+                return;
+            }
             if (player.isShiftKeyDown()) {
                 manager.pickUpBody(player, occupied);
             } else {
                 BodyManager.message(player, "body_display_edit");
             }
+            return;
+        }
+        if (!allowed(player)) {
             return;
         }
         ItemStack stack = player.getItemInHand(hand);

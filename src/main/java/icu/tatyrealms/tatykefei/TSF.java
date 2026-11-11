@@ -23,6 +23,7 @@ import icu.tatyrealms.tatykefei.network.HypnosisSpeechPayload;
 import icu.tatyrealms.tatykefei.network.BodyDragPayload;
 import icu.tatyrealms.tatykefei.state.HypnosisRestrictions;
 import icu.tatyrealms.tatykefei.body.BodyManager;
+import icu.tatyrealms.tatykefei.block.BodyDisplayBlock;
 import icu.tatyrealms.tatykefei.state.Form;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -228,6 +229,14 @@ public final class TSF implements ModInitializer {
         UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
             if (BodyManager.spiritSpear(player.getItemInHand(hand))) {
                 return player.getItemInHand(hand).getItem().use(level, player, hand);
+            }
+            if (BodyManager.form(player) == Form.SPIRIT
+                    && !BodyManager.restricted(player, HypnosisRestrictions.INTERACTION)
+                    && level.getBlockState(hit.getBlockPos()).is(BodyDisplayBlock.INSTANCE)) {
+                if (player instanceof ServerPlayer actor) {
+                    BodyManager.get().interactDisplay(actor, hit.getBlockPos(), hand);
+                }
+                return InteractionResult.SUCCESS;
             }
             return restricted(player) ? InteractionResult.FAIL : InteractionResult.PASS;
         });

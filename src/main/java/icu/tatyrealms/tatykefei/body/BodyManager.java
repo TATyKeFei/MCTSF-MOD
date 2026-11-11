@@ -90,9 +90,11 @@ import net.minecraft.world.item.component.ResolvableProfile;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.storage.LevelResource;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 public final class BodyManager {
@@ -1343,6 +1345,20 @@ public final class BodyManager {
         message(player, "possessed", body.name);
     }
 
+    boolean interactDisplayedBody(ServerPlayer player, Body body) {
+        boolean equip = player.getMainHandItem().is(TSFItems.ZIPPER);
+        boolean enter = !player.isShiftKeyDown() && (state(player).form != Form.HUMAN
+                || player.getMainHandItem().isEmpty() && wearingZipper(body));
+        if (!equip && !enter) {
+            return false;
+        }
+        Entity entity = body.entityId == null ? null : player.level().getEntity(body.entityId);
+        if (entity != null) {
+            interactBody(player, entity);
+        }
+        return true;
+    }
+
     public boolean interactBody(ServerPlayer player, Entity entity) {
         if (!emptyBody(entity)) {
             return false;
@@ -1353,7 +1369,7 @@ public final class BodyManager {
         }
         Body body = foldedSkin(entity) ? placedSkinForEntity(entity) : bodyForEntity(entity);
         if (body == null || entity.level() != player.level() || player.distanceToSqr(entity) > 25
-                || !player.hasLineOfSight(entity)) {
+                || !canSeeEmptyBody(player, body, entity)) {
             return true;
         }
         if (body.skinPlaced) {
@@ -1375,7 +1391,7 @@ public final class BodyManager {
             }
         } else if (!player.isShiftKeyDown() && state(player).form == Form.HUMAN
                 && player.getMainHandItem().isEmpty() && wearingZipper(body)) {
-            Vec3 destination = safePosition(player.level(), entity.position());
+            Vec3 destination = emptyBodyEntryPosition(player, body, entity);
             if (destination == null) {
                 message(player, "no_space");
             } else {
@@ -1390,7 +1406,7 @@ public final class BodyManager {
         } else if (state(player).form == Form.HUMAN) {
             message(player, "leave_first");
         } else {
-            Vec3 destination = safePosition(player.level(), entity.position());
+            Vec3 destination = emptyBodyEntryPosition(player, body, entity);
             if (destination == null) {
                 message(player, "no_space");
             } else if (!protectBody(player, body, ProtectionTotems.Kind.POSSESSION)) {
@@ -1402,6 +1418,25 @@ public final class BodyManager {
             }
         }
         return true;
+    }
+
+    private boolean canSeeEmptyBody(ServerPlayer player, Body body, Entity entity) {
+        if (player.hasLineOfSight(entity)) {
+            return true;
+        }
+        if (!body.displayMounted) {
+            return false;
+        }
+        var hit = player.level().clip(new ClipContext(player.getEyePosition(), entity.getBoundingBox().getCenter(),
+                ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player));
+        return hit.getType() == HitResult.Type.MISS
+                || hit.getBlockPos().asLong() == body.displayPosition;
+    }
+
+    private Vec3 emptyBodyEntryPosition(ServerPlayer player, Body body, Entity entity) {
+        Vec3 origin = body.displayMounted
+                ? new Vec3(entity.getX(), entity.getBoundingBox().minY, entity.getZ()) : entity.position();
+        return safePosition(player.level(), origin);
     }
 
     public Body bodyForEntity(Entity entity) {
