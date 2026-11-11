@@ -1,12 +1,6 @@
 {
-  "type": "minecraft:crafting_shapeless",
-  "category": "misc",
-  "ingredients": [
-    "tsf:personality_expulsion_potion",
-    "minecraft:gunpowder"
-  ],
-  "result": {
-    "id": "tsf:personality_expulsion_splash_potion",
-    "count": 1
-  }
+  "type": "minecraft:brewing",
+  "input": {"item": "tsf:personality_expulsion_potion"},
+  "reagent": {"item": "minecraft:gunpowder"},
+  "output": {"id": "tsf:personality_expulsion_splash_potion"}
 }

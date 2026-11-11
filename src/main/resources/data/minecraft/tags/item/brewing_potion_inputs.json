@@ -1,0 +1,11 @@
+{
+  "replace": false,
+  "values": [
+    "tsf:soul_projection_potion",
+    "tsf:personality_expulsion_potion",
+    "tsf:soul_projection_splash_potion",
+    "tsf:personality_expulsion_splash_potion",
+    "tsf:soul_projection_lingering_potion",
+    "tsf:personality_expulsion_lingering_potion"
+  ]
+}

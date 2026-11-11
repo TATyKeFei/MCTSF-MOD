@@ -1,12 +1,6 @@
 {
-  "type": "minecraft:crafting_shapeless",
-  "category": "misc",
-  "ingredients": [
-    "tsf:soul_projection_potion",
-    "minecraft:gunpowder"
-  ],
-  "result": {
-    "id": "tsf:soul_projection_splash_potion",
-    "count": 1
-  }
+  "type": "minecraft:brewing",
+  "input": {"item": "tsf:soul_projection_potion"},
+  "reagent": {"item": "minecraft:gunpowder"},
+  "output": {"id": "tsf:soul_projection_splash_potion"}
 }
