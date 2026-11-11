@@ -1,7 +1,7 @@
 package icu.tatyrealms.tatykefei.item;
 
-import icu.tatyrealms.tatykefei.compat.TrinketsCompat;
-import icu.tatyrealms.tatykefei.state.BodyManager;
+import icu.tatyrealms.tatykefei.compat.trinkets.TrinketsCompat;
+import icu.tatyrealms.tatykefei.body.BodyManager;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;

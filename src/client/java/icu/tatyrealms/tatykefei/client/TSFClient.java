@@ -1,5 +1,13 @@
 package icu.tatyrealms.tatykefei.client;
 
+import icu.tatyrealms.tatykefei.client.compat.needsofnature.NeedsOfNatureClientCompat;
+import icu.tatyrealms.tatykefei.client.hud.HypnosisProgress;
+import icu.tatyrealms.tatykefei.client.input.BodyDragging;
+import icu.tatyrealms.tatykefei.client.observer.ObserverView;
+import icu.tatyrealms.tatykefei.client.render.BodyAnimations;
+import icu.tatyrealms.tatykefei.client.screen.PhoneScreen;
+import icu.tatyrealms.tatykefei.client.screen.SkinLayersScreen;
+import icu.tatyrealms.tatykefei.client.screen.TSFSettingsScreen;
 import com.google.gson.Gson;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.serialization.JsonOps;
@@ -15,7 +23,7 @@ import icu.tatyrealms.tatykefei.network.SettingsPayload;
 import icu.tatyrealms.tatykefei.network.SkinLayersPayload;
 import icu.tatyrealms.tatykefei.network.HypnosisProgressPayload;
 import icu.tatyrealms.tatykefei.network.HypnosisSpeechPayload;
-import icu.tatyrealms.tatykefei.state.BodyManager;
+import icu.tatyrealms.tatykefei.body.BodyManager;
 import icu.tatyrealms.tatykefei.state.Form;
 import java.util.HashMap;
 import java.util.Map;

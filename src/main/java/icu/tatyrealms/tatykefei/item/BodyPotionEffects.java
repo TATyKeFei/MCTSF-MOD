@@ -1,7 +1,7 @@
 package icu.tatyrealms.tatykefei.item;
 
 import icu.tatyrealms.tatykefei.TSF;
-import icu.tatyrealms.tatykefei.state.BodyManager;
+import icu.tatyrealms.tatykefei.body.BodyManager;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;

@@ -1,6 +1,6 @@
 package icu.tatyrealms.tatykefei.item;
 
-import icu.tatyrealms.tatykefei.state.BodyManager;
+import icu.tatyrealms.tatykefei.body.BodyManager;
 import net.minecraft.core.dispenser.BlockSource;
 import net.minecraft.core.dispenser.DefaultDispenseItemBehavior;
 import net.minecraft.server.level.ServerPlayer;

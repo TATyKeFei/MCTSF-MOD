@@ -1,7 +1,7 @@
 package icu.tatyrealms.tatykefei.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import icu.tatyrealms.tatykefei.state.BodyRigPose;
+import icu.tatyrealms.tatykefei.body.BodyRigPose;
 import icu.tatyrealms.tatykefei.state.EmptyBodyHolder;
 import java.util.Map;
 import java.util.WeakHashMap;

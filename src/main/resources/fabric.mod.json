@@ -10,7 +10,7 @@
   "entrypoints": {
     "main": ["icu.tatyrealms.tatykefei.TSF"],
     "client": ["icu.tatyrealms.tatykefei.client.TSFClient"],
-    "modmenu": ["icu.tatyrealms.tatykefei.client.TSFModMenu"]
+    "modmenu": ["icu.tatyrealms.tatykefei.client.compat.modmenu.TSFModMenu"]
   },
   "mixins": ["tsf.mixins.json", {"config": "tsf.client.mixins.json", "environment": "client"}],
   "depends": {

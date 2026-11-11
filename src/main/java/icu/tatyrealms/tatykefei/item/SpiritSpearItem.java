@@ -1,6 +1,6 @@
 package icu.tatyrealms.tatykefei.item;
 
-import icu.tatyrealms.tatykefei.state.BodyManager;
+import icu.tatyrealms.tatykefei.body.BodyManager;
 import icu.tatyrealms.tatykefei.state.Form;
 import icu.tatyrealms.tatykefei.state.HypnosisRestrictions;
 import java.util.Optional;

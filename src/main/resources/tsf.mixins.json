@@ -2,6 +2,24 @@
   "required": true,
   "package": "icu.tatyrealms.tatykefei.mixin",
   "compatibilityLevel": "JAVA_25",
-  "mixins": ["BodyCollisionCacheMixin", "PlayerMixin", "ServerPlayerMixin", "ServerGamePacketListenerMixin", "PlayerListMixin", "AvatarMixin", "EntityMixin", "LivingEntityMixin", "KineticWeaponMixin", "MobMixin", "AbstractMinecartMixin", "MannequinAccessor", "MannequinMixin", "NeedsOfNatureInteractionMixin", "EntityCollisionContextMixin"],
-  "injectors": {"defaultRequire": 1}
+  "mixins": [
+    "world.BodyCollisionCacheMixin",
+    "player.PlayerMixin",
+    "player.ServerPlayerMixin",
+    "player.ServerGamePacketListenerMixin",
+    "player.PlayerListMixin",
+    "entity.AvatarMixin",
+    "entity.EntityMixin",
+    "entity.LivingEntityMixin",
+    "item.KineticWeaponMixin",
+    "entity.MobMixin",
+    "entity.AbstractMinecartMixin",
+    "entity.MannequinAccessor",
+    "entity.MannequinMixin",
+    "compat.NeedsOfNatureInteractionMixin",
+    "world.EntityCollisionContextMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
 }

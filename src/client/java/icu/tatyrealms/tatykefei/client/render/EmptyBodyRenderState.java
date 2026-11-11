@@ -1,6 +1,6 @@
 package icu.tatyrealms.tatykefei.client.render;
 
-import icu.tatyrealms.tatykefei.state.BodyRigPose;
+import icu.tatyrealms.tatykefei.body.BodyRigPose;
 
 public interface EmptyBodyRenderState {
     boolean tsf$isEmptyBody();

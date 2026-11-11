@@ -1,0 +1,41 @@
+{
+  "required": true,
+  "package": "icu.tatyrealms.tatykefei.client.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "input.BodyDragInputMixin",
+    "input.BodyDragScrollMixin",
+    "player.ClientPlayerMixin",
+    "network.ClientPacketListenerMixin",
+    "player.LocalPlayerMixin",
+    "player.PlayerInfoMixin",
+    "render.LevelExtractorMixin",
+    "render.EntityRendererMixin",
+    "render.EntityRenderDispatcherMixin",
+    "render.AvatarRendererMixin",
+    "render.AvatarRenderStateMixin",
+    "render.PlayerModelMixin",
+    "input.KeyboardInputMixin",
+    "render.FirstPersonRendererMixin",
+    "render.ItemModelResolverMixin",
+    "render.ItemStackRenderStateMixin",
+    "render.ItemLayerRenderStateMixin",
+    "render.SlimeRenderStateMixin",
+    "render.LivingEntityRendererMixin",
+    "render.SlimeRendererMixin",
+    "render.SlimeOuterLayerMixin",
+    "render.GameRendererMixin",
+    "render.CameraMixin",
+    "render.HudMixin",
+    "render.GuiMixin",
+    "compat.NeedsOfNatureSelectionMixin",
+    "compat.NeedsOfNatureSkinMixin",
+    "player.LivingEntityUseAccessor"
+  ],
+  "mixins": [
+    "screen.InventoryScreenMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

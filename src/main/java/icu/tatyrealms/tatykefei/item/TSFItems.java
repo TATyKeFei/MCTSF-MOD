@@ -2,7 +2,7 @@ package icu.tatyrealms.tatykefei.item;
 
 import icu.tatyrealms.tatykefei.TSF;
 import icu.tatyrealms.tatykefei.block.BodyDisplayBlock;
-import icu.tatyrealms.tatykefei.state.BodyManager;
+import icu.tatyrealms.tatykefei.body.BodyManager;
 import java.util.function.Function;
 import java.util.Optional;
 import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;

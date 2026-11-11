@@ -1,7 +1,7 @@
 package icu.tatyrealms.tatykefei.block;
 
 import icu.tatyrealms.tatykefei.TSF;
-import icu.tatyrealms.tatykefei.state.BodyManager;
+import icu.tatyrealms.tatykefei.body.BodyManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Registry;
