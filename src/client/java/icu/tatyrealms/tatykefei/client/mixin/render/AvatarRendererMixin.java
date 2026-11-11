@@ -59,7 +59,15 @@ public abstract class AvatarRendererMixin {
         ((AnimatedAvatarRenderState) state).tsf$setAnimation(avatar instanceof Player player
                 && BodyManager.form(player) == Form.HUMAN ? BodyAnimations.frame(player.getUUID(), partialTick) : null);
         if (emptyBody) {
-            if (!(Minecraft.getInstance().hitResult instanceof EntityHitResult hit) || hit.getEntity() != avatar) {
+            if (avatar instanceof icu.tatyrealms.tatykefei.state.EmptyBodyHolder holder && holder.tsf$isMounted()) {
+                state.nameTag = holder.tsf$showDisplayName() && state.distanceToCameraSq < 4096 ? avatar.getDisplayName() : null;
+                var pose = ((EmptyBodyRenderState) state).tsf$rig();
+                if (pose != null) {
+                    var bounds = pose.bounds();
+                    state.nameTagAttachment = new net.minecraft.world.phys.Vec3(
+                            (bounds.minX + bounds.maxX) / 2, bounds.maxY + 0.3, (bounds.minZ + bounds.maxZ) / 2);
+                }
+            } else if (!(Minecraft.getInstance().hitResult instanceof EntityHitResult hit) || hit.getEntity() != avatar) {
                 state.nameTag = null;
             }
             state.bedOrientation = null;

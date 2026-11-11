@@ -1363,6 +1363,11 @@ public final class BodyManager {
         if (!emptyBody(entity)) {
             return false;
         }
+        Body mounted = bodyForEntity(entity);
+        if (mounted != null && mounted.displayMounted && player.isShiftKeyDown()) {
+            bodyRigs.openSettings(player, BlockPos.of(mounted.displayPosition), store.bodies.values());
+            return true;
+        }
         if (hypnotized(player) || state(player).form == Form.OBSERVER || !ready(player)
                 || !NeedsOfNatureCompat.canChangeBody(player)) {
             return true;
@@ -1397,8 +1402,6 @@ public final class BodyManager {
             } else {
                 enterEmptyZipper(player, body, destination);
             }
-        } else if (player.isShiftKeyDown() && body.displayMounted && player.getMainHandItem().isEmpty()) {
-            message(player, "body_display_edit");
         } else if (player.isShiftKeyDown()) {
             pickUpBody(player, body);
         } else if (player.getMainHandItem().is(TSFItems.SKIN_KNIFE)) {
@@ -1420,7 +1423,7 @@ public final class BodyManager {
         return true;
     }
 
-    private boolean canSeeEmptyBody(ServerPlayer player, Body body, Entity entity) {
+    boolean canSeeEmptyBody(ServerPlayer player, Body body, Entity entity) {
         if (player.hasLineOfSight(entity)) {
             return true;
         }
@@ -1680,6 +1683,18 @@ public final class BodyManager {
 
     public void interactDisplay(ServerPlayer player, BlockPos pos, InteractionHand hand) {
         bodyRigs.interactDisplay(player, pos, hand, store.bodies.values());
+    }
+
+    public boolean pickUpDisplayedBody(ServerPlayer player, Entity entity) {
+        return bodyRigs.pickUpDisplayed(player, entity);
+    }
+
+    public void pickUpDisplayedBody(ServerPlayer player, BlockPos pos) {
+        bodyRigs.pickUpDisplayed(player, pos, store.bodies.values());
+    }
+
+    public void configureDisplay(ServerPlayer player, icu.tatyrealms.tatykefei.network.BodyDisplayPayload payload) {
+        bodyRigs.configure(player, payload, store.bodies.values());
     }
 
     public void removeDisplay(ServerLevel level, BlockPos pos) {

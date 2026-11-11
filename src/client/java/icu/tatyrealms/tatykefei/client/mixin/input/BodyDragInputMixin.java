@@ -15,4 +15,11 @@ public abstract class BodyDragInputMixin {
             callback.cancel();
         }
     }
+
+    @Inject(method = "pauseGame", at = @At("HEAD"), cancellable = true)
+    private void tsf$finishBodyEditing(boolean suppressPauseMenu, CallbackInfo callback) {
+        if (BodyDragging.finishEditing()) {
+            callback.cancel();
+        }
+    }
 }

@@ -214,8 +214,15 @@
   "message.tsf.occupant_offline": "The body's occupant is offline. Recover it after they reconnect.",
   "block.tsf.body_display": "Body Display Stand",
   "item.tsf.body_display": "Body Display Stand",
-  "tooltip.tsf.body_display": "Place on walls, floors or ceilings; use a body to mount it and sneak-use the stand to retrieve it",
+  "tooltip.tsf.body_display": "Place on walls, floors or ceilings; use a body to mount it, sneak-attack to retrieve it, sneak-use for settings",
   "message.tsf.body_display_insert": "Use the stand while holding a body to mount it",
-  "message.tsf.body_display_edit": "With an empty hand, hold Shift and Use to grab a part; aim to pose, scroll to adjust distance, release Use to fix the pose",
-  "screen.tsf.body_limb_physics": "Empty body limb physics: %s"
+  "message.tsf.body_display_edit": "Sneak-use the body or stand for settings; sneak-attack to retrieve the body",
+  "screen.tsf.body_limb_physics": "Empty body limb physics: %s",
+  "screen.tsf.body_display": "Body Display Settings",
+  "screen.tsf.display_name": "Show Name: %s",
+  "screen.tsf.display_poseable": "Allow Posing: %s",
+  "screen.tsf.display_edit": "Adjust Pose",
+  "screen.tsf.display_reset": "Reset Pose",
+  "message.tsf.body_display_editing": "Pose editing: hold Use with an empty hand to drag parts, scroll for distance, Esc to finish",
+  "screen.tsf.display_edit_hint": "Empty your hand to edit; hold Use to drag, Esc to finish"
 }

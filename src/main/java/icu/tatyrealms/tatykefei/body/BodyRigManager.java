@@ -4,7 +4,10 @@ import icu.tatyrealms.tatykefei.state.EmptyBodyHolder;
 import icu.tatyrealms.tatykefei.state.Form;
 import icu.tatyrealms.tatykefei.config.TSFServerConfig;
 import icu.tatyrealms.tatykefei.block.BodyDisplayBlock;
+import icu.tatyrealms.tatykefei.block.BodyDisplayBlockEntity;
 import icu.tatyrealms.tatykefei.network.BodyDragPayload;
+import icu.tatyrealms.tatykefei.network.BodyDisplayPayload;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -41,8 +44,13 @@ public final class BodyRigManager implements AutoCloseable {
     private final AsyncBodyPhysics worker = new AsyncBodyPhysics();
     private final BodyCollisionCache collisions = new BodyCollisionCache();
     private final Map<UUID, Grab> grabs = new HashMap<>();
+    private final Map<UUID, DisplaySession> menus = new HashMap<>();
+    private final Map<UUID, DisplaySession> editors = new HashMap<>();
     private long time;
     private boolean physicsEnabled = TSFServerConfig.get().bodyLimbPhysics;
+
+    private record DisplaySession(ServerLevel level, BlockPos pos, UUID body) {
+    }
 
     private static final class Simulation {
         final Entity entity;
@@ -112,6 +120,141 @@ public final class BodyRigManager implements AutoCloseable {
                 && dimension.equals(body.dimension)).findFirst().orElse(null);
     }
 
+    private boolean canConfigure(ServerPlayer player, BlockPos pos) {
+        if (!allowed(player) || player.distanceToSqr(Vec3.atCenterOf(pos)) > 36
+                || !player.getAbilities().mayBuild || !player.level().mayInteract(player, pos)
+                || !player.level().getBlockState(pos).is(BodyDisplayBlock.INSTANCE)) {
+            return false;
+        }
+        var hit = player.level().clip(new ClipContext(player.getEyePosition(), Vec3.atCenterOf(pos),
+                ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player));
+        return hit.getType() == HitResult.Type.MISS || hit.getBlockPos().equals(pos);
+    }
+
+    private BodyDisplayBlockEntity settings(ServerLevel level, BlockPos pos) {
+        if (!(level.getBlockEntity(pos) instanceof BodyDisplayBlockEntity)) {
+            level.setBlockEntity(new BodyDisplayBlockEntity(pos, level.getBlockState(pos)));
+        }
+        return (BodyDisplayBlockEntity) level.getBlockEntity(pos);
+    }
+
+    public void openSettings(ServerPlayer player, BlockPos pos, Collection<Body> bodies) {
+        if (!canConfigure(player, pos)) {
+            return;
+        }
+        endEditing(player);
+        Body body = displayed(player.level(), pos, bodies);
+        menus.put(player.getUUID(), new DisplaySession(player.level(), pos.immutable(), body == null ? null : body.id));
+        sendSettings(player, pos, body, BodyDisplayPayload.OPEN);
+    }
+
+    private void sendSettings(ServerPlayer player, BlockPos pos, Body body, int operation) {
+        var settings = settings(player.level(), pos);
+        Entity entity = body == null || body.entityId == null ? null : player.level().getEntity(body.entityId);
+        ServerPlayNetworking.send(player, new BodyDisplayPayload(pos, operation, settings.showName(),
+                settings.poseable(), entity == null ? -1 : entity.getId()));
+    }
+
+    public void configure(ServerPlayer player, BodyDisplayPayload payload, Collection<Body> bodies) {
+        if (payload.operation() == BodyDisplayPayload.STOP_EDIT) {
+            endEditing(player);
+            return;
+        }
+        DisplaySession session = menus.get(player.getUUID());
+        if (session == null || session.level != player.level() || !session.pos.equals(payload.pos())) {
+            return;
+        }
+        if (payload.operation() == BodyDisplayPayload.CLOSE) {
+            menus.remove(player.getUUID());
+            return;
+        }
+        if (!canConfigure(player, session.pos)) {
+            menus.remove(player.getUUID());
+            return;
+        }
+        Body body = displayed(player.level(), session.pos, bodies);
+        var settings = settings(player.level(), session.pos);
+        if (payload.operation() == BodyDisplayPayload.UPDATE) {
+            settings.configure(payload.showName(), payload.poseable());
+            if (body != null) {
+                if (!settings.poseable()) {
+                    endEditors(body);
+                }
+                Entity entity = body.entityId == null ? null : player.level().getEntity(body.entityId);
+                if (entity != null) {
+                    prepare(body, entity);
+                }
+            }
+        } else if (body != null && body.id.equals(session.body)) {
+            if (payload.operation() == BodyDisplayPayload.RESET && settings.poseable()) {
+                endEditors(body);
+                body.rigPose = BodyRigPose.create(true, "ceiling".equals(body.displayFace), body.yaw);
+                Entity entity = body.entityId == null ? null : player.level().getEntity(body.entityId);
+                if (entity != null) {
+                    synchronizePose(body, entity);
+                }
+                manager.rigChanged();
+            } else if (payload.operation() == BodyDisplayPayload.EDIT && settings.poseable() && player.getMainHandItem().isEmpty()) {
+                endEditing(player);
+                editors.put(player.getUUID(), session);
+                menus.remove(player.getUUID());
+                sendSettings(player, session.pos, body, BodyDisplayPayload.BEGIN_EDIT);
+                return;
+            }
+        }
+        sendSettings(player, session.pos, body, BodyDisplayPayload.SNAPSHOT);
+    }
+
+    private void endEditors(Body body) {
+        for (UUID id : List.copyOf(editors.keySet())) {
+            DisplaySession session = editors.get(id);
+            if (body.id.equals(session.body)) {
+                ServerPlayer player = session.level.getServer().getPlayerList().getPlayer(id);
+                if (player != null) {
+                    endEditing(player);
+                } else {
+                    editors.remove(id);
+                    grabs.remove(id);
+                }
+            }
+        }
+        discardSimulation(body.id);
+    }
+
+    private void endEditing(ServerPlayer player) {
+        DisplaySession session = editors.remove(player.getUUID());
+        Grab grab = grabs.remove(player.getUUID());
+        if (grab != null) {
+            discardSimulation(grab.body.id);
+            manager.rigChanged();
+        }
+        if (session != null) {
+            ServerPlayNetworking.send(player, new BodyDisplayPayload(session.pos, BodyDisplayPayload.END_EDIT, false, false, -1));
+        }
+    }
+
+    public boolean pickUpDisplayed(ServerPlayer player, Entity entity) {
+        Body body = manager.bodyForEntity(entity);
+        if (body == null || !body.displayMounted) {
+            return false;
+        }
+        BlockPos pos = BlockPos.of(body.displayPosition);
+        if (player.isShiftKeyDown() && canConfigure(player, pos) && player.distanceToSqr(entity) <= 25
+                && manager.canSeeEmptyBody(player, body, entity)) {
+            manager.pickUpBody(player, body);
+        }
+        return true;
+    }
+
+    public void pickUpDisplayed(ServerPlayer player, BlockPos pos, Collection<Body> bodies) {
+        if (player.isShiftKeyDown() && canConfigure(player, pos)) {
+            Body body = displayed(player.level(), pos, bodies);
+            if (body != null) {
+                manager.pickUpBody(player, body);
+            }
+        }
+    }
+
     public void interactDisplay(ServerPlayer player, BlockPos pos, InteractionHand hand, Collection<Body> bodies) {
         if (!player.isAlive() || player.isSpectator() || BodyManager.hypnotized(player)
                 || player.distanceToSqr(Vec3.atCenterOf(pos)) > 36
@@ -122,17 +265,17 @@ public final class BodyRigManager implements AutoCloseable {
         if (!state.is(BodyDisplayBlock.INSTANCE)) {
             return;
         }
+        if (hand == InteractionHand.MAIN_HAND && player.isShiftKeyDown()) {
+            openSettings(player, pos, bodies);
+            return;
+        }
         Body occupied = displayed(player.level(), pos, bodies);
         if (occupied != null) {
             if (hand != InteractionHand.MAIN_HAND || manager.interactDisplayedBody(player, occupied)
                     || !allowed(player)) {
                 return;
             }
-            if (player.isShiftKeyDown()) {
-                manager.pickUpBody(player, occupied);
-            } else {
-                BodyManager.message(player, "body_display_edit");
-            }
+            BodyManager.message(player, "body_display_edit");
             return;
         }
         if (!allowed(player)) {
@@ -231,6 +374,10 @@ public final class BodyRigManager implements AutoCloseable {
         }
         ensurePose(body);
         holder.tsf$setRigPose(body.displayMounted || TSFServerConfig.get().bodyLimbPhysics ? body.rigPose.encode() : "");
+        if (body.displayMounted) {
+            var options = settings((ServerLevel) entity.level(), BlockPos.of(body.displayPosition));
+            holder.tsf$setDisplayOptions(options.showName(), options.poseable());
+        }
     }
 
     private static void ensurePose(Body body) {
@@ -240,6 +387,7 @@ public final class BodyRigManager implements AutoCloseable {
     }
 
     public void forget(Body body) {
+        endEditors(body);
         discardSimulation(body.id);
         grabs.entrySet().removeIf(entry -> entry.getValue().body == body);
         body.displayMounted = false;
@@ -257,7 +405,9 @@ public final class BodyRigManager implements AutoCloseable {
             }
             return;
         }
-        if (!allowed(player) || !player.isShiftKeyDown() || !player.getMainHandItem().isEmpty()
+        DisplaySession session = editors.get(player.getUUID());
+        if (!allowed(player) || session == null || session.level != player.level()
+                || !player.getMainHandItem().isEmpty()
                 || !Float.isFinite(payload.distance())) {
             return;
         }
@@ -277,7 +427,8 @@ public final class BodyRigManager implements AutoCloseable {
             return;
         }
         Body body = manager.bodyForEntity(entity);
-        if (body == null || !body.displayMounted || player.distanceToSqr(entity) > 49
+        if (body == null || !body.id.equals(session.body) || !body.displayMounted
+                || !settings(player.level(), session.pos).poseable() || player.distanceToSqr(entity) > 49
                 || !player.level().mayInteract(player, BlockPos.of(body.displayPosition)) || !player.getAbilities().mayBuild
                 || grabs.values().stream().anyMatch(grab -> grab.body == body)) {
             return;
@@ -338,6 +489,22 @@ public final class BodyRigManager implements AutoCloseable {
 
     public void tick(MinecraftServer server, Map<UUID, Body> bodies, Map<UUID, Entity> entities) {
         time++;
+        menus.entrySet().removeIf(entry -> {
+            ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
+            return player == null || player.level() != entry.getValue().level || !canConfigure(player, entry.getValue().pos);
+        });
+        for (UUID id : List.copyOf(editors.keySet())) {
+            DisplaySession session = editors.get(id);
+            ServerPlayer player = server.getPlayerList().getPlayer(id);
+            Body body = bodies.get(session.body);
+            if (player == null) {
+                editors.remove(id);
+            } else if (player.level() != session.level || !canConfigure(player, session.pos)
+                    || body == null || !body.displayMounted || body.displayPosition != session.pos.asLong()
+                    || !settings(session.level, session.pos).poseable()) {
+                endEditing(player);
+            }
+        }
         boolean enabled = TSFServerConfig.get().bodyLimbPhysics;
         boolean configChanged = enabled != physicsEnabled;
         physicsEnabled = enabled;
@@ -348,7 +515,7 @@ public final class BodyRigManager implements AutoCloseable {
         grabs.entrySet().removeIf(entry -> {
             Grab grab = entry.getValue();
             ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
-            boolean invalid = player == null || !allowed(player) || !player.isShiftKeyDown() || !player.getMainHandItem().isEmpty()
+            boolean invalid = player == null || !allowed(player) || !editors.containsKey(entry.getKey()) || !player.getMainHandItem().isEmpty()
                     || player.level() != grab.entity.level() || grab.entity.isRemoved() || !grab.body.displayMounted
                     || player.distanceToSqr(grab.entity) > 49 || time - grab.updated > 10;
             if (invalid) {
@@ -550,6 +717,8 @@ public final class BodyRigManager implements AutoCloseable {
         simulations.values().forEach(Simulation::cancel);
         simulations.clear();
         grabs.clear();
+        menus.clear();
+        editors.clear();
         collisions.clear();
         worker.close();
     }

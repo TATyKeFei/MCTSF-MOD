@@ -8,6 +8,8 @@ import icu.tatyrealms.tatykefei.client.render.BodyAnimations;
 import icu.tatyrealms.tatykefei.client.screen.PhoneScreen;
 import icu.tatyrealms.tatykefei.client.screen.SkinLayersScreen;
 import icu.tatyrealms.tatykefei.client.screen.TSFSettingsScreen;
+import icu.tatyrealms.tatykefei.client.screen.BodyDisplayScreen;
+import icu.tatyrealms.tatykefei.network.BodyDisplayPayload;
 import com.google.gson.Gson;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.serialization.JsonOps;
@@ -59,6 +61,20 @@ public final class TSFClient implements ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(SettingsPayload.TYPE, (payload, context) -> {
             if (context.client().gui.screen() instanceof TSFSettingsScreen screen) {
                 screen.receive(payload);
+            }
+        });
+        ClientPlayNetworking.registerGlobalReceiver(BodyDisplayPayload.TYPE, (payload, context) -> {
+            if (payload.operation() == BodyDisplayPayload.BEGIN_EDIT) {
+                context.client().gui.setScreen(null);
+                BodyDragging.edit(context.client(), payload);
+            } else if (payload.operation() == BodyDisplayPayload.END_EDIT) {
+                BodyDragging.clear();
+            } else if (payload.operation() == BodyDisplayPayload.SNAPSHOT) {
+                if (context.client().gui.screen() instanceof BodyDisplayScreen screen) {
+                    screen.receive(payload);
+                }
+            } else if (payload.operation() == BodyDisplayPayload.OPEN) {
+                context.client().gui.setScreen(new BodyDisplayScreen(payload));
             }
         });
         ClientPlayNetworking.registerGlobalReceiver(SkinLayersPayload.TYPE, (payload, context) -> {
@@ -114,7 +130,7 @@ public final class TSFClient implements ClientModInitializer {
             VISUALS.clear();
             PROFILES.clear();
             SLIMES.clear();
-            BodyDragging.stop();
+            BodyDragging.clear();
             BodyAnimations.clear();
             HypnosisProgress.clear();
             ObserverView.clear();

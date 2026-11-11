@@ -214,8 +214,15 @@
   "message.tsf.occupant_offline": "占据该肉体的玩家已离线，请在其上线后恢复",
   "block.tsf.body_display": "肉体展示架",
   "item.tsf.body_display": "肉体展示架",
-  "tooltip.tsf.body_display": "可放置在墙面、地板或天花板，手持肉体右键放入，潜行右键取回",
+  "tooltip.tsf.body_display": "可放置在墙面、地板或天花板，手持肉体右键放入，潜行左键拿起，潜行右键设置",
   "message.tsf.body_display_insert": "手持肉体右键放入展示架",
-  "message.tsf.body_display_edit": "空手按住 Shift 和右键抓取部位，移动视角调整，滚轮调整距离，松开右键固定姿势",
-  "screen.tsf.body_limb_physics": "空肉体肢体物理：%s"
+  "message.tsf.body_display_edit": "潜行右键肉体或展示架打开设置，潜行左键拿起肉体",
+  "screen.tsf.body_limb_physics": "空肉体肢体物理：%s",
+  "screen.tsf.body_display": "肉体展示架设置",
+  "screen.tsf.display_name": "显示名牌：%s",
+  "screen.tsf.display_poseable": "允许摆弄：%s",
+  "screen.tsf.display_edit": "调整姿势",
+  "screen.tsf.display_reset": "重置姿势",
+  "message.tsf.body_display_editing": "姿势编辑：空手按住右键拖动部位，滚轮调整距离，Esc 结束",
+  "screen.tsf.display_edit_hint": "空手进入编辑模式，按住右键拖动，Esc 结束"
 }

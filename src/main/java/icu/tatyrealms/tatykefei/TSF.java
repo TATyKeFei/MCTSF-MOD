@@ -24,6 +24,9 @@ import icu.tatyrealms.tatykefei.network.BodyDragPayload;
 import icu.tatyrealms.tatykefei.state.HypnosisRestrictions;
 import icu.tatyrealms.tatykefei.body.BodyManager;
 import icu.tatyrealms.tatykefei.block.BodyDisplayBlock;
+import icu.tatyrealms.tatykefei.block.BodyDisplayBlockEntity;
+import icu.tatyrealms.tatykefei.network.BodyDisplayPayload;
+import icu.tatyrealms.tatykefei.state.EmptyBodyHolder;
 import icu.tatyrealms.tatykefei.state.Form;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -64,6 +67,7 @@ public final class TSF implements ModInitializer {
     @Override
     public void onInitialize() {
         TSFItems.initialize();
+        BodyDisplayBlockEntity.initialize();
         TrinketsCompat.initialize();
         NeedsOfNatureCompat.initialize();
         NeedsOfNatureHypnosis.initialize();
@@ -78,6 +82,8 @@ public final class TSF implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(HypnosisProgressPayload.TYPE, HypnosisProgressPayload.CODEC);
         PayloadTypeRegistry.serverboundPlay().register(HypnosisSpeechPayload.TYPE, HypnosisSpeechPayload.CODEC);
         PayloadTypeRegistry.serverboundPlay().register(BodyDragPayload.TYPE, BodyDragPayload.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(BodyDisplayPayload.TYPE, BodyDisplayPayload.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(BodyDisplayPayload.TYPE, BodyDisplayPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(SettingsPayload.TYPE, SettingsPayload.CODEC);
         PayloadTypeRegistry.serverboundPlay().register(SettingsPayload.TYPE, SettingsPayload.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(SettingsPayload.TYPE, (payload, context) -> {
@@ -89,6 +95,8 @@ public final class TSF implements ModInitializer {
                 (payload, context) -> BodyManager.get().speakAsHypnotized(context.player(), payload));
         ServerPlayNetworking.registerGlobalReceiver(BodyDragPayload.TYPE,
                 (payload, context) -> BodyManager.get().dragBody(context.player(), payload));
+        ServerPlayNetworking.registerGlobalReceiver(BodyDisplayPayload.TYPE,
+                (payload, context) -> BodyManager.get().configureDisplay(context.player(), payload));
         ServerLifecycleEvents.SERVER_STARTING.register(server -> {
             try {
                 TSFServerConfig.reload();
@@ -130,6 +138,12 @@ public final class TSF implements ModInitializer {
         UseEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
             if (BodyManager.restricted(player, HypnosisRestrictions.INTERACTION)) {
                 return InteractionResult.FAIL;
+            }
+            if (player.isShiftKeyDown() && entity instanceof EmptyBodyHolder holder && holder.tsf$isMounted()) {
+                if (player instanceof ServerPlayer actor && hand == InteractionHand.MAIN_HAND) {
+                    BodyManager.get().interactBody(actor, entity);
+                }
+                return InteractionResult.SUCCESS;
             }
             if (entity instanceof Player && player.getItemInHand(hand).is(TSFItems.PHONE)) {
                 return TSFItems.PHONE.use(level, player, hand);
@@ -193,6 +207,12 @@ public final class TSF implements ModInitializer {
             if (BodyManager.restricted(player, HypnosisRestrictions.INTERACTION)) {
                 return InteractionResult.FAIL;
             }
+            if (entity instanceof EmptyBodyHolder holder && holder.tsf$isMounted()) {
+                if (player.isShiftKeyDown() && player instanceof ServerPlayer actor && hand == InteractionHand.MAIN_HAND) {
+                    BodyManager.get().pickUpDisplayedBody(actor, entity);
+                }
+                return InteractionResult.SUCCESS;
+            }
             if (BodyManager.spiritSpear(player.getItemInHand(hand))) {
                 return InteractionResult.FAIL;
             }
@@ -227,6 +247,12 @@ public final class TSF implements ModInitializer {
             return InteractionResult.PASS;
         });
         UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
+            if (player.isShiftKeyDown() && level.getBlockState(hit.getBlockPos()).is(BodyDisplayBlock.INSTANCE)) {
+                if (!restricted(player) && player instanceof ServerPlayer actor && hand == InteractionHand.MAIN_HAND) {
+                    BodyManager.get().interactDisplay(actor, hit.getBlockPos(), hand);
+                }
+                return InteractionResult.SUCCESS;
+            }
             if (BodyManager.spiritSpear(player.getItemInHand(hand))) {
                 return player.getItemInHand(hand).getItem().use(level, player, hand);
             }
@@ -240,8 +266,17 @@ public final class TSF implements ModInitializer {
             }
             return restricted(player) ? InteractionResult.FAIL : InteractionResult.PASS;
         });
-        AttackBlockCallback.EVENT.register((player, level, hand, position, direction) -> restricted(player) ? InteractionResult.FAIL : InteractionResult.PASS);
-        PlayerBlockBreakEvents.BEFORE.register((level, player, position, state, blockEntity) -> !restricted(player));
+        AttackBlockCallback.EVENT.register((player, level, hand, position, direction) -> {
+            if (player.isShiftKeyDown() && level.getBlockState(position).is(BodyDisplayBlock.INSTANCE)) {
+                if (!restricted(player) && player instanceof ServerPlayer actor && hand == InteractionHand.MAIN_HAND) {
+                    BodyManager.get().pickUpDisplayedBody(actor, position);
+                }
+                return InteractionResult.SUCCESS;
+            }
+            return restricted(player) ? InteractionResult.FAIL : InteractionResult.PASS;
+        });
+        PlayerBlockBreakEvents.BEFORE.register((level, player, position, state, blockEntity) -> !restricted(player)
+                && !(player.isShiftKeyDown() && state.is(BodyDisplayBlock.INSTANCE)));
         registerCommands();
     }
 

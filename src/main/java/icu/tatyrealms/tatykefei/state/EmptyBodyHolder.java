@@ -13,6 +13,12 @@ public interface EmptyBodyHolder {
 
     void tsf$setRigPose(String pose);
 
+    boolean tsf$showDisplayName();
+
+    boolean tsf$poseable();
+
+    void tsf$setDisplayOptions(boolean showName, boolean poseable);
+
     default boolean tsf$isMounted() {
         return tsf$isEmptyBody() && tsf$rigPose().startsWith("m,");
     }
