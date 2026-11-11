@@ -9,6 +9,7 @@
     "network.ClientPacketListenerMixin",
     "player.LocalPlayerMixin",
     "player.PlayerInfoMixin",
+    "player.PlayerDisplayNameMixin",
     "render.LevelExtractorMixin",
     "render.EntityRendererMixin",
     "render.EntityRenderDispatcherMixin",
