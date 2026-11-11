@@ -16,6 +16,7 @@
     "render.AvatarRendererMixin",
     "render.AvatarRenderStateMixin",
     "render.PlayerModelMixin",
+    "render.WingsLayerMixin",
     "input.KeyboardInputMixin",
     "render.FirstPersonRendererMixin",
     "render.ItemModelResolverMixin",
