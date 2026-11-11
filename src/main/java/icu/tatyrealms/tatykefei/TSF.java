@@ -4,6 +4,7 @@ import icu.tatyrealms.tatykefei.config.TSFServerConfig;
 import icu.tatyrealms.tatykefei.item.TSFItems;
 import icu.tatyrealms.tatykefei.item.ProtectionTotems;
 import icu.tatyrealms.tatykefei.compat.trinkets.TrinketsCompat;
+import icu.tatyrealms.tatykefei.compat.carbonchat.CarbonChatCompat;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureCompat;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureHypnosis;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureTanks;
@@ -30,6 +31,7 @@ import icu.tatyrealms.tatykefei.state.EmptyBodyHolder;
 import icu.tatyrealms.tatykefei.state.Form;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
@@ -69,6 +71,7 @@ public final class TSF implements ModInitializer {
         TSFItems.initialize();
         BodyDisplayBlockEntity.initialize();
         TrinketsCompat.initialize();
+        CarbonChatCompat.initialize();
         NeedsOfNatureCompat.initialize();
         NeedsOfNatureHypnosis.initialize();
         NeedsOfNatureTanks.initialize();
@@ -110,7 +113,9 @@ public final class TSF implements ModInitializer {
             BodyManager.clear();
             ProtectionTotems.clear();
         });
-        ServerMessageEvents.ALLOW_CHAT_MESSAGE.register((message, sender, parameters) ->
+        Identifier chatPhase = id("chat_restrictions");
+        ServerMessageEvents.ALLOW_CHAT_MESSAGE.addPhaseOrdering(chatPhase, Event.DEFAULT_PHASE);
+        ServerMessageEvents.ALLOW_CHAT_MESSAGE.register(chatPhase, (message, sender, parameters) ->
                 !BodyManager.restricted(sender, HypnosisRestrictions.SPEECH) && BodyManager.get().allowChat(sender, message));
         ServerMessageEvents.ALLOW_COMMAND_MESSAGE.register((message, source, parameters) ->
                 !(source.getEntity() instanceof Player player)

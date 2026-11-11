@@ -17,6 +17,10 @@
     "entity.MannequinAccessor",
     "entity.MannequinMixin",
     "compat.NeedsOfNatureInteractionMixin",
+    "compat.CarbonChatHandlerMixin",
+    "compat.CarbonChannelMixin",
+    "compat.CarbonPlayerMixin",
+    "compat.CarbonWhisperMixin",
     "world.EntityCollisionContextMixin"
   ],
   "injectors": {

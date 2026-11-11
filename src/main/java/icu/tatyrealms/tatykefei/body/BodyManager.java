@@ -3,6 +3,7 @@ package icu.tatyrealms.tatykefei.body;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NatureAppearance;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NatureTank;
 import icu.tatyrealms.tatykefei.observer.ObserverChat;
+import icu.tatyrealms.tatykefei.compat.carbonchat.CarbonChatCompat;
 import icu.tatyrealms.tatykefei.observer.ObserverSync;
 import icu.tatyrealms.tatykefei.persistence.AsyncStateWriter;
 import icu.tatyrealms.tatykefei.persistence.StateStore;
@@ -578,6 +579,9 @@ public final class BodyManager {
         if (text.isEmpty() || text.length() > HypnosisSpeechPayload.MAX_LENGTH
                 || text.codePoints().anyMatch(character -> !StringUtil.isAllowedChatCharacter(character))) {
             message(actor, "hypnosis_speech_invalid");
+            return;
+        }
+        if (CarbonChatCompat.speakAsHypnotized(actor, target, text)) {
             return;
         }
         Component decorated = server.getChatDecorator().decorate(target, Component.literal(text));
@@ -2328,6 +2332,18 @@ public final class BodyManager {
                 controller != null && state(controller).observerChatPrivate);
     }
 
+    public boolean allowPrivateMessage(ServerPlayer player, UUID recipient) {
+        if (restricted(player, HypnosisRestrictions.SPEECH)) {
+            return false;
+        }
+        ServerPlayer controller = speechController(player);
+        if (controller != null && state(controller).observerChatPrivate && !controller.getUUID().equals(recipient)) {
+            message(player, "observer_chat_private_only");
+            return false;
+        }
+        return true;
+    }
+
     public boolean allowCommandMessage(ServerPlayer player) {
         ServerPlayer controller = speechController(player);
         if (controller != null && state(controller).observerChatPrivate) {
@@ -2797,11 +2813,13 @@ public final class BodyManager {
     }
 
     private void broadcast() {
+        List<VisualState> snapshot = visuals();
+        CarbonChatCompat.updateIdentities(snapshot);
         if (!server.getPlayerList().getPlayers().isEmpty()) {
             server.getPlayerList().broadcastAll(new ClientboundPlayerInfoUpdatePacket(
                     EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME), server.getPlayerList().getPlayers()));
         }
-        String json = GSON.toJson(visuals());
+        String json = GSON.toJson(snapshot);
         List<Body> appearances = natureAppearances();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             if (ServerPlayNetworking.canSend(player, StatePayload.TYPE)) {

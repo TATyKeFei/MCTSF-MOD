@@ -222,6 +222,7 @@
   "screen.tsf.display_name": "显示名牌：%s",
   "screen.tsf.display_poseable": "允许摆弄：%s",
   "screen.tsf.display_cape": "显示披风：%s",
+  "message.tsf.carbon_chat_unavailable": "CarbonChat 聊天兼容暂不可用，请查看服务端日志",
   "screen.tsf.display_edit": "调整姿势",
   "screen.tsf.display_reset": "重置姿势",
   "message.tsf.body_display_editing": "姿势编辑：空手按住右键拖动部位，滚轮调整距离，Esc 结束",
