@@ -1472,7 +1472,6 @@ public final class BodyManager {
         body.y = destination.y;
         body.z = destination.z;
         spawnBody(body);
-        message(player, "skin_unfolded", body.name);
         changed();
     }
 
@@ -1633,7 +1632,6 @@ public final class BodyManager {
         spawnBody(body);
         consumePlacedItem(player, context);
         refreshInventory(player);
-        message(player, "body_placed", body.name);
         changed();
         return true;
     }
@@ -1861,7 +1859,6 @@ public final class BodyManager {
         body.skinDropEntity = null;
         body.skinRecoveryAt = server.overworld().getGameTime() + 600;
         spawnBody(body);
-        message(player, "skin_created", body.name);
         changed();
     }
 
@@ -2072,7 +2069,6 @@ public final class BodyManager {
         spawnBody(body);
         stack.shrink(1);
         refreshInventory(player);
-        message(player, "skin_unfolded", body.name);
         changed();
     }
 
