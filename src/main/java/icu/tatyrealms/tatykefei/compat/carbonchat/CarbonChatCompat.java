@@ -26,6 +26,7 @@ public final class CarbonChatCompat {
     private static Object chatHandler;
     private static Method handleChat;
     private static Method playerId;
+    private static Method username;
     private static Class<?> consolePlayer;
     private static boolean warned;
     private static final ThreadLocal<UUID> FORCED_SPEAKER = new ThreadLocal<>();
@@ -49,6 +50,7 @@ public final class CarbonChatCompat {
             handleChat = handler.getClass().getMethod("allowChatMessage", PlayerChatMessage.class,
                     ServerPlayer.class, ChatType.Bound.class);
             playerId = Class.forName("net.draycia.carbon.api.users.CarbonPlayer").getMethod("uuid");
+            username = Class.forName("net.draycia.carbon.api.users.CarbonPlayer").getMethod("username");
             consolePlayer = Class.forName("net.draycia.carbon.common.users.ConsoleCarbonPlayer");
             chatHandler = handler;
             LoggerFactory.getLogger("TSF").info("Enabled CarbonChat integration");
@@ -76,10 +78,25 @@ public final class CarbonChatCompat {
         return names.get(player);
     }
 
-    public static String assumedUsername(Object sender, String original) {
+    public static String formattedUsername(Object sender, Audience recipient, String original) {
         try {
             TextComponent name = names.get((UUID) playerId.invoke(sender));
-            return name == null ? original : name.content();
+            if (name == null) {
+                return original;
+            }
+            return isConsole(recipient) ? name.content() + "(" + original + ")" : name.content();
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError exception) {
+            warn(exception);
+            return original;
+        }
+    }
+
+    public static Component formattedDisplayName(Object sender, Audience recipient, Component original) {
+        if (!isConsole(recipient)) {
+            return original;
+        }
+        try {
+            return Component.text(formattedUsername(sender, recipient, (String) username.invoke(sender)));
         } catch (ReflectiveOperationException | RuntimeException | LinkageError exception) {
             warn(exception);
             return original;
