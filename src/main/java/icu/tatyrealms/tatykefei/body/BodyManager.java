@@ -288,7 +288,7 @@ public final class BodyManager {
             releaseSpiritAttachment(player);
             returnToBody(player);
         }
-        placeWornSkins(player);
+        placeConsciousSkins(player);
         updateNatureBody(player);
         Body occupied = store.bodies.get(state.body);
         if (player.isAlive() && state.form == Form.HUMAN && occupied != null
@@ -338,25 +338,35 @@ public final class BodyManager {
         save();
     }
 
-    private void placeWornSkins(ServerPlayer player) {
+    private void placeConsciousSkins(ServerPlayer player) {
         List<SkinLayer> worn = List.copyOf(layers(player));
+        Body body = store.bodies.get(state(player).body);
+        boolean removed = false;
         for (SkinLayer layer : worn) {
+            if (!consciousSkin(layer.body)) {
+                continue;
+            }
             layer.remove.run();
             Body skin = layer.body;
+            if (body != null) {
+                body.skinOrder.remove(skin.id);
+            }
             skin.skinToken = UUID.randomUUID();
             skin.skinDropEntity = null;
             skin.skinPlaced = true;
             skin.skinRecoveryAt = server.overworld().getGameTime() + 600;
             locate(skin, player);
             spawnBody(skin);
+            removed = true;
         }
-        if (!worn.isEmpty()) {
-            Body body = store.bodies.get(state(player).body);
-            if (body != null) {
-                body.skinOrder.clear();
-            }
+        if (removed) {
             refreshInventory(player);
         }
+    }
+
+    private boolean consciousSkin(Body skin) {
+        return store.players.values().stream().anyMatch(state -> state.form == Form.OBSERVER
+                && state.spiritHost == null && skin.id.equals(state.observedBody));
     }
 
     public void openPhone(ServerPlayer player) {
