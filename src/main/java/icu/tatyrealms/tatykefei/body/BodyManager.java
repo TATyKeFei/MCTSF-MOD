@@ -118,6 +118,12 @@ public final class BodyManager {
     private final Map<UUID, HypnosisSession> hypnosisSessions = new HashMap<>();
     private final Map<UUID, ItemEntity> slimeBottleDrops = new HashMap<>();
     private final Map<UUID, List<UUID>> lastSkinLayers = new HashMap<>();
+    /**
+     * Skin layers are read by several hot paths (display names, observer targeting and
+     * visual broadcasts). Keep the decoded view for the current game tick and invalidate
+     * it whenever TSF changes the equipment or periodically to notice external changes.
+     */
+    private final Map<UUID, CachedSkinLayers> skinLayerCache = new HashMap<>();
     private final Map<UUID, UUID> natureBodies = new HashMap<>();
     private final Set<UUID> pendingNatureRestores = new HashSet<>();
     private final NeedsOfNatureSkins natureSkins = new NeedsOfNatureSkins();
@@ -323,6 +329,7 @@ public final class BodyManager {
         cooldowns.remove(player.getUUID());
         pendingProjections.remove(player.getUUID());
         lastSkinLayers.remove(player.getUUID());
+        skinLayerCache.remove(player.getUUID());
         captureNatureBody(player);
         natureBodies.remove(player.getUUID());
         pendingNatureRestores.remove(player.getUUID());
@@ -2161,11 +2168,17 @@ public final class BodyManager {
     }
 
     private List<SkinLayer> layers(ServerPlayer player) {
-        List<SkinLayer> result = new ArrayList<>();
-        Body body = state(player).form == Form.HUMAN ? store.bodies.get(state(player).body) : null;
+        PlayerState playerState = state(player);
+        Body body = playerState.form == Form.HUMAN ? store.bodies.get(playerState.body) : null;
         if (body == null) {
-            return result;
+            skinLayerCache.remove(player.getUUID());
+            return List.of();
         }
+        CachedSkinLayers cached = skinLayerCache.get(player.getUUID());
+        if (cached != null && cached.tick() == ticks && cached.body().id.equals(body.id)) {
+            return cached.layers();
+        }
+        List<SkinLayer> result = new ArrayList<>();
         boolean migrated = false;
         var iterator = body.skinLayers.iterator();
         while (iterator.hasNext()) {
@@ -2192,7 +2205,16 @@ public final class BodyManager {
                 .filter(id -> !body.skinOrder.contains(id)).toList();
         body.skinOrder.addAll(migrated ? 0 : body.skinOrder.size(), discovered);
         result.sort(java.util.Comparator.comparingInt(layer -> body.skinOrder.indexOf(layer.body.id)));
+        skinLayerCache.put(player.getUUID(), new CachedSkinLayers(ticks, body, List.copyOf(result)));
         return result;
+    }
+
+    private void invalidateSkinLayers(ServerPlayer player) {
+        skinLayerCache.remove(player.getUUID());
+    }
+
+    private void invalidateSkinLayers() {
+        skinLayerCache.clear();
     }
 
     private void addLayer(List<SkinLayer> layers, ItemStack stack, Runnable remove) {
@@ -2203,6 +2225,9 @@ public final class BodyManager {
     }
 
     private record SkinLayer(Body body, ItemStack stack, Runnable remove) {
+    }
+
+    private record CachedSkinLayers(int tick, Body body, List<SkinLayer> layers) {
     }
 
     public Body appearance(ServerPlayer player) {
@@ -2936,6 +2961,7 @@ public final class BodyManager {
     }
 
     private void changed() {
+        invalidateSkinLayers();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             updateSkinLayers(player);
             updateNatureBody(player);
@@ -2948,6 +2974,9 @@ public final class BodyManager {
     }
 
     private boolean updateSkinLayers(ServerPlayer player) {
+        // Inventory and Trinkets can also be changed by other mods. Refresh this view
+        // periodically instead of retaining a stale cache indefinitely.
+        invalidateSkinLayers(player);
         List<SkinLayer> worn = layers(player);
         int limit = TSFServerConfig.get().maxSkinLayers;
         if (worn.size() > limit) {
@@ -2961,6 +2990,7 @@ public final class BodyManager {
             }
             refreshInventory(player);
             message(player, "skin_layer_limit", limit);
+            invalidateSkinLayers(player);
         }
         List<UUID> skins = layers(player).stream().map(layer -> layer.body.id).toList();
         List<UUID> previous = lastSkinLayers.put(player.getUUID(), skins);
