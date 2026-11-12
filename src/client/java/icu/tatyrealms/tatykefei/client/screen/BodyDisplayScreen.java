@@ -32,7 +32,7 @@ public final class BodyDisplayScreen extends Screen {
     private void buttons() {
         clearWidgets();
         int left = (width - 240) / 2;
-        int top = height / 2 - 84;
+        int top = height / 2 - 90;
         addRenderableWidget(Button.builder(Component.translatable("screen.tsf.display_name",
                 Component.translatable(settings.showName() ? "options.on" : "options.off")), button ->
                 send(BodyDisplayPayload.UPDATE, !settings.showName(), settings.poseable()))
@@ -43,32 +43,38 @@ public final class BodyDisplayScreen extends Screen {
                 .bounds(left, top + 24, 240, 20).build());
         addRenderableWidget(Button.builder(Component.translatable("screen.tsf.display_cape",
                 Component.translatable(settings.showCape() ? "options.on" : "options.off")), button ->
-                send(BodyDisplayPayload.UPDATE, settings.showName(), settings.poseable(), !settings.showCape()))
+                send(BodyDisplayPayload.UPDATE, settings.showName(), settings.poseable(),
+                        !settings.showCape(), settings.hideStand()))
                 .bounds(left, top + 48, 240, 20).build());
+        addRenderableWidget(Button.builder(Component.translatable("screen.tsf.display_hide_stand",
+                Component.translatable(settings.hideStand() ? "options.on" : "options.off")), button ->
+                send(BodyDisplayPayload.UPDATE, settings.showName(), settings.poseable(),
+                        settings.showCape(), !settings.hideStand()))
+                .bounds(left, top + 72, 240, 20).build());
         Button edit = addRenderableWidget(Button.builder(Component.translatable("screen.tsf.display_edit"), button ->
                 send(BodyDisplayPayload.EDIT, settings.showName(), settings.poseable()))
-                .bounds(left, top + 80, 240, 20).build());
+                .bounds(left, top + 100, 240, 20).build());
         edit.active = settings.poseable() && settings.entity() >= 0 && minecraft.player.getMainHandItem().isEmpty();
         edit.setTooltip(Tooltip.create(Component.translatable("screen.tsf.display_edit_hint")));
         Button reset = addRenderableWidget(Button.builder(Component.translatable("screen.tsf.display_reset"), button ->
                 send(BodyDisplayPayload.RESET, settings.showName(), settings.poseable()))
-                .bounds(left, top + 104, 240, 20).build());
+                .bounds(left, top + 124, 240, 20).build());
         reset.active = settings.poseable() && settings.entity() >= 0;
         addRenderableWidget(Button.builder(Component.translatable("gui.done"), button -> onClose())
-                .bounds(left, top + 140, 240, 20).build());
+                .bounds(left, top + 156, 240, 20).build());
     }
 
     private void send(int operation, boolean showName, boolean poseable) {
-        send(operation, showName, poseable, settings.showCape());
+        send(operation, showName, poseable, settings.showCape(), settings.hideStand());
     }
 
-    private void send(int operation, boolean showName, boolean poseable, boolean showCape) {
-        ClientPlayNetworking.send(new BodyDisplayPayload(settings.pos(), operation, showName, poseable, showCape, -1));
+    private void send(int operation, boolean showName, boolean poseable, boolean showCape, boolean hideStand) {
+        ClientPlayNetworking.send(new BodyDisplayPayload(settings.pos(), operation, showName, poseable, showCape, hideStand, -1));
     }
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.centeredText(font, title, width / 2, height / 2 - 114, 0xFFFFFFFF);
+        graphics.centeredText(font, title, width / 2, height / 2 - 116, 0xFFFFFFFF);
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
     }
 

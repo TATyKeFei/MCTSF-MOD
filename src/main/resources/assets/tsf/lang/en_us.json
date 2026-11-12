@@ -222,6 +222,7 @@
   "screen.tsf.display_name": "Show Name: %s",
   "screen.tsf.display_poseable": "Allow Posing: %s",
   "screen.tsf.display_cape": "Show Cape: %s",
+  "screen.tsf.display_hide_stand": "Hide Stand: %s",
   "message.tsf.carbon_chat_unavailable": "CarbonChat integration is unavailable; check the server log",
   "screen.tsf.display_edit": "Adjust Pose",
   "screen.tsf.display_reset": "Reset Pose",

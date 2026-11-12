@@ -6,7 +6,8 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
-public record BodyDisplayPayload(BlockPos pos, int operation, boolean showName, boolean poseable, boolean showCape, int entity)
+public record BodyDisplayPayload(BlockPos pos, int operation, boolean showName, boolean poseable,
+        boolean showCape, boolean hideStand, int entity)
         implements CustomPacketPayload {
     public static final int UPDATE = 0;
     public static final int EDIT = 1;
@@ -25,9 +26,10 @@ public record BodyDisplayPayload(BlockPos pos, int operation, boolean showName, 
                 buffer.writeBoolean(payload.showName());
                 buffer.writeBoolean(payload.poseable());
                 buffer.writeBoolean(payload.showCape());
+                buffer.writeBoolean(payload.hideStand());
                 buffer.writeVarInt(payload.entity());
             }, buffer -> new BodyDisplayPayload(buffer.readBlockPos(), buffer.readUnsignedByte(),
-                    buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readVarInt()));
+                    buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readVarInt()));
 
     @Override
     public Type<BodyDisplayPayload> type() {

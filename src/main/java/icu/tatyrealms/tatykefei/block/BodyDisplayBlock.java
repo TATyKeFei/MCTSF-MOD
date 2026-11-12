@@ -21,11 +21,13 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.FaceAttachedHorizontalDirectionalBlock;
+import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.AttachFace;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
@@ -33,6 +35,7 @@ import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 public final class BodyDisplayBlock extends FaceAttachedHorizontalDirectionalBlock implements EntityBlock {
+    public static final BooleanProperty HIDDEN = BooleanProperty.create("hidden");
     public static final BodyDisplayBlock INSTANCE = register();
 
     private static BodyDisplayBlock register() {
@@ -43,7 +46,8 @@ public final class BodyDisplayBlock extends FaceAttachedHorizontalDirectionalBlo
 
     private BodyDisplayBlock(Properties properties) {
         super(properties);
-        registerDefaultState(stateDefinition.any().setValue(FACE, AttachFace.FLOOR).setValue(FACING, Direction.NORTH));
+        registerDefaultState(stateDefinition.any().setValue(FACE, AttachFace.FLOOR)
+                .setValue(FACING, Direction.NORTH).setValue(HIDDEN, false));
     }
 
     @Override
@@ -58,6 +62,11 @@ public final class BodyDisplayBlock extends FaceAttachedHorizontalDirectionalBlo
                 : face == Direction.DOWN ? AttachFace.CEILING : AttachFace.WALL)
                 .setValue(FACING, face.getAxis().isHorizontal() ? face : context.getHorizontalDirection().getOpposite());
         return state.canSurvive(context.getLevel(), context.getClickedPos()) ? state : null;
+    }
+
+    @Override
+    protected RenderShape getRenderShape(BlockState state) {
+        return state.getValue(HIDDEN) ? RenderShape.INVISIBLE : RenderShape.MODEL;
     }
 
     @Override
@@ -102,6 +111,6 @@ public final class BodyDisplayBlock extends FaceAttachedHorizontalDirectionalBlo
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACE, FACING);
+        builder.add(FACE, FACING, HIDDEN);
     }
 }
