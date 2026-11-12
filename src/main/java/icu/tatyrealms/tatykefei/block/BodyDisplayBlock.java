@@ -36,6 +36,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 
 public final class BodyDisplayBlock extends FaceAttachedHorizontalDirectionalBlock implements EntityBlock {
     public static final BooleanProperty HIDDEN = BooleanProperty.create("hidden");
+    public static final BooleanProperty OCCUPIED = BooleanProperty.create("occupied");
     public static final BodyDisplayBlock INSTANCE = register();
 
     private static BodyDisplayBlock register() {
@@ -47,7 +48,7 @@ public final class BodyDisplayBlock extends FaceAttachedHorizontalDirectionalBlo
     private BodyDisplayBlock(Properties properties) {
         super(properties);
         registerDefaultState(stateDefinition.any().setValue(FACE, AttachFace.FLOOR)
-                .setValue(FACING, Direction.NORTH).setValue(HIDDEN, false));
+                .setValue(FACING, Direction.NORTH).setValue(HIDDEN, false).setValue(OCCUPIED, false));
     }
 
     @Override
@@ -66,7 +67,7 @@ public final class BodyDisplayBlock extends FaceAttachedHorizontalDirectionalBlo
 
     @Override
     protected RenderShape getRenderShape(BlockState state) {
-        return state.getValue(HIDDEN) ? RenderShape.INVISIBLE : RenderShape.MODEL;
+        return state.getValue(HIDDEN) && state.getValue(OCCUPIED) ? RenderShape.INVISIBLE : RenderShape.MODEL;
     }
 
     @Override
@@ -111,6 +112,6 @@ public final class BodyDisplayBlock extends FaceAttachedHorizontalDirectionalBlo
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACE, FACING, HIDDEN);
+        builder.add(FACE, FACING, HIDDEN, OCCUPIED);
     }
 }

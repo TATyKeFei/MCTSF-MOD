@@ -223,6 +223,7 @@
   "screen.tsf.display_poseable": "Allow Posing: %s",
   "screen.tsf.display_cape": "Show Cape: %s",
   "screen.tsf.display_hide_stand": "Hide Stand: %s",
+  "screen.tsf.display_hide_stand_hint": "Hide the stand only while a body is mounted; removing the body shows it again",
   "message.tsf.carbon_chat_unavailable": "CarbonChat integration is unavailable; check the server log",
   "screen.tsf.display_edit": "Adjust Pose",
   "screen.tsf.display_reset": "Reset Pose",

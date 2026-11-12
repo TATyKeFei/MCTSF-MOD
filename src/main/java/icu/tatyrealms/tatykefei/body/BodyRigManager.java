@@ -29,6 +29,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.decoration.Mannequin;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.AttachFace;
 import net.minecraft.world.phys.HitResult;
@@ -136,6 +137,13 @@ public final class BodyRigManager implements AutoCloseable {
             level.setBlockEntity(new BodyDisplayBlockEntity(pos, level.getBlockState(pos)));
         }
         return (BodyDisplayBlockEntity) level.getBlockEntity(pos);
+    }
+
+    private static void setDisplayOccupied(ServerLevel level, BlockPos pos, boolean occupied) {
+        BlockState state = level.getBlockState(pos);
+        if (state.is(BodyDisplayBlock.INSTANCE) && state.getValue(BodyDisplayBlock.OCCUPIED) != occupied) {
+            level.setBlock(pos, state.setValue(BodyDisplayBlock.OCCUPIED, occupied), Block.UPDATE_ALL);
+        }
     }
 
     public void openSettings(ServerPlayer player, BlockPos pos, Collection<Body> bodies) {
@@ -326,6 +334,7 @@ public final class BodyRigManager implements AutoCloseable {
         body.packedToken = null;
         manager.spawnBody(body);
         if (body.entityId == null) {
+            setDisplayOccupied(player.level(), pos, false);
             body.displayMounted = false;
             body.packedToken = token;
             body.entityId = previousEntity;
@@ -376,7 +385,10 @@ public final class BodyRigManager implements AutoCloseable {
         ensurePose(body);
         holder.tsf$setRigPose(body.displayMounted || TSFServerConfig.get().bodyLimbPhysics ? body.rigPose.encode() : "");
         if (body.displayMounted) {
-            var options = settings((ServerLevel) entity.level(), BlockPos.of(body.displayPosition));
+            ServerLevel level = (ServerLevel) entity.level();
+            BlockPos pos = BlockPos.of(body.displayPosition);
+            setDisplayOccupied(level, pos, true);
+            var options = settings(level, pos);
             holder.tsf$setDisplayOptions(options.showName(), options.poseable(), options.showCape());
         }
     }
@@ -387,7 +399,10 @@ public final class BodyRigManager implements AutoCloseable {
         }
     }
 
-    public void forget(Body body) {
+    public void forget(Body body, ServerLevel level) {
+        if (body.displayMounted) {
+            setDisplayOccupied(level, BlockPos.of(body.displayPosition), false);
+        }
         endEditors(body);
         discardSimulation(body.id);
         grabs.entrySet().removeIf(entry -> entry.getValue().body == body);

@@ -223,6 +223,7 @@
   "screen.tsf.display_poseable": "允许摆弄：%s",
   "screen.tsf.display_cape": "显示披风：%s",
   "screen.tsf.display_hide_stand": "隐藏展示架：%s",
+  "screen.tsf.display_hide_stand_hint": "仅在放置肉体时隐藏展示架，取走肉体后自动显示",
   "message.tsf.carbon_chat_unavailable": "CarbonChat 聊天兼容暂不可用，请查看服务端日志",
   "screen.tsf.display_edit": "调整姿势",
   "screen.tsf.display_reset": "重置姿势",

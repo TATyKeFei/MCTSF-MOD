@@ -2482,7 +2482,7 @@ public final class BodyManager {
     }
 
     private void removeBodyEntity(Body body) {
-        bodyRigs.forget(body);
+        bodyRigs.forget(body, level(body.dimension));
         Entity loaded = bodyEntities.remove(body.id);
         if (loaded != null && !loaded.isRemoved()) {
             locate(body, loaded);

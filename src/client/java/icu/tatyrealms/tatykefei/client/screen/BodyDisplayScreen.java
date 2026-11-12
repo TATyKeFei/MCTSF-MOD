@@ -50,7 +50,8 @@ public final class BodyDisplayScreen extends Screen {
                 Component.translatable(settings.hideStand() ? "options.on" : "options.off")), button ->
                 send(BodyDisplayPayload.UPDATE, settings.showName(), settings.poseable(),
                         settings.showCape(), !settings.hideStand()))
-                .bounds(left, top + 72, 240, 20).build());
+                .bounds(left, top + 72, 240, 20)
+                .tooltip(Tooltip.create(Component.translatable("screen.tsf.display_hide_stand_hint"))).build());
         Button edit = addRenderableWidget(Button.builder(Component.translatable("screen.tsf.display_edit"), button ->
                 send(BodyDisplayPayload.EDIT, settings.showName(), settings.poseable()))
                 .bounds(left, top + 100, 240, 20).build());
