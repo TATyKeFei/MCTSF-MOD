@@ -1,5 +1,4 @@
 name: '漏洞报告'
-about: 反馈BUG
 title: "[BUG] xxxx(概括漏洞)"
 description: '注意: 未正确根据提示进行反馈错误可能会被忽略或关闭'
 labels: ['Bug', '调查中']
