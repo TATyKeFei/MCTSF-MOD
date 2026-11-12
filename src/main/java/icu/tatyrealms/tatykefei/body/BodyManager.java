@@ -1268,8 +1268,6 @@ public final class BodyManager {
         state.observerFallback = target.getUUID();
         state.form = Form.OBSERVER;
         applyForm(player);
-        message(player, "spirit_attached", target.getDisplayName());
-        message(target, "spirit_host", player.getGameProfile().name());
         changed();
     }
 
@@ -1357,11 +1355,9 @@ public final class BodyManager {
         if (returnForm == null) {
             state(target).observedBody = body.id;
             state(target).observerFallback = player.getUUID();
-            message(target, "body_stolen", player.getDisplayName());
         } else {
             returnFromZipper(target, returnBody, returnForm);
         }
-        message(player, "possessed", body.name);
     }
 
     boolean interactDisplayedBody(ServerPlayer player, Body body) {
@@ -1531,6 +1527,7 @@ public final class BodyManager {
         body.y = destination.y;
         body.z = destination.z;
         spawnBody(body);
+        player.getMainHandItem().hurtAndBreak(2, player, InteractionHand.MAIN_HAND.asEquipmentSlot());
         changed();
     }
 
@@ -1930,6 +1927,7 @@ public final class BodyManager {
         body.skinDropEntity = null;
         body.skinRecoveryAt = server.overworld().getGameTime() + 600;
         spawnBody(body);
+        player.getMainHandItem().hurtAndBreak(2, player, InteractionHand.MAIN_HAND.asEquipmentSlot());
         changed();
     }
 
