@@ -1,0 +1,112 @@
+name: '漏洞报告'
+about: 反馈BUG
+title: "[BUG] xxxx(概括漏洞)"
+description: '注意: 未正确根据提示进行反馈错误可能会被忽略或关闭'
+labels: ['Bug', '调查中']
+type: Bug
+body:
+  # 选择题
+  - type: checkboxes
+    id: latests
+    attributes:
+      label: '是否已尝试最新的模组版本?'
+      description: '你的问题可能在新版本被发现并被修复了'
+      options:
+        - label: '我已更新至最新版本, 并且同样复现该问题.'
+          required: true
+  - type: checkboxes
+    id: liberror
+    attributes:
+      label: '如果是因其他模组冲突导致的问题请勾选此处'
+      description: '如果是因其他模组冲突导致的问题请勾选此处'
+      options:
+        - label: '如果是因其他模组冲突导致的问题请勾选此处'
+          required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: '详细描述'
+      description: '对该问题清晰地描述, 包括复现的相关步骤'
+      value: |
+        ```
+        遇到了什么问题?
+        ...啊巴啊巴
+
+        复现方式步骤:
+        1. ...
+        2. ...
+        3. ...
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: '详细日志信息'
+      description: '请提供您的客户端/服务端完整日志'
+      value: |
+        ```
+
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: configuration
+    attributes:
+      label: '配置文件'
+      description: '[可选] 请尽可能提供存在问题的部分, 请粘贴在下面的 ``` 行之间相关的配置部分'
+      value: |
+        ```
+
+        ```
+    validations:
+      required: false
+
+  - type: textarea
+    id: device
+    attributes:
+      label: '设备'
+      description: '[可选] 填写您的设备详细'
+      value: |
+        ```
+        - CPU: 9900X
+        - GPU: 9070XT
+        - RAM: DDR5 16G 6000MHz
+        - ...
+        ```
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: '游戏环境'
+      description: '[可选] 填写您的操作系统环境/游戏运行环境'
+      value: |
+        ```
+        - `操作系统`: ArchLinux x86_64
+        - `MC版本`: 26.3
+        - `TSF模组版本`: v.11.45.14
+        - `Java版本`: JDK 25
+        - `Fabric Loader`: 0.20.1
+        - `渲染后端`: Vulkan/OpenGL/Dxgi
+        - `游戏显示服务器`: Wayland/X11/XWayland
+        - ...
+        ```
+    validations:
+      required: false
+
+  - type: textarea
+    id: other
+    attributes:
+      label: '其他'
+      description: '[可选] 如有其他补充描述可写在此处'
+      value: |
+        ```
+
+        ```
+    validations:
+      required: false
