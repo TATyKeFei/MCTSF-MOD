@@ -218,6 +218,8 @@
   "message.tsf.body_display_insert": "Use the stand while holding a body to mount it",
   "message.tsf.body_display_edit": "Sneak-use the body or stand for settings; sneak-attack to retrieve the body",
   "screen.tsf.body_limb_physics": "Empty body limb physics: %s",
+  "screen.tsf.body_pose_picking": "Pick bodies by pose: %s",
+  "screen.tsf.body_pose_picking_hint": "Click the visible head, torso and limbs of empty bodies without changing their movement collision box",
   "screen.tsf.body_display": "Body Display Settings",
   "screen.tsf.display_name": "Show Name: %s",
   "screen.tsf.display_poseable": "Allow Posing: %s",

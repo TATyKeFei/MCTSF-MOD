@@ -20,6 +20,7 @@ public final class TSFServerConfig {
     public boolean deathLeavesBody = true;
     public int maxSkinLayers = 16;
     public boolean bodyLimbPhysics = true;
+    public boolean bodyPosePicking = true;
 
     public static TSFServerConfig parse(String json) throws IOException {
         try {

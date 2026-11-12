@@ -218,6 +218,8 @@
   "message.tsf.body_display_insert": "手持肉体右键放入展示架",
   "message.tsf.body_display_edit": "潜行右键肉体或展示架打开设置，潜行左键拿起肉体",
   "screen.tsf.body_limb_physics": "空肉体肢体物理：%s",
+  "screen.tsf.body_pose_picking": "按肉体姿势选中：%s",
+  "screen.tsf.body_pose_picking_hint": "按空肉体实际显示的头、躯干和四肢判定点击，不改变移动碰撞箱",
   "screen.tsf.body_display": "肉体展示架设置",
   "screen.tsf.display_name": "显示名牌：%s",
   "screen.tsf.display_poseable": "允许摆弄：%s",

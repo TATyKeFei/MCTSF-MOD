@@ -5,6 +5,7 @@
   "client": [
     "input.BodyDragInputMixin",
     "input.BodyDragScrollMixin",
+    "input.BodyPickingMixin",
     "player.ClientPlayerMixin",
     "network.ClientPacketListenerMixin",
     "player.LocalPlayerMixin",

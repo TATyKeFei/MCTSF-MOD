@@ -17,6 +17,7 @@ import icu.tatyrealms.tatykefei.network.ActionPayload;
 import icu.tatyrealms.tatykefei.network.AnimationPayload;
 import icu.tatyrealms.tatykefei.network.StatePayload;
 import icu.tatyrealms.tatykefei.network.SettingsPayload;
+import icu.tatyrealms.tatykefei.network.BodyPickingPayload;
 import icu.tatyrealms.tatykefei.network.ObserverPayload;
 import icu.tatyrealms.tatykefei.network.SkinLayersPayload;
 import icu.tatyrealms.tatykefei.network.HypnosisProgressPayload;
@@ -88,6 +89,7 @@ public final class TSF implements ModInitializer {
         PayloadTypeRegistry.serverboundPlay().register(BodyDisplayPayload.TYPE, BodyDisplayPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(BodyDisplayPayload.TYPE, BodyDisplayPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(SettingsPayload.TYPE, SettingsPayload.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(BodyPickingPayload.TYPE, BodyPickingPayload.CODEC);
         PayloadTypeRegistry.serverboundPlay().register(SettingsPayload.TYPE, SettingsPayload.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(SettingsPayload.TYPE, (payload, context) -> {
             ServerPlayNetworking.send(context.player(), settings(context.player(), payload));
@@ -123,7 +125,10 @@ public final class TSF implements ModInitializer {
                         && (!(player instanceof ServerPlayer serverPlayer) || BodyManager.get().allowCommandMessage(serverPlayer)));
         ServerTickEvents.END_SERVER_TICK.register(server -> BodyManager.get().tick());
         ServerEntityEvents.ENTITY_LOAD.register((entity, level) -> BodyManager.get().entityLoaded(entity));
-        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> BodyManager.get().joined(handler.player));
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+            BodyManager.get().joined(handler.player);
+            ServerPlayNetworking.send(handler.player, new BodyPickingPayload(TSFServerConfig.get().bodyPosePicking));
+        });
         ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) ->
                 !(entity instanceof Player player && BodyManager.form(player) == Form.SPIRIT)
                         && !BodyManager.emptyBody(entity));
@@ -295,12 +300,20 @@ public final class TSF implements ModInitializer {
         if (!payload.json().isEmpty() && editable) {
             try {
                 TSFServerConfig.save(TSFServerConfig.parse(payload.json()));
+                synchronizeBodyPicking(player.level().getServer());
                 BodyManager.message(player, "config_saved");
             } catch (java.io.IOException exception) {
                 player.sendSystemMessage(Component.literal(exception.getMessage()));
             }
         }
         return new SettingsPayload(TSFServerConfig.get().json(), editable);
+    }
+
+    private static void synchronizeBodyPicking(net.minecraft.server.MinecraftServer server) {
+        BodyPickingPayload payload = new BodyPickingPayload(TSFServerConfig.get().bodyPosePicking);
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            ServerPlayNetworking.send(player, payload);
+        }
     }
 
     private void registerCommands() {
@@ -337,6 +350,7 @@ public final class TSF implements ModInitializer {
                                 .then(Commands.literal("reload").executes(context -> {
                                     try {
                                         TSFServerConfig.reload();
+                                        synchronizeBodyPicking(context.getSource().getServer());
                                         context.getSource().sendSuccess(() -> Component.translatable("message.tsf.config_reloaded"), true);
                                         return 1;
                                     } catch (java.io.IOException exception) {

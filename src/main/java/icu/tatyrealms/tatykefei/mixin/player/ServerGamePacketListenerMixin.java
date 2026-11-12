@@ -1,6 +1,11 @@
 package icu.tatyrealms.tatykefei.mixin.player;
 
 import icu.tatyrealms.tatykefei.body.BodyManager;
+import icu.tatyrealms.tatykefei.body.BodyPicking;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.AABB;
 import icu.tatyrealms.tatykefei.state.HypnosisRestrictions;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.network.protocol.game.ServerboundChatCommandSignedPacket;
@@ -17,6 +22,20 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class ServerGamePacketListenerMixin {
     @Shadow
     public ServerPlayer player;
+
+    @WrapOperation(method = "handleInteract", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/world/entity/Entity;getBoundingBox()Lnet/minecraft/world/phys/AABB;"))
+    private AABB tsf$bodyInteractionBounds(Entity entity, Operation<AABB> original) {
+        var pose = BodyPicking.serverPose(entity);
+        return pose != null ? pose.bounds().move(entity.position()) : original.call(entity);
+    }
+
+    @WrapOperation(method = "handleAttack", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/world/entity/Entity;getBoundingBox()Lnet/minecraft/world/phys/AABB;"))
+    private AABB tsf$bodyAttackBounds(Entity entity, Operation<AABB> original) {
+        var pose = BodyPicking.serverPose(entity);
+        return pose != null ? pose.bounds().move(entity.position()) : original.call(entity);
+    }
 
     @Inject(method = "performUnsignedChatCommand", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/commands/Commands;performCommand(Lcom/mojang/brigadier/ParseResults;Ljava/lang/String;)V"), cancellable = true)

@@ -3,6 +3,7 @@ package icu.tatyrealms.tatykefei.client;
 import icu.tatyrealms.tatykefei.client.compat.needsofnature.NeedsOfNatureClientCompat;
 import icu.tatyrealms.tatykefei.client.hud.HypnosisProgress;
 import icu.tatyrealms.tatykefei.client.input.BodyDragging;
+import icu.tatyrealms.tatykefei.client.input.BodyPosePicking;
 import icu.tatyrealms.tatykefei.client.input.BodyExitInput;
 import icu.tatyrealms.tatykefei.client.observer.ObserverView;
 import icu.tatyrealms.tatykefei.client.render.BodyAnimations;
@@ -23,6 +24,7 @@ import icu.tatyrealms.tatykefei.network.StatePayload;
 import icu.tatyrealms.tatykefei.network.VisualState;
 import icu.tatyrealms.tatykefei.network.ObserverPayload;
 import icu.tatyrealms.tatykefei.network.SettingsPayload;
+import icu.tatyrealms.tatykefei.network.BodyPickingPayload;
 import icu.tatyrealms.tatykefei.network.SkinLayersPayload;
 import icu.tatyrealms.tatykefei.network.HypnosisProgressPayload;
 import icu.tatyrealms.tatykefei.network.HypnosisSpeechPayload;
@@ -64,6 +66,8 @@ public final class TSFClient implements ClientModInitializer {
                 screen.receive(payload);
             }
         });
+        ClientPlayNetworking.registerGlobalReceiver(BodyPickingPayload.TYPE,
+                (payload, context) -> BodyPosePicking.configure(payload.enabled()));
         ClientPlayNetworking.registerGlobalReceiver(BodyDisplayPayload.TYPE, (payload, context) -> {
             if (payload.operation() == BodyDisplayPayload.BEGIN_EDIT) {
                 context.client().gui.setScreen(null);
@@ -128,6 +132,7 @@ public final class TSFClient implements ClientModInitializer {
             PROFILES.clear();
             SLIMES.clear();
             BodyDragging.clear();
+            BodyPosePicking.configure(false);
             BodyAnimations.clear();
             HypnosisProgress.clear();
             ObserverView.clear();

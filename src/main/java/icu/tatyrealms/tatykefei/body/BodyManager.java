@@ -1382,8 +1382,10 @@ public final class BodyManager {
             return true;
         }
         Body body = foldedSkin(entity) ? placedSkinForEntity(entity) : bodyForEntity(entity);
-        if (body == null || entity.level() != player.level() || player.distanceToSqr(entity) > 25
-                || !canSeeEmptyBody(player, body, entity)) {
+        BodyRigPose pickingPose = BodyPicking.serverPose(entity);
+        if (body == null || entity.level() != player.level()
+                || (pickingPose != null ? !BodyPicking.canInteract(player, entity, pickingPose)
+                    : player.distanceToSqr(entity) > 25 || !canSeeEmptyBody(player, body, entity))) {
             return true;
         }
         if (body.skinPlaced) {
