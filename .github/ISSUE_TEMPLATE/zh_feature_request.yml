@@ -1,0 +1,50 @@
+name: '功能请求'
+description: '注意: 无效/无法理解的问题可能会被忽略或关闭'
+title: "[功能请求] xxxxxxxx(概述)"
+labels: ['增强']
+body:
+  - type: checkboxes
+    id: wikis
+    attributes:
+      label: '是否已查阅 Wiki'
+      description: '往往很多需求都是因为没有详细查阅 Wiki, 你是否已阅读 [Wiki](https://github.com/TATyKeFei/MCTSF-MOD/wiki)?'
+      options:
+        - label: '我已查阅 Wiki 并确定没有存在该功能'
+          required: true
+
+  - type: checkboxes
+    id: issues-reviewed
+    attributes:
+      label: '是否存在重复 issue'
+      description: '有些功能可能已经被别人提到过，你翻阅过 [Issues](https://github.com/TATyKeFei/MCTSF-MOD/issues) 吗?'
+      options:
+        - label: '我已翻阅现有的 issue 没有发现内容重复'
+          required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: '详细的描述'
+      description: '对该功能清晰地描述'
+      value: |
+        ```
+        1. ...
+        2. ...
+        3. ...
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: other
+    attributes:
+      label: '其他补充'
+      description: '如有其他补充可在此处填写'
+      value: |
+        ```
+        1. ...
+        2. ...
+        3. ...
+        ```
+    validations:
+      required: false
