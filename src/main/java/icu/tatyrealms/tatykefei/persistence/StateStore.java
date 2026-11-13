@@ -36,8 +36,34 @@ public final class StateStore {
         }
     }
 
-    public JsonElement snapshot() {
-        return GSON.toJsonTree(this);
+    public Map<String, JsonElement> records(String server) {
+        Map<String, JsonElement> records = new HashMap<>();
+        players.forEach((id, state) -> {
+            if (server == null || server.equals(state.storageServer)) records.put("p:" + id, GSON.toJsonTree(state));
+        });
+        bodies.forEach((id, body) -> {
+            if (server == null || server.equals(body.storageServer)) records.put("b:" + id, GSON.toJsonTree(body));
+        });
+        return records;
+    }
+
+    public static JsonElement json(Map<String, JsonElement> records) {
+        var root = new com.google.gson.JsonObject();
+        var players = new com.google.gson.JsonObject();
+        var bodies = new com.google.gson.JsonObject();
+        records.forEach((key, value) -> {
+            if (key.startsWith("p:")) players.add(key.substring(2), value);
+            else if (key.startsWith("b:")) bodies.add(key.substring(2), value);
+        });
+        root.add("players", players);
+        root.add("bodies", bodies);
+        return root;
+    }
+
+    public static StateStore fromRecords(Map<String, JsonElement> records) {
+        StateStore state = GSON.fromJson(json(records), StateStore.class);
+        state.bodies.forEach((id, body) -> body.id = id);
+        return state;
     }
 
     static void write(Path path, JsonElement snapshot) throws IOException {

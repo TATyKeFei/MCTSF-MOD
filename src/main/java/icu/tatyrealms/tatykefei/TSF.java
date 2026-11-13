@@ -25,6 +25,9 @@ import icu.tatyrealms.tatykefei.network.HypnosisSpeechPayload;
 import icu.tatyrealms.tatykefei.network.BodyDragPayload;
 import icu.tatyrealms.tatykefei.state.HypnosisRestrictions;
 import icu.tatyrealms.tatykefei.body.BodyManager;
+import icu.tatyrealms.tatykefei.persistence.StorageLoginTask;
+import net.fabricmc.fabric.api.networking.v1.ServerConfigurationConnectionEvents;
+import net.fabricmc.fabric.api.networking.v1.FabricServerConfigurationPacketListenerImpl;
 import icu.tatyrealms.tatykefei.block.BodyDisplayBlock;
 import icu.tatyrealms.tatykefei.block.BodyDisplayBlockEntity;
 import icu.tatyrealms.tatykefei.network.BodyDisplayPayload;
@@ -126,8 +129,14 @@ public final class TSF implements ModInitializer {
         ServerTickEvents.END_SERVER_TICK.register(server -> BodyManager.get().tick());
         ServerEntityEvents.ENTITY_LOAD.register((entity, level) -> BodyManager.get().entityLoaded(entity));
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+            StorageLoginTask.entered(handler.player.getUUID());
             BodyManager.get().joined(handler.player);
             ServerPlayNetworking.send(handler.player, new BodyPickingPayload(TSFServerConfig.get().bodyPosePicking));
+        });
+        ServerConfigurationConnectionEvents.CONFIGURE.register((handler, server) ->
+                ((FabricServerConfigurationPacketListenerImpl) handler).addTask(new StorageLoginTask(handler)));
+        ServerConfigurationConnectionEvents.DISCONNECT.register((handler, server) -> {
+            StorageLoginTask.disconnected(handler);
         });
         ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) ->
                 !(entity instanceof Player player && BodyManager.form(player) == Form.SPIRIT)

@@ -11,6 +11,8 @@ import java.util.Map;
 import java.util.UUID;
 
 public final class Body {
+    public String storageServer;
+    public UUID storageCarrier;
     public UUID id;
     public UUID owner;
     public String name;

@@ -230,5 +230,6 @@
   "screen.tsf.display_edit": "调整姿势",
   "screen.tsf.display_reset": "重置姿势",
   "message.tsf.body_display_editing": "姿势编辑：空手按住右键拖动部位，滚轮调整距离，Esc 结束",
-  "screen.tsf.display_edit_hint": "空手进入编辑模式，按住右键拖动，Esc 结束"
+  "screen.tsf.display_edit_hint": "空手进入编辑模式，按住右键拖动，Esc 结束",
+  "message.tsf.storage_login_failed": "无法接管 TSF 数据：存储暂不可用或上一服务器仍在保存，请稍后重试"
 }

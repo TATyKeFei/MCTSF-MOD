@@ -3,6 +3,7 @@ package icu.tatyrealms.tatykefei.state;
 import java.util.UUID;
 
 public final class PlayerState {
+    public String storageServer;
     public Form form = Form.HUMAN;
     public boolean normalRespawn;
     public Integer slimeColor;

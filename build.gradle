@@ -65,3 +65,21 @@ tasks.register('texturePack', Zip) {
     destinationDirectory = layout.buildDirectory.dir('libs')
 }
 
+sourceSets {
+    storageTest {
+        compileClasspath += sourceSets.test.compileClasspath
+        runtimeClasspath += sourceSets.test.runtimeClasspath
+    }
+}
+
+tasks.register('storageTest', JavaExec) {
+    dependsOn storageTestClasses
+    classpath = sourceSets.storageTest.runtimeClasspath
+    mainClass = 'icu.tatyrealms.tatykefei.persistence.StorageChecks'
+    def testDirectory = layout.buildDirectory.dir('storage-checks')
+    workingDir = testDirectory
+    doFirst { testDirectory.get().asFile.mkdirs() }
+}
+
+check.dependsOn storageTest
+

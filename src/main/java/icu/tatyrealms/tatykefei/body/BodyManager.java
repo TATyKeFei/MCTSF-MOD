@@ -5,7 +5,7 @@ import icu.tatyrealms.tatykefei.compat.needsofnature.NatureTank;
 import icu.tatyrealms.tatykefei.observer.ObserverChat;
 import icu.tatyrealms.tatykefei.compat.carbonchat.CarbonChatCompat;
 import icu.tatyrealms.tatykefei.observer.ObserverSync;
-import icu.tatyrealms.tatykefei.persistence.AsyncStateWriter;
+import icu.tatyrealms.tatykefei.persistence.StatePersistence;
 import icu.tatyrealms.tatykefei.persistence.StateStore;
 import icu.tatyrealms.tatykefei.state.EmptyBodyHolder;
 import icu.tatyrealms.tatykefei.state.Form;
@@ -111,9 +111,10 @@ public final class BodyManager {
     private final MinecraftServer server;
     private final Path path;
     private final StateStore store;
-    private final AsyncStateWriter stateWriter;
+    private final StatePersistence statePersistence;
     private final BodyProfileLookup bodyProfiles;
-    private boolean saveRequested;
+    private boolean storageTimersReady;
+    private final Map<UUID, Body> storageLocalBodies = new HashMap<>();
     private final Map<UUID, Long> cooldowns = new HashMap<>();
     private final Map<UUID, HypnosisSession> hypnosisSessions = new HashMap<>();
     private final Map<UUID, ItemEntity> slimeBottleDrops = new HashMap<>();
@@ -140,11 +141,12 @@ public final class BodyManager {
         this.server = server;
         this.path = server.getWorldPath(LevelResource.ROOT).resolve("tsf/state.json");
         try {
-            this.store = StateStore.load(path);
+            this.statePersistence = new StatePersistence(TSFServerConfig.get().storage(), path);
+            this.store = statePersistence.load();
+            store.bodies.forEach((id, body) -> { if (local(body)) storageLocalBodies.put(id, body); });
         } catch (IOException exception) {
-            throw new IllegalStateException("TSF 存档读取失败，请检查 " + path, exception);
+            throw new IllegalStateException("TSF 存储初始化失败，请检查服务器存储配置", exception);
         }
-        stateWriter = new AsyncStateWriter(path);
         bodyProfiles = new BodyProfileLookup(server.services().profileRepository(), server.services().sessionService());
         instance = this;
     }
@@ -156,7 +158,7 @@ public final class BodyManager {
     public static void clear() {
         if (instance != null) {
             BodyManager manager = instance;
-            try (AsyncStateWriter writer = manager.stateWriter) {
+            try (StatePersistence persistence = manager.statePersistence) {
                 manager.save(true);
             } catch (IOException exception) {
                 throw new IllegalStateException("Unable to finish saving TSF state: " + manager.path, exception);
@@ -208,6 +210,7 @@ public final class BodyManager {
     private PlayerState state(ServerPlayer player) {
         return store.players.computeIfAbsent(player.getUUID(), ignored -> {
             PlayerState state = new PlayerState();
+            state.storageServer = statePersistence.serverId();
             state.body = player.getUUID();
             return state;
         });
@@ -220,7 +223,9 @@ public final class BodyManager {
         }
         return store.bodies.computeIfAbsent(state.homeBody, id -> {
             Body body = new Body();
+            body.storageServer = statePersistence.serverId();
             body.id = id;
+            storageLocalBodies.put(id, body);
             body.owner = player.getUUID();
             body.name = player.getGameProfile().name();
             body.profile = ResolvableProfile.CODEC.encodeStart(JsonOps.INSTANCE, player.getProfile()).getOrThrow();
@@ -233,6 +238,8 @@ public final class BodyManager {
     }
 
     public void joined(ServerPlayer player) {
+        ensureStorageTimers();
+        receiveStorage();
         PlayerState state = state(player);
         nativeBody(player);
         if (state.slimeBottleToken == null && state.slimeBottleDimension != null) {
@@ -240,7 +247,7 @@ public final class BodyManager {
         }
         if (state.form == Form.HUMAN) {
             Body body = store.bodies.get(state.body);
-            if (body == null || !player.getUUID().equals(body.occupant)) {
+            if (!local(body) || !player.getUUID().equals(body.occupant)) {
                 state.form = Form.SLIME;
                 state.body = null;
                 message(player, "body_unavailable");
@@ -306,7 +313,7 @@ public final class BodyManager {
             if (occupied != null && !player.getUUID().equals(occupied.owner)) {
                 detach(player, Form.SLIME);
                 Body home = nativeBody(player);
-                if (home.occupant == null && home.zipperCarrier == null && !home.skinned && home.packedToken == null) {
+                if (local(home) && home.occupant == null && home.zipperCarrier == null && !home.skinned && home.packedToken == null) {
                     Vec3 destination = safePosition(level(home.dimension), new Vec3(home.x, home.y, home.z));
                     if (destination != null) {
                         enter(player, home, destination);
@@ -343,6 +350,8 @@ public final class BodyManager {
         }
         visualsDirty = true;
         save();
+        submitSave();
+        statePersistence.release(player.getUUID());
     }
 
     private void placeConsciousSkins(ServerPlayer player) {
@@ -820,7 +829,8 @@ public final class BodyManager {
         CompoundTag data = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
         try {
             PlayerState captive = store.players.get(UUID.fromString(data.getStringOr("tsf_slime", "")));
-            return captive != null && captive.slimeBottleToken != null
+            return captive != null && (!statePersistence.shared() || statePersistence.serverId().equals(captive.storageServer))
+                    && captive.slimeBottleToken != null
                     && captive.slimeBottleToken.toString().equals(data.getStringOr("tsf_slime_token", "")) ? captive : null;
         } catch (IllegalArgumentException exception) {
             return null;
@@ -1387,7 +1397,7 @@ public final class BodyManager {
         }
         Body mounted = bodyForEntity(entity);
         if (mounted != null && mounted.displayMounted && player.isShiftKeyDown()) {
-            bodyRigs.openSettings(player, BlockPos.of(mounted.displayPosition), store.bodies.values());
+            bodyRigs.openSettings(player, BlockPos.of(mounted.displayPosition), localBodies().values());
             return true;
         }
         if (hypnotized(player) || state(player).form == Form.OBSERVER || !ready(player)
@@ -1468,7 +1478,7 @@ public final class BodyManager {
 
     public Body bodyForEntity(Entity entity) {
         for (Body body : store.bodies.values()) {
-            if (entity.getUUID().equals(body.entityId) && body.occupant == null && !body.skinned
+            if (local(body) && entity.getUUID().equals(body.entityId) && body.occupant == null && !body.skinned
                     && body.packedToken == null && body.zipperCarrier == null) {
                 return body;
             }
@@ -1477,7 +1487,7 @@ public final class BodyManager {
     }
 
     private Body placedSkinForEntity(Entity entity) {
-        return store.bodies.values().stream().filter(body -> body.skinPlaced && body.skinned
+        return store.bodies.values().stream().filter(body -> local(body) && body.skinPlaced && body.skinned
                 && entity.getUUID().equals(body.entityId)).findFirst().orElse(null);
     }
 
@@ -1622,7 +1632,7 @@ public final class BodyManager {
         body.natureAppearance = appearance;
         locate(body, recipient);
         ItemStack stack = packBody(body);
-        store.bodies.put(body.id, body);
+        registerBody(body);
         recipient.getInventory().placeItemBackInInventory(stack, Prediction.SERVER_ONLY);
         refreshInventory(recipient);
         save();
@@ -1707,7 +1717,7 @@ public final class BodyManager {
     }
 
     public void interactDisplay(ServerPlayer player, BlockPos pos, InteractionHand hand) {
-        bodyRigs.interactDisplay(player, pos, hand, store.bodies.values());
+        bodyRigs.interactDisplay(player, pos, hand, localBodies().values());
     }
 
     public boolean pickUpDisplayedBody(ServerPlayer player, Entity entity) {
@@ -1715,15 +1725,15 @@ public final class BodyManager {
     }
 
     public void pickUpDisplayedBody(ServerPlayer player, BlockPos pos) {
-        bodyRigs.pickUpDisplayed(player, pos, store.bodies.values());
+        bodyRigs.pickUpDisplayed(player, pos, localBodies().values());
     }
 
     public void configureDisplay(ServerPlayer player, icu.tatyrealms.tatykefei.network.BodyDisplayPayload payload) {
-        bodyRigs.configure(player, payload, store.bodies.values());
+        bodyRigs.configure(player, payload, localBodies().values());
     }
 
     public void removeDisplay(ServerLevel level, BlockPos pos) {
-        bodyRigs.removeDisplay(level, pos, store.bodies.values());
+        bodyRigs.removeDisplay(level, pos, localBodies().values());
     }
 
     public void bodyBlockChanged(ServerLevel level, BlockPos pos) {
@@ -1776,7 +1786,7 @@ public final class BodyManager {
         body.profile = ResolvableProfile.CODEC.encodeStart(JsonOps.INSTANCE, player.getProfile()).getOrThrow();
         body.natureAppearance = freshNatureBody(player);
         locate(body, player);
-        store.bodies.put(body.id, body);
+        registerBody(body);
         state(player).homeBody = body.id;
         totem.shrink(1);
         enter(player, body, destination);
@@ -1789,6 +1799,10 @@ public final class BodyManager {
     }
 
     private void enter(ServerPlayer player, Body body, Vec3 destination) {
+        if (!local(body)) {
+            message(player, "body_unavailable");
+            return;
+        }
         player.closeContainer();
         List<ItemStack> carried = new ArrayList<>();
         for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
@@ -1860,6 +1874,10 @@ public final class BodyManager {
             return;
         }
         Body body = nativeBody(player);
+        if (!local(body)) {
+            message(player, "body_unavailable");
+            return;
+        }
         if (player.getUUID().equals(body.occupant)) {
             message(player, "already_home");
             return;
@@ -2022,7 +2040,8 @@ public final class BodyManager {
     private Body linkedBody(ItemStack stack) {
         String id = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag().getStringOr("tsf_body", "");
         try {
-            return store.bodies.get(UUID.fromString(id));
+            Body body = store.bodies.get(UUID.fromString(id));
+            return local(body) ? body : null;
         } catch (IllegalArgumentException exception) {
             return null;
         }
@@ -2254,7 +2273,7 @@ public final class BodyManager {
     }
 
     private ServerPlayer controller(Body body, Set<UUID> visited) {
-        if (body == null || !visited.add(body.id)) {
+        if (!local(body) || !visited.add(body.id)) {
             return null;
         }
         if (body.occupant != null) {
@@ -2270,7 +2289,7 @@ public final class BodyManager {
                 return candidate;
             }
         }
-        for (Body parent : store.bodies.values()) {
+        for (Body parent : localBodies().values()) {
             if (parent.skinLayers.stream().anyMatch(json -> skinBody(decodeItem(json)) == body)
                     || parent.inventory.stream().anyMatch(json -> skinBody(decodeItem(json)) == body)) {
                 ServerPlayer wearer = controller(parent, visited);
@@ -2298,6 +2317,7 @@ public final class BodyManager {
             return false;
         }
         Body body = store.bodies.get(state.observedBody);
+        if (!local(body)) body = null;
         if (state.spiritHost == null && body != null && !body.skinned && body.packedToken == null && body.occupant == null
                 && body.zipperCarrier == null) {
             Vec3 destination = safePosition(level(body.dimension), new Vec3(body.x, body.y, body.z));
@@ -2458,6 +2478,7 @@ public final class BodyManager {
     }
 
     void spawnBody(Body body) {
+        if (!local(body)) return;
         if (body.packedToken != null || body.zipperCarrier != null || body.skinned && !body.skinPlaced || body.occupant != null) {
             return;
         }
@@ -2517,6 +2538,7 @@ public final class BodyManager {
     }
 
     private void removeBodyEntity(Body body) {
+        if (!local(body)) return;
         bodyRigs.forget(body, level(body.dimension));
         Entity loaded = bodyEntities.remove(body.id);
         if (loaded != null && !loaded.isRemoved()) {
@@ -2640,7 +2662,7 @@ public final class BodyManager {
                 body.owner = player.getUUID();
                 body.name = player.getGameProfile().name();
                 body.profile = ResolvableProfile.CODEC.encodeStart(JsonOps.INSTANCE, player.getProfile()).getOrThrow();
-                store.bodies.put(body.id, body);
+                registerBody(body);
                 state.homeBody = body.id;
             }
             state.body = body.id;
@@ -2669,6 +2691,10 @@ public final class BodyManager {
         }
         clearHypnosis(player);
         Body body = nativeBody(player);
+        if (!local(body)) {
+            message(player, "body_unavailable");
+            return;
+        }
         UUID controller = body.occupant == null ? body.zipperCarrier : body.occupant;
         if (controller != null && !controller.equals(player.getUUID())) {
             ServerPlayer occupant = server.getPlayerList().getPlayer(controller);
@@ -2698,9 +2724,14 @@ public final class BodyManager {
     }
 
     public void tick() {
+        ensureStorageTimers();
+        if (!statePersistence.healthy()) {
+            throw new IllegalStateException("TSF 共享存储租约无法续期，停止服务器以避免跨服数据冲突");
+        }
+        receiveStorage();
         ticks++;
         boolean recoveryChanged = false;
-        bodyRigs.tick(server, store.bodies, bodyEntities);
+        bodyRigs.tick(server, localBodies(), bodyEntities);
         updateBodyPositions();
         updateSkinDrops();
         for (UUID id : List.copyOf(pendingProjections)) {
@@ -2805,7 +2836,7 @@ public final class BodyManager {
         }
         if (ticks % 200 == 0) {
             for (Body body : store.bodies.values()) {
-                if (body.occupant == null && body.zipperCarrier == null && (!body.skinned || body.skinPlaced)
+                if (local(body) && body.occupant == null && body.zipperCarrier == null && (!body.skinned || body.skinPlaced)
                         && body.packedToken == null) {
                     ServerLevel level = level(body.dimension);
                     if (level.hasChunkAt(BlockPos.containing(body.x, body.y, body.z))) {
@@ -2814,7 +2845,7 @@ public final class BodyManager {
                 }
             }
         }
-        if (saveRequested) {
+        if (ticks % statePersistence.flushIntervalTicks() == 0) {
             submitSave();
         }
     }
@@ -2947,6 +2978,7 @@ public final class BodyManager {
             }
         }
         for (Body body : store.bodies.values()) {
+            if (!local(body)) continue;
             if (body.skinned && body.skinPlaced && body.skinRecoveryAt == 0) {
                 body.skinRecoveryAt = server.overworld().getGameTime() + 600;
                 visualsDirty = true;
@@ -3014,6 +3046,7 @@ public final class BodyManager {
     }
 
     private void captureTank(Body body, ServerPlayer player) {
+        if (!local(body)) return;
         NatureTank tank = NeedsOfNatureTanks.capture(player);
         if (tank != null) {
             body.natureTank = tank;
@@ -3034,7 +3067,7 @@ public final class BodyManager {
 
     private void captureNatureBody(ServerPlayer player) {
         Body body = store.bodies.get(natureBodies.get(player.getUUID()));
-        if (body != null) {
+        if (local(body)) {
             if (natureSkins.capture(body)) {
                 visualsDirty = true;
             }
@@ -3086,14 +3119,14 @@ public final class BodyManager {
     }
 
     public void save() {
-        saveRequested = true;
+        // 周期性提交，避免同一刻的多次玩法修改重复序列化整个存档。
     }
 
     public void save(boolean flush) {
         submitSave();
         if (flush) {
             try {
-                stateWriter.flush();
+                statePersistence.flush();
             } catch (IOException exception) {
                 throw new IllegalStateException("Unable to save TSF state: " + path, exception);
             }
@@ -3101,6 +3134,8 @@ public final class BodyManager {
     }
 
     private void submitSave() {
+        if (statePersistence.ephemeral()) return;
+        ensureStorageTimers();
         updateBodyPositions();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             captureNatureBody(player);
@@ -3110,7 +3145,140 @@ public final class BodyManager {
                 captureTank(body, player);
             }
         }
-        stateWriter.submit(store.snapshot());
-        saveRequested = false;
+        Map<UUID, UUID> carriers = storageCarriers();
+        if (statePersistence.shared()) store.bodies.values().stream().filter(this::local)
+                .forEach(body -> body.storageCarrier = carriers.get(body.id));
+        store.bodies.values().stream().filter(body -> body.storageServer == null)
+                .forEach(body -> body.storageServer = statePersistence.serverId());
+        Map<String, JsonElement> records = store.records(statePersistence.shared() ? statePersistence.serverId() : null);
+        if (statePersistence.shared()) {
+            long time = server.overworld().getGameTime();
+            long now = System.currentTimeMillis();
+            records.forEach((key, data) -> {
+                var object = data.getAsJsonObject();
+                if (key.startsWith("b:")) storageTimer(object, "skinRecoveryAt", time, now);
+                else {
+                    storageTimer(object, "expulsionAt", time, now);
+                    storageTimer(object, "hypnosisUntil", time, now);
+                }
+            });
+        }
+        statePersistence.submit(records, carriers);
+    }
+
+    public CompletableFuture<Void> prepareLogin(UUID player) { return statePersistence.claim(player); }
+
+    public void cancelLogin(UUID player) { statePersistence.release(player); }
+
+    private boolean local(Body body) {
+        return body != null && (!statePersistence.shared() || body.storageServer == null
+                || statePersistence.serverId().equals(body.storageServer));
+    }
+
+    private Map<UUID, Body> localBodies() {
+        return statePersistence.shared() ? storageLocalBodies : store.bodies;
+    }
+
+    private void registerBody(Body body) {
+        body.storageServer = statePersistence.serverId();
+        store.bodies.put(body.id, body);
+        storageLocalBodies.put(body.id, body);
+    }
+
+    private void receiveStorage() {
+        StatePersistence.Update update = statePersistence.poll();
+        if (update == null) return;
+        StateStore incoming = StateStore.fromRecords(update.records());
+        normalizeStorageTimers(incoming);
+        incoming.players.forEach((id, state) -> {
+            PlayerState previous = store.players.get(id);
+            boolean wasLocal = previous != null && statePersistence.serverId().equals(previous.storageServer);
+            if (update.acquired().contains("p:" + id) || !wasLocal || !statePersistence.serverId().equals(state.storageServer)) store.players.put(id, state);
+        });
+        incoming.bodies.forEach((id, body) -> {
+            Body previous = store.bodies.get(id);
+            if (previous != null && local(previous) && !local(body)) {
+                Entity entity = bodyEntities.remove(id);
+                if (entity != null) entity.discard();
+                skinDrops.remove(id);
+            }
+            if (update.acquired().contains("b:" + id) || previous == null || !local(previous) || !local(body)) {
+                store.bodies.put(id, body);
+                if (local(body)) storageLocalBodies.put(id, body);
+                else storageLocalBodies.remove(id);
+            }
+        });
+        invalidateSkinLayers();
+    }
+
+    private Map<UUID, UUID> storageCarriers() {
+        Map<UUID, UUID> result = new HashMap<>();
+        if (!statePersistence.shared()) return result;
+        store.bodies.values().stream().filter(this::local).filter(body -> body.storageCarrier != null)
+                .forEach(body -> result.put(body.id, body.storageCarrier));
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            result.values().removeIf(player.getUUID()::equals);
+            PlayerState state = state(player);
+            if (state.form == Form.HUMAN && local(store.bodies.get(state.body))) result.put(state.body, player.getUUID());
+            if (local(store.bodies.get(state.zipperReturnBody))) result.put(state.zipperReturnBody, player.getUUID());
+            for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+                Body body = carriedBody(player.getInventory().getItem(slot));
+                if (body != null) result.put(body.id, player.getUUID());
+            }
+            for (TrinketsCompat.Slot slot : TrinketsCompat.slots(player)) {
+                Body body = carriedBody(slot.stack());
+                if (body != null) result.put(body.id, player.getUUID());
+            }
+        }
+        // 嵌套皮物及肉体中的打包物品随外层一起转移，队列避免环形引用。
+        var queue = new java.util.ArrayDeque<>(result.keySet());
+        while (!queue.isEmpty()) {
+            Body body = store.bodies.get(queue.removeFirst());
+            if (!local(body)) continue;
+            UUID carrier = result.get(body.id);
+            List<UUID> nested = new ArrayList<>(body.skinOrder);
+            List<JsonElement> items = new ArrayList<>(body.inventory);
+            items.addAll(body.skinLayers);
+            items.addAll(body.accessories.values());
+            for (JsonElement item : items) {
+                Body child = carriedBody(decodeItem(item));
+                if (child != null) nested.add(child.id);
+            }
+            for (UUID child : nested) {
+                if (local(store.bodies.get(child)) && result.putIfAbsent(child, carrier) == null) queue.add(child);
+            }
+        }
+        return result;
+    }
+
+    private Body carriedBody(ItemStack stack) {
+        Body skin = skinBody(stack);
+        return skin != null ? skin : packedBody(stack);
+    }
+
+    private void normalizeStorageTimers(StateStore state) {
+        if (!statePersistence.shared()) return;
+        long time = server.overworld() == null ? 0 : server.overworld().getGameTime();
+        long now = System.currentTimeMillis();
+        state.bodies.values().forEach(body -> {
+            if (body.skinRecoveryAt != 0) body.skinRecoveryAt = Math.max(1, time + Math.max(0, body.skinRecoveryAt - now) / 50);
+        });
+        state.players.values().forEach(player -> {
+            if (player.expulsionAt != 0) player.expulsionAt = Math.max(1, time + Math.max(0, player.expulsionAt - now) / 50);
+            if (player.hypnosisUntil != 0) player.hypnosisUntil = Math.max(1, time + Math.max(0, player.hypnosisUntil - now) / 50);
+        });
+    }
+
+    private void ensureStorageTimers() {
+        if (!storageTimersReady && server.overworld() != null) {
+            normalizeStorageTimers(store);
+            storageTimersReady = true;
+        }
+    }
+
+    private static void storageTimer(com.google.gson.JsonObject object, String key, long time, long now) {
+        if (object.has(key) && object.get(key).getAsLong() != 0) {
+            object.addProperty(key, now + Math.max(0, object.get(key).getAsLong() - time) * 50);
+        }
     }
 }
