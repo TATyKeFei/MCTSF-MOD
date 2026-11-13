@@ -45,7 +45,8 @@ public final class TSFItems {
     public static final Item SNATCHING_SPEAR = register("snatching_spear", properties -> new SpiritSpearItem(properties
             .component(DataComponents.LORE, ItemLoreText.translated("tooltip.tsf.snatching_spear"))));
     public static final Item SKIN_KNIFE = register("skin_knife", properties -> new Item(properties
-            .sword(ToolMaterial.IRON, 3.0F, -2.4F)));
+            // 攻击速度 3.2，攻击冷却为原版铁剑的一半
+            .sword(ToolMaterial.IRON, 3.0F, -0.8F)));
     public static final Item SKIN_SUIT = register("skin_suit", SkinSuitItem::new);
     public static final Item EMPTY_BODY = register("empty_body", EmptyBodyItem::new);
     public static final Item BODY_DISPLAY = register("body_display", properties -> new net.minecraft.world.item.BlockItem(
