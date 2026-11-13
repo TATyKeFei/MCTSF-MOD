@@ -5,7 +5,7 @@
     "component": "minecraft:profile",
     "on_true": {
       "type": "minecraft:special",
-      "base": "tsf:item/skin_suit_display",
+      "base": "tsf:item/empty_body_display",
       "model": {"type": "tsf:skin_suit"}
     },
     "on_false": {"type": "minecraft:model", "model": "tsf:item/empty_body"}
