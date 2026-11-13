@@ -79,6 +79,28 @@ public final class StatePersistence implements AutoCloseable {
     public String serverId() { return settings.serverId; }
     public int flushIntervalTicks() { return settings.flushIntervalSeconds * 20; }
 
+    /** 在持久化线程提交本服快照并读取同一事务的数据，文件写入不占用租约续期线程。 */
+    public CompletableFuture<StateExporter.Result> export(Path directory, boolean all, long gameTime, long now) {
+        if (backend == null) {
+            return CompletableFuture.failedFuture(new IOException("TSF database storage is required for export"));
+        }
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return persist();
+            } catch (IOException | RuntimeException exception) {
+                IOException problem = new IOException("Cannot snapshot TSF database for export", exception);
+                failed(problem);
+                throw new CompletionException(problem);
+            }
+        }, executor).thenApplyAsync(snapshot -> {
+            try {
+                return StateExporter.write(directory, snapshot, all ? null : settings.serverId, gameTime, now);
+            } catch (IOException exception) {
+                throw new CompletionException(exception);
+            }
+        });
+    }
+
     public boolean healthy() {
         return backend == null || System.nanoTime() - lastSuccess
                 < TimeUnit.SECONDS.toNanos(settings.leaseSeconds - settings.syncIntervalSeconds);
@@ -190,7 +212,7 @@ public final class StatePersistence implements AutoCloseable {
         failure = exception;
     }
 
-    private void persist() throws IOException {
+    private Map<String, JsonElement> persist() throws IOException {
         synchronized (this) {
             if (latest != null) {
                 pending = latest.records;
@@ -205,7 +227,7 @@ public final class StatePersistence implements AutoCloseable {
                 saved.putAll(strings(pending));
             }
             success();
-            return;
+            return pending;
         }
         Map<String, String> snapshot = strings(pending);
         long started = System.nanoTime();
@@ -259,6 +281,7 @@ public final class StatePersistence implements AutoCloseable {
         offer(frame.records, Set.of());
         lastSuccess = started;
         failure = null;
+        return frame.records;
     }
 
     private void heartbeat(Map<String, String> values, long now, boolean initial) throws IOException {

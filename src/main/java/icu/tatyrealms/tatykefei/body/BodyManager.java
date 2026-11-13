@@ -6,6 +6,7 @@ import icu.tatyrealms.tatykefei.observer.ObserverChat;
 import icu.tatyrealms.tatykefei.compat.carbonchat.CarbonChatCompat;
 import icu.tatyrealms.tatykefei.observer.ObserverSync;
 import icu.tatyrealms.tatykefei.persistence.StatePersistence;
+import icu.tatyrealms.tatykefei.persistence.StateExporter;
 import icu.tatyrealms.tatykefei.persistence.StateStore;
 import icu.tatyrealms.tatykefei.state.EmptyBodyHolder;
 import icu.tatyrealms.tatykefei.state.Form;
@@ -3131,6 +3132,16 @@ public final class BodyManager {
                 throw new IllegalStateException("Unable to save TSF state: " + path, exception);
             }
         }
+    }
+
+    public boolean sharedStorage() {
+        return statePersistence.shared();
+    }
+
+    public CompletableFuture<StateExporter.Result> exportStorage(boolean all) {
+        submitSave();
+        return statePersistence.export(TSFServerConfig.directory().resolve("exports"), all,
+                server.overworld().getGameTime(), System.currentTimeMillis());
     }
 
     private void submitSave() {

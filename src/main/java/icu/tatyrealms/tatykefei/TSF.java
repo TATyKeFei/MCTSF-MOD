@@ -11,6 +11,7 @@ import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureTanks;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureBodies;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureSkins;
 import icu.tatyrealms.tatykefei.command.GiveBodyCommand;
+import icu.tatyrealms.tatykefei.command.StorageCommand;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import icu.tatyrealms.tatykefei.network.Action;
 import icu.tatyrealms.tatykefei.network.ActionPayload;
@@ -382,6 +383,7 @@ public final class TSF implements ModInitializer {
                                     return 1;
                                 }))
                         .then(GiveBodyCommand.create())
+                        .then(StorageCommand.create())
                         .then(Commands.literal("recover")
                                 .requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
                                 .executes(context -> {
