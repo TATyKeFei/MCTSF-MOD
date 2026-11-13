@@ -80,16 +80,26 @@ public final class TSFServerConfig {
     }
 
     public static void reload() throws IOException {
-        Path configPath = path();
-        TSFServerConfig loaded;
+        current = load(directory());
+    }
+
+    static TSFServerConfig load(Path directory) throws IOException {
+        Path configPath = directory.resolve("tsf-server.yml");
         if (Files.exists(configPath)) {
-            loaded = parseYaml(Files.readString(configPath, StandardCharsets.UTF_8));
-        } else {
-            String defaults = defaultYaml();
-            loaded = parseYaml(defaults);
-            writeYaml(configPath, defaults);
+            return parseYaml(Files.readString(configPath, StandardCharsets.UTF_8));
         }
-        current = loaded;
+        // 仅移动已有的 YAML 配置，保留凭据和注释，不导入旧 JSON。
+        Path previousPath = directory.resolveSibling("tsf-server.yml");
+        if (Files.exists(previousPath)) {
+            TSFServerConfig loaded = parseYaml(Files.readString(previousPath, StandardCharsets.UTF_8));
+            Files.createDirectories(directory);
+            Files.move(previousPath, configPath);
+            return loaded;
+        }
+        String defaults = defaultYaml();
+        TSFServerConfig loaded = parseYaml(defaults);
+        writeYaml(configPath, defaults);
+        return loaded;
     }
 
     private static String defaultYaml() throws IOException {
@@ -102,7 +112,11 @@ public final class TSFServerConfig {
     }
 
     private static Path path() {
-        return FabricLoader.getInstance().getConfigDir().resolve("tsf-server.yml");
+        return directory().resolve("tsf-server.yml");
+    }
+
+    public static Path directory() {
+        return FabricLoader.getInstance().getConfigDir().resolve("tsf");
     }
 
     public static TSFServerConfig parseYaml(String text) throws IOException {
@@ -243,6 +257,7 @@ public final class TSFServerConfig {
         options.setIndent(2);
         options.setPrettyFlow(true);
         return "# TSF 配置格式版本独立于模组版本，旧 JSON 不会自动导入\n"
+                + "# 配置路径：config/tsf/tsf-server.yml\n"
                 + "# storage.type: file、memory、postgresql、mariadb、redis、valkey\n"
                 + "# memory 不持久化；数据库和同步参数修改后需要重启\n"
                 + "# 多服使用相同 namespace，每服 server-id 必须唯一且保持不变\n"

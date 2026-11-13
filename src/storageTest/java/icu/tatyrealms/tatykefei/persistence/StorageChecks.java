@@ -15,6 +15,7 @@ import java.util.concurrent.CompletionException;
 /** 不依赖游戏启动的持久化行为检查，真实数据库通过环境变量选择。 */
 public final class StorageChecks {
     public static void main(String[] arguments) throws Exception {
+        icu.tatyrealms.tatykefei.config.ConfigLocationChecks.run();
         configChecks();
         localChecks();
         sharedChecks(new FakeBackend());
