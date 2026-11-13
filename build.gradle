@@ -31,6 +31,9 @@ dependencies {
     include "net.kyori:adventure-text-serializer-commons:${project.adventure_version}"
     include "net.kyori:option:${project.adventure_option_version}"
     compileOnly "com.terraformersmc:modmenu:21.0.0"
+    implementation include("org.yaml:snakeyaml:${project.snakeyaml_version}")
+    implementation include("org.postgresql:postgresql:${project.postgresql_version}")
+    implementation include("org.mariadb.jdbc:mariadb-java-client:${project.mariadb_version}")
 }
 
 repositories {
