@@ -1,0 +1,53 @@
+# TSF 配置文件
+
+# 这个`config-version`值不要改！！
+# don't change the `config-version`!!!
+config-version: 1
+
+gameplay:
+  # 是否启用皮刀，以及使用时是否要求目标已被催眠或倒地
+  skin-knife-enabled: true
+  skin-knife-requires-hypnosis: false
+  skin-knife-requires-downed: false
+  # 人格驱逐延迟，单位为秒，范围 1-60
+  expulsion-delay-seconds: 3
+  death-leaves-body: true
+  # 最大皮物层数，范围 1-64。建议: 8-16
+  max-skin-layers: 16
+  body-limb-physics: true
+  body-pose-picking: true
+
+# 存储和同步参数修改后需要重启
+# 同步范围为 TSF 数据，原版背包和世界文件需要独立的同步方案
+storage:
+  # 可选 file、memory、postgresql、mariadb、redis、valkey
+  # file 保存到世界目录
+  # memory 方便测试/调试用的，非测试不要用，重启数据会没
+  type: file
+  # 多服使用相同 namespace, 每服 server-id 必须唯一且保持不变
+  namespace: tsf
+  server-id: server-1
+  # 保存间隔 1-300 秒，同步间隔 1-30 秒
+  flush-interval-seconds: 5
+  sync-interval-seconds: 2
+  # 租约有效期 15-300 秒，至少为同步间隔的三倍
+  lease-seconds: 30
+
+  # PostgreSQL 和 MariaDB 共用此配置，数据库需预先创建，表由模组创建
+  sql:
+    host: localhost
+    # PostgreSQL 通常使用 5432, MariaDB 通常使用 3306
+    port: 5432
+    database: tsf
+    username: tsf
+    password: ''
+    tls: false
+
+  # Redis 和 Valkey 共用此配置，持久化由其服务端配置
+  redis:
+    host: localhost
+    port: 6379
+    database: 0
+    username: ''
+    password: ''
+    tls: false

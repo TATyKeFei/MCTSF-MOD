@@ -72,7 +72,7 @@ public final class TSFServerConfig {
 
     public static TSFServerConfig read() throws IOException {
         return Files.exists(path()) ? parseYaml(Files.readString(path(), StandardCharsets.UTF_8))
-                : new TSFServerConfig();
+                : parseYaml(defaultYaml());
     }
 
     public static TSFServerConfig get() {
@@ -80,11 +80,25 @@ public final class TSFServerConfig {
     }
 
     public static void reload() throws IOException {
-        TSFServerConfig loaded = read();
-        if (!Files.exists(path())) {
-            writeYaml(path(), loaded);
+        Path configPath = path();
+        TSFServerConfig loaded;
+        if (Files.exists(configPath)) {
+            loaded = parseYaml(Files.readString(configPath, StandardCharsets.UTF_8));
+        } else {
+            String defaults = defaultYaml();
+            loaded = parseYaml(defaults);
+            writeYaml(configPath, defaults);
         }
         current = loaded;
+    }
+
+    private static String defaultYaml() throws IOException {
+        try (var stream = TSFServerConfig.class.getResourceAsStream("/tsf-server.yml")) {
+            if (stream == null) {
+                throw new IOException("Missing bundled TSF default configuration: tsf-server.yml");
+            }
+            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     private static Path path() {
@@ -250,9 +264,13 @@ public final class TSFServerConfig {
     }
 
     private static void writeYaml(Path path, TSFServerConfig config) throws IOException {
+        writeYaml(path, yaml(config));
+    }
+
+    private static void writeYaml(Path path, String yaml) throws IOException {
         Files.createDirectories(path.getParent());
         Path temporary = path.resolveSibling(path.getFileName() + ".tmp");
-        Files.writeString(temporary, yaml(config), StandardCharsets.UTF_8);
+        Files.writeString(temporary, yaml, StandardCharsets.UTF_8);
         try {
             Files.move(temporary, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
                     java.nio.file.StandardCopyOption.ATOMIC_MOVE);
