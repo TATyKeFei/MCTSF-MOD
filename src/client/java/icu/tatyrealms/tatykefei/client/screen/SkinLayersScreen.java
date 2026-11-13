@@ -115,11 +115,11 @@ public final class SkinLayersScreen extends Screen {
             if (index < snapshot.layers().size()) {
                 SkinLayersPayload.Entry entry = snapshot.layers().get(index);
                 Component label = Component.literal((index + 1) + ". " + entry.name());
-                if (index == snapshot.layers().size() - 1) {
+                if (index == 0) {
                     label = Component.translatable("screen.tsf.outer_skin", label);
                 }
                 graphics.text(font, font.plainSubstrByWidth(label.getString(), (panelWidth - 36) / 2),
-                        left + 12, top + 65 + row * 20, index == snapshot.layers().size() - 1 ? 0xFFFFD48C : 0xFFB5D6F4);
+                        left + 12, top + 65 + row * 20, index == 0 ? 0xFFFFD48C : 0xFFB5D6F4);
             }
         }
         graphics.centeredText(font, Component.literal(Integer.toString(page + 1)), width / 2, top + panelHeight - 67, 0xFFB5D6F4);

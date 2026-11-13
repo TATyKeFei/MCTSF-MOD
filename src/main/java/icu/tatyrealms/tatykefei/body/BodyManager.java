@@ -2090,7 +2090,7 @@ public final class BodyManager {
         if (worn.isEmpty() || !canWearSkin(player, replacement, true)) {
             return;
         }
-        SkinLayer outer = worn.getLast();
+        SkinLayer outer = worn.getFirst();
         ItemStack removed = outer.stack.copy();
         ItemStack incoming = replacement.copyWithCount(1);
         outer.remove.run();
@@ -2154,7 +2154,7 @@ public final class BodyManager {
         }
         List<SkinLayer> layers = layers(player);
         if (!layers.isEmpty() && !hypnotized(player)) {
-            SkinLayer outermost = layers.getLast();
+            SkinLayer outermost = layers.getFirst();
             outermost.remove.run();
             if (!player.getInventory().add(outermost.stack)) {
                 player.drop(outermost.stack, false, Prediction.SERVER_ONLY);
@@ -2235,11 +2235,11 @@ public final class BodyManager {
             return null;
         }
         List<SkinLayer> layers = layers(player);
-        return layers.isEmpty() ? store.bodies.get(state(player).body) : layers.getLast().body;
+        return layers.isEmpty() ? store.bodies.get(state(player).body) : layers.getFirst().body;
     }
 
     private Body storedAppearance(Body body) {
-        for (int index = body.skinOrder.size() - 1; index >= 0; index--) {
+        for (int index = 0; index < body.skinOrder.size(); index++) {
             Body skin = store.bodies.get(body.skinOrder.get(index));
             if (skin != null && skin.skinned) {
                 return skin;
