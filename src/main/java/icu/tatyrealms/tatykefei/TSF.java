@@ -142,6 +142,13 @@ public final class TSF implements ModInitializer {
         ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) ->
                 !(entity instanceof Player player && BodyManager.form(player) == Form.SPIRIT)
                         && !BodyManager.emptyBody(entity));
+        ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, source, baseDamage, damageTaken, blocked) -> {
+            ItemStack weapon = source.getWeaponItem();
+            // 皮刀命中后把伤害冷却从 20 降到 15，使有效无敌刻由 10 tick 缩短到 5 tick
+            if (!blocked && weapon != null && weapon.is(TSFItems.SKIN_KNIFE)) {
+                entity.damageCooldownTime = 15;
+            }
+        });
         ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
             if (entity instanceof ServerPlayer player) {
                 BodyManager.get().died(player);
