@@ -1,5 +1,6 @@
 package icu.tatyrealms.tatykefei.client.render;
 
+import icu.tatyrealms.tatykefei.body.BodyRigPose;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
@@ -8,6 +9,7 @@ import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Pose;
+import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
@@ -53,7 +55,13 @@ public final class BodyPreview {
             living.scale = 1.0F;
         }
         if (renderState instanceof PreviewRenderState preview) {
-            preview.tsf$setPreviewYaw(entity.getYRot() - 180.0F + xAngle * 20.0F);
+            // 骨架坐标已是世界朝向，按骨架背向补偿，保证预览始终展示肉体正面
+            float baseYaw = 180.0F - entity.getYRot();
+            if (renderState instanceof EmptyBodyRenderState body && body.tsf$rig() instanceof BodyRigPose pose) {
+                Vec3 back = pose.basis().forward();
+                baseYaw = (float) Math.toDegrees(Math.atan2(back.x, back.z));
+            }
+            preview.tsf$setPreviewYaw(baseYaw + xAngle * 20.0F);
         }
         int size = Math.max(20, (y1 - y0) * 3 / 7);
         // 展示架肉体使用 SLEEPING 姿态，包围盒高度只有 0.2，需要按站立高度居中
