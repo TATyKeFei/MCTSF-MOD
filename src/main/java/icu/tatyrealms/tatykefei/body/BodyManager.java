@@ -1156,7 +1156,7 @@ public final class BodyManager {
             body.saturation = player.getFoodData().getSaturationLevel();
             locate(body, player);
             body.occupant = null;
-            player.getInventory().clearContent();
+            clearVanillaInventory(player);
             spawnBody(body);
             player.setHealth(Math.min(8, player.getMaxHealth()));
             player.getFoodData().setFoodLevel(20);
@@ -1828,7 +1828,7 @@ public final class BodyManager {
         state.zipperReturnForm = null;
         body.zipperCarrier = null;
         body.occupant = player.getUUID();
-        player.getInventory().clearContent();
+        clearVanillaInventory(player);
         for (int slot = 0; slot < Math.min(body.inventory.size(), player.getInventory().getContainerSize()); slot++) {
             player.getInventory().setItem(slot, decodeItem(body.inventory.get(slot)));
         }
@@ -2416,6 +2416,13 @@ public final class BodyManager {
 
     private JsonElement encodeItem(ItemStack stack) {
         return ItemStack.OPTIONAL_CODEC.encodeStart(server.registryAccess().createSerializationContext(JsonOps.INSTANCE), stack).getOrThrow();
+    }
+
+    private void clearVanillaInventory(ServerPlayer player) {
+        // Trinkets 会在 Inventory.clearContent() 末尾清空饰品栏，这里只处理原版背包槽位
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            player.getInventory().setItem(slot, ItemStack.EMPTY);
+        }
     }
 
     private void captureInventory(Body body, ServerPlayer player) {
