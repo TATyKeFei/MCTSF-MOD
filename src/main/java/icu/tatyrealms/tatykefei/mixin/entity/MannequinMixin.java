@@ -52,6 +52,8 @@ public abstract class MannequinMixin implements EmptyBodyHolder, Leashable {
     private static final EntityDataAccessor<Boolean> TSF_POSEABLE = SynchedEntityData.defineId(Mannequin.class, EntityDataSerializers.BOOLEAN);
     @Unique
     private static final EntityDataAccessor<Boolean> TSF_SHOW_CAPE = SynchedEntityData.defineId(Mannequin.class, EntityDataSerializers.BOOLEAN);
+    @Unique
+    private static final EntityDataAccessor<String> TSF_FACE = SynchedEntityData.defineId(Mannequin.class, EntityDataSerializers.STRING);
 
     @Inject(method = "defineSynchedData", at = @At("TAIL"))
     private void tsf$defineData(SynchedEntityData.Builder builder, CallbackInfo callback) {
@@ -61,6 +63,7 @@ public abstract class MannequinMixin implements EmptyBodyHolder, Leashable {
         builder.define(TSF_SHOW_NAME, false);
         builder.define(TSF_POSEABLE, true);
         builder.define(TSF_SHOW_CAPE, true);
+        builder.define(TSF_FACE, "");
     }
 
     @Override
@@ -79,11 +82,17 @@ public abstract class MannequinMixin implements EmptyBodyHolder, Leashable {
     }
 
     @Override
-    public void tsf$setDisplayOptions(boolean showName, boolean poseable, boolean showCape) {
+    public String tsf$face() {
+        return ((Mannequin) (Object) this).getEntityData().get(TSF_FACE);
+    }
+
+    @Override
+    public void tsf$setDisplayOptions(boolean showName, boolean poseable, boolean showCape, String face) {
         var data = ((Mannequin) (Object) this).getEntityData();
         data.set(TSF_SHOW_NAME, showName);
         data.set(TSF_POSEABLE, poseable);
         data.set(TSF_SHOW_CAPE, showCape);
+        data.set(TSF_FACE, face == null ? "" : face);
     }
 
     @Override

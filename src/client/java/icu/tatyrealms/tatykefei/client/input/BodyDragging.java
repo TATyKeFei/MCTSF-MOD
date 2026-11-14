@@ -48,7 +48,7 @@ public final class BodyDragging {
         stop();
         if (ClientPlayNetworking.canSend(BodyDisplayPayload.TYPE)) {
             ClientPlayNetworking.send(new BodyDisplayPayload(display.pos(), BodyDisplayPayload.STOP_EDIT,
-                    false, false, true, false, -1));
+                    false, false, true, false, -1, ""));
         }
         clear();
         return true;

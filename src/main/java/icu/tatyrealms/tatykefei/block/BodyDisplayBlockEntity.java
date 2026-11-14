@@ -22,6 +22,7 @@ public final class BodyDisplayBlockEntity extends BlockEntity {
     private boolean showName;
     private boolean poseable = true;
     private boolean showCape = true;
+    private String face = "";
 
     public BodyDisplayBlockEntity(BlockPos pos, BlockState state) {
         super(TYPE, pos, state);
@@ -42,14 +43,19 @@ public final class BodyDisplayBlockEntity extends BlockEntity {
         return showCape;
     }
 
+    public String face() {
+        return face;
+    }
+
     public boolean hideStand() {
         return getBlockState().getValue(BodyDisplayBlock.HIDDEN);
     }
 
-    public void configure(boolean showName, boolean poseable, boolean showCape, boolean hideStand) {
+    public void configure(boolean showName, boolean poseable, boolean showCape, String face, boolean hideStand) {
         this.showName = showName;
         this.poseable = poseable;
         this.showCape = showCape;
+        this.face = face == null ? "" : face;
         setChanged();
         if (level != null) {
             BlockState state = getBlockState();
@@ -68,6 +74,7 @@ public final class BodyDisplayBlockEntity extends BlockEntity {
         output.putBoolean("show_name", showName);
         output.putBoolean("poseable", poseable);
         output.putBoolean("show_cape", showCape);
+        output.putString("face", face);
     }
 
     @Override
@@ -76,6 +83,7 @@ public final class BodyDisplayBlockEntity extends BlockEntity {
         showName = input.getBooleanOr("show_name", false);
         poseable = input.getBooleanOr("poseable", true);
         showCape = input.getBooleanOr("show_cape", true);
+        face = input.getStringOr("face", "");
     }
 
     @Override

@@ -2,6 +2,7 @@ package icu.tatyrealms.tatykefei.client;
 
 import icu.tatyrealms.tatykefei.client.compat.needsofnature.NeedsOfNatureClientCompat;
 import icu.tatyrealms.tatykefei.client.compat.punchy.PunchyClientCompat;
+import icu.tatyrealms.tatykefei.client.compat.punchymoves.PunchyMovesClientCompat;
 import icu.tatyrealms.tatykefei.client.hud.HypnosisProgress;
 import icu.tatyrealms.tatykefei.client.input.BodyDragging;
 import icu.tatyrealms.tatykefei.client.input.BodyPosePicking;
@@ -58,6 +59,7 @@ public final class TSFClient implements ClientModInitializer {
     public void onInitializeClient() {
         NeedsOfNatureClientCompat.initialize();
         PunchyClientCompat.initialize();
+        PunchyMovesClientCompat.initialize();
         SpecialModelRenderers.ID_MAPPER.put(TSF.id("skin_suit"), SkinSuitRenderer.Unbaked.CODEC);
         ClientPlayNetworking.registerGlobalReceiver(AnimationPayload.TYPE, (payload, context) -> BodyAnimations.receive(payload));
         ClientPlayNetworking.registerGlobalReceiver(HypnosisProgressPayload.TYPE,

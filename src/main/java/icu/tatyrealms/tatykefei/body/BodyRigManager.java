@@ -160,7 +160,8 @@ public final class BodyRigManager implements AutoCloseable {
         var settings = settings(player.level(), pos);
         Entity entity = body == null || body.entityId == null ? null : player.level().getEntity(body.entityId);
         ServerPlayNetworking.send(player, new BodyDisplayPayload(pos, operation, settings.showName(),
-                settings.poseable(), settings.showCape(), settings.hideStand(), entity == null ? -1 : entity.getId()));
+                settings.poseable(), settings.showCape(), settings.hideStand(), entity == null ? -1 : entity.getId(),
+                settings.face()));
     }
 
     public void configure(ServerPlayer player, BodyDisplayPayload payload, Collection<Body> bodies) {
@@ -183,7 +184,7 @@ public final class BodyRigManager implements AutoCloseable {
         Body body = displayed(player.level(), session.pos, bodies);
         var settings = settings(player.level(), session.pos);
         if (payload.operation() == BodyDisplayPayload.UPDATE) {
-            settings.configure(payload.showName(), payload.poseable(), payload.showCape(), payload.hideStand());
+            settings.configure(payload.showName(), payload.poseable(), payload.showCape(), payload.face(), payload.hideStand());
             if (body != null) {
                 if (!settings.poseable()) {
                     endEditors(body);
@@ -238,7 +239,7 @@ public final class BodyRigManager implements AutoCloseable {
         }
         if (session != null) {
             ServerPlayNetworking.send(player, new BodyDisplayPayload(session.pos, BodyDisplayPayload.END_EDIT,
-                    false, false, true, false, -1));
+                    false, false, true, false, -1, ""));
         }
     }
 
@@ -389,7 +390,7 @@ public final class BodyRigManager implements AutoCloseable {
             BlockPos pos = BlockPos.of(body.displayPosition);
             setDisplayOccupied(level, pos, true);
             var options = settings(level, pos);
-            holder.tsf$setDisplayOptions(options.showName(), options.poseable(), options.showCape());
+            holder.tsf$setDisplayOptions(options.showName(), options.poseable(), options.showCape(), options.face());
         }
     }
 

@@ -9,7 +9,9 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import icu.tatyrealms.tatykefei.client.render.EmptyBodyPose;
 import icu.tatyrealms.tatykefei.client.render.EmptyBodyRenderState;
 import icu.tatyrealms.tatykefei.client.render.EmptyBodyShadow;
+import icu.tatyrealms.tatykefei.client.render.FaceRenderState;
 import icu.tatyrealms.tatykefei.client.render.FoldedSkinPose;
+import icu.tatyrealms.tatykefei.client.render.PreviewRenderState;
 import icu.tatyrealms.tatykefei.network.VisualState;
 import icu.tatyrealms.tatykefei.body.BodyManager;
 import icu.tatyrealms.tatykefei.state.Form;
@@ -35,6 +37,10 @@ public abstract class AvatarRendererMixin {
                 FoldedSkinPose.applyWorld(poses, bodyRotation);
             } else if (((EmptyBodyRenderState) state).tsf$rig() != null) {
                 BodyRigRendering.applyWorld(poses);
+                float previewYaw = ((PreviewRenderState) state).tsf$previewYaw();
+                if (previewYaw != 0.0F) {
+                    poses.rotateDegrees(com.mojang.math.Axis.YP, previewYaw);
+                }
             } else {
                 EmptyBodyPose.apply(poses, bodyRotation);
             }
@@ -58,6 +64,13 @@ public abstract class AvatarRendererMixin {
         ((EmptyBodyRenderState) state).tsf$setRig(emptyBody ? BodyRigRendering.frame(avatar, partialTick) : null);
         ((AnimatedAvatarRenderState) state).tsf$setAnimation(avatar instanceof Player player
                 && BodyManager.form(player) == Form.HUMAN ? BodyAnimations.frame(player.getUUID(), partialTick) : null);
+        String customFace = null;
+        if (emptyBody && avatar instanceof icu.tatyrealms.tatykefei.state.EmptyBodyHolder bodyHolder
+                && bodyHolder.tsf$isMounted()) {
+            String face = bodyHolder.tsf$face();
+            customFace = face == null || face.isEmpty() ? null : face;
+        }
+        ((FaceRenderState) state).tsf$setFace(customFace);
         if (emptyBody) {
             if (avatar instanceof icu.tatyrealms.tatykefei.state.EmptyBodyHolder holder && holder.tsf$isMounted()) {
                 state.showCape &= holder.tsf$showCape();
