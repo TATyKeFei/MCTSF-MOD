@@ -1,7 +1,13 @@
 {
   "type": "minecraft:crafting_shaped",
   "category": "equipment",
-  "pattern": [" I", "S "],
-  "key": {"I": "minecraft:amethyst_shard", "S": "minecraft:stick"},
+  "pattern": [" NA", " G ", "SL "],
+  "key": {
+    "N": "minecraft:gold_nugget",
+    "A": "minecraft:amethyst_shard",
+    "G": "minecraft:gold_ingot",
+    "S": "minecraft:stick",
+    "L": "minecraft:leather"
+  },
   "result": {"id": "tsf:skin_knife", "count": 1}
 }
