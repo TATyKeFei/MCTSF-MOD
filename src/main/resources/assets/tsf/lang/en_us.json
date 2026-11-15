@@ -226,6 +226,8 @@
   "screen.tsf.body_limb_physics": "Empty body limb physics: %s",
   "screen.tsf.body_pose_picking": "Pick bodies by pose: %s",
   "screen.tsf.body_pose_picking_hint": "Click the visible head, torso and limbs of empty bodies without changing their movement collision box",
+  "screen.tsf.client_skin_lookup": "Client Mojang skin lookup: %s",
+  "screen.tsf.client_skin_lookup_hint": "When enabled, clients always query Mojang for the latest body account skin; offline or failed lookups show the default skin",
   "screen.tsf.body_display": "Body Display Settings",
   "screen.tsf.display_name": "Show Name: %s",
   "screen.tsf.display_poseable": "Allow Posing: %s",

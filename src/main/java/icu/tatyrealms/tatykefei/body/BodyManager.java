@@ -72,6 +72,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Prediction;
 import net.minecraft.util.StringUtil;
+import net.minecraft.util.Util;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
@@ -2440,7 +2441,80 @@ public final class BodyManager {
     }
 
     private ResolvableProfile profile(Body body) {
-        return ResolvableProfile.CODEC.parse(JsonOps.INSTANCE, body.profile).getOrThrow();
+        ResolvableProfile stored = ResolvableProfile.CODEC.parse(JsonOps.INSTANCE, body.profile).getOrThrow();
+        if (!TSFServerConfig.get().clientSkinLookup) {
+            return stored;
+        }
+        GameProfile partial = stored.partialProfile();
+        UUID id = partial.id();
+        // Mojang 正版 UUID 为 v4；离线 UUID 为 v3，改按名字查询
+        if (id != null && id.version() == 4) {
+            return ResolvableProfile.createUnresolved(id);
+        }
+        if (partial.name() != null && !partial.name().isBlank()) {
+            return ResolvableProfile.createUnresolved(partial.name());
+        }
+        return id == null || id.equals(Util.NIL_UUID) ? stored : ResolvableProfile.createUnresolved(id);
+    }
+
+    public void refreshSkinProfiles() {
+        for (var entry : List.copyOf(bodyEntities.entrySet())) {
+            Body body = store.bodies.get(entry.getKey());
+            Entity entity = entry.getValue();
+            if (body == null || entity.isRemoved()) {
+                continue;
+            }
+            if (entity instanceof Mannequin mannequin) {
+                Body appearance = body.skinPlaced ? body : storedAppearance(body);
+                ((MannequinAccessor) mannequin).tsf$setProfile(profile(appearance));
+                refreshEquipmentProfiles(mannequin);
+            }
+        }
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            Inventory inventory = player.getInventory();
+            boolean changed = false;
+            for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+                changed |= refreshSkinItemProfile(inventory.getItem(slot));
+            }
+            if (changed) {
+                refreshInventory(player);
+            }
+        }
+        for (ItemEntity item : List.copyOf(skinDrops.values())) {
+            if (!item.isRemoved()) {
+                ItemStack stack = item.getItem().copy();
+                if (refreshSkinItemProfile(stack)) {
+                    item.setItem(stack);
+                }
+            }
+        }
+        broadcast();
+    }
+
+    private void refreshEquipmentProfiles(Mannequin mannequin) {
+        for (var entry : Inventory.EQUIPMENT_SLOT_MAPPING.int2ObjectEntrySet()) {
+            ItemStack stack = mannequin.getItemBySlot(entry.getValue()).copy();
+            if (refreshSkinItemProfile(stack)) {
+                mannequin.setItemSlot(entry.getValue(), stack);
+            }
+        }
+    }
+
+    private boolean refreshSkinItemProfile(ItemStack stack) {
+        if (stack.isEmpty() || (!stack.is(TSFItems.EMPTY_BODY) && !stack.is(TSFItems.SKIN_SUIT))) {
+            return false;
+        }
+        Body body = linkedBody(stack);
+        if (body == null) {
+            return false;
+        }
+        Body appearance = stack.is(TSFItems.SKIN_SUIT) ? body : storedAppearance(body);
+        ResolvableProfile updated = profile(appearance);
+        if (updated.equals(stack.get(DataComponents.PROFILE))) {
+            return false;
+        }
+        stack.set(DataComponents.PROFILE, updated);
+        return true;
     }
 
     private void locate(Body body, Entity entity) {
@@ -2538,6 +2612,7 @@ public final class BodyManager {
         if (!body.skinPlaced && body.selectedSlot < body.inventory.size()) {
             mannequin.setItemSlot(EquipmentSlot.MAINHAND, decodeItem(body.inventory.get(body.selectedSlot)));
         }
+        refreshEquipmentProfiles(mannequin);
         body.entityId = mannequin.getUUID();
         bodyRigs.prepare(body, mannequin);
         if (!level.addFreshEntity(mannequin)) {
@@ -2574,6 +2649,10 @@ public final class BodyManager {
                 slimeBottleDrops.put(captive.slimeBottleToken, item);
             }
             if (item.getItem().is(TSFItems.SKIN_SUIT) || item.getItem().is(TSFItems.EMPTY_BODY)) {
+                ItemStack stack = item.getItem().copy();
+                if (refreshSkinItemProfile(stack)) {
+                    item.setItem(stack);
+                }
                 item.setCustomName(item.getItem().get(DataComponents.CUSTOM_NAME));
                 item.setCustomNameVisible(false);
             }
@@ -2599,6 +2678,9 @@ public final class BodyManager {
                 holder.tsf$setFoldedSkin(body.skinPlaced);
                 Body appearance = body.skinPlaced ? body : storedAppearance(body);
                 ((MannequinAccessor) entity).tsf$setProfile(profile(appearance));
+                if (entity instanceof Mannequin mannequin) {
+                    refreshEquipmentProfiles(mannequin);
+                }
                 entity.setCustomName(Component.translatable(body.skinPlaced ? "item.tsf.named_skin" : "entity.tsf.empty_body", appearance.name));
                 entity.setCustomNameVisible(false);
                 entity.setNoGravity(body.displayMounted);
@@ -2874,7 +2956,8 @@ public final class BodyManager {
             Body appearance = appearance(player);
             visuals.add(new VisualState(player.getUUID(), state.form, state.body,
                     appearance == null ? player.getGameProfile().name() : appearance.name,
-                    appearance == null ? null : appearance.profile, state.hypnotist != null, wearing, skins.size(),
+                    appearance == null ? null : ResolvableProfile.CODEC.encodeStart(JsonOps.INSTANCE, profile(appearance)).getOrThrow(),
+                    state.hypnotist != null, wearing, skins.size(),
                     state.zipperReturnForm != null, skinRecoverySeconds(player), state.slimeColor,
                     state.hypnotist, state.hypnotist == null ? 0 : state.hypnosisRestrictions,
                     appearance == null ? null : appearance.owner,

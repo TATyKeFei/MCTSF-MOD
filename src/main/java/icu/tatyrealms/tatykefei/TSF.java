@@ -316,8 +316,12 @@ public final class TSF implements ModInitializer {
                 || player.level().getServer().isSingleplayerOwner(new net.minecraft.server.players.NameAndId(player.getGameProfile()));
         if (!payload.json().isEmpty() && editable) {
             try {
+                boolean previousSkinLookup = TSFServerConfig.get().clientSkinLookup;
                 TSFServerConfig.save(TSFServerConfig.parse(payload.json()));
                 synchronizeBodyPicking(player.level().getServer());
+                if (previousSkinLookup != TSFServerConfig.get().clientSkinLookup) {
+                    BodyManager.get().refreshSkinProfiles();
+                }
                 BodyManager.message(player, "config_saved");
             } catch (java.io.IOException exception) {
                 player.sendSystemMessage(Component.literal(exception.getMessage()));
@@ -366,8 +370,12 @@ public final class TSF implements ModInitializer {
                                 .requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
                                 .then(Commands.literal("reload").executes(context -> {
                                     try {
+                                        boolean previousSkinLookup = TSFServerConfig.get().clientSkinLookup;
                                         TSFServerConfig.reload();
                                         synchronizeBodyPicking(context.getSource().getServer());
+                                        if (previousSkinLookup != TSFServerConfig.get().clientSkinLookup) {
+                                            BodyManager.get().refreshSkinProfiles();
+                                        }
                                         context.getSource().sendSuccess(() -> Component.translatable("message.tsf.config_reloaded"), true);
                                         return 1;
                                     } catch (java.io.IOException exception) {

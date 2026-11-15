@@ -82,6 +82,9 @@ public final class TSFSettingsScreen extends Screen {
         toggle("body_pose_picking", settings.bodyPosePicking, left, top + 171,
                 () -> settings.bodyPosePicking = !settings.bodyPosePicking)
                 .setTooltip(Tooltip.create(Component.translatable("screen.tsf.body_pose_picking_hint")));
+        toggle("client_skin_lookup", settings.clientSkinLookup, left, top + 192,
+                () -> settings.clientSkinLookup = !settings.clientSkinLookup)
+                .setTooltip(Tooltip.create(Component.translatable("screen.tsf.client_skin_lookup_hint")));
         Button save = addRenderableWidget(Button.builder(Component.translatable("screen.tsf.settings_save"), button -> save())
                 .bounds(left, top + 213, 146, 20).build());
         save.active = editable;
@@ -116,8 +119,8 @@ public final class TSFSettingsScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         graphics.fill(0, 0, width, height, 0xE0101A2A);
         int top = Math.max(0, (height - 240) / 2);
-        graphics.centeredText(font, title, width / 2, top + 8, 0xFFE6F2FF);
-        graphics.centeredText(font, status, width / 2, top + 198, 0xFFB5D6F4);
+        graphics.centeredText(font, title, width / 2, top + 4, 0xFFE6F2FF);
+        graphics.centeredText(font, status, width / 2, top + 14, 0xFFB5D6F4);
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
     }
 

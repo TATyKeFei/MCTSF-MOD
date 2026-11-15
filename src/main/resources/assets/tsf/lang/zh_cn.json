@@ -226,6 +226,8 @@
   "screen.tsf.body_limb_physics": "空肉体肢体物理：%s",
   "screen.tsf.body_pose_picking": "按肉体姿势选中：%s",
   "screen.tsf.body_pose_picking_hint": "按空肉体实际显示的头、躯干和四肢判定点击，不改变移动碰撞箱",
+  "screen.tsf.client_skin_lookup": "客户端查询 Mojang 皮肤：%s",
+  "screen.tsf.client_skin_lookup_hint": "开启后客户端总是向 Mojang 查询肉体账号的最新皮肤，离线或查询失败时显示默认皮肤",
   "screen.tsf.body_display": "肉体展示架设置",
   "screen.tsf.display_name": "显示名牌：%s",
   "screen.tsf.display_poseable": "允许摆弄：%s",

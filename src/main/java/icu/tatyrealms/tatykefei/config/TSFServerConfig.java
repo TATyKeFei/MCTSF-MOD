@@ -29,6 +29,7 @@ public final class TSFServerConfig {
     public int maxSkinLayers = 16;
     public boolean bodyLimbPhysics = true;
     public boolean bodyPosePicking = true;
+    public boolean clientSkinLookup;
     private Storage storage = new Storage();
 
     public static TSFServerConfig parse(String json) throws IOException {
@@ -135,7 +136,7 @@ public final class TSFServerConfig {
             Map<String, Object> gameplay = section(root, "gameplay");
             keys(gameplay, Set.of("skin-knife-enabled", "skin-knife-requires-hypnosis",
                     "skin-knife-requires-downed", "expulsion-delay-seconds", "death-leaves-body",
-                    "max-skin-layers", "body-limb-physics", "body-pose-picking"), "gameplay");
+                    "max-skin-layers", "body-limb-physics", "body-pose-picking", "client-skin-lookup"), "gameplay");
             config.skinKnifeEnabled = bool(gameplay, "skin-knife-enabled", true);
             config.skinKnifeRequiresHypnosis = bool(gameplay, "skin-knife-requires-hypnosis", false);
             config.skinKnifeRequiresDowned = bool(gameplay, "skin-knife-requires-downed", false);
@@ -144,6 +145,7 @@ public final class TSFServerConfig {
             config.maxSkinLayers = number(gameplay, "max-skin-layers", 16);
             config.bodyLimbPhysics = bool(gameplay, "body-limb-physics", true);
             config.bodyPosePicking = bool(gameplay, "body-pose-picking", true);
+            config.clientSkinLookup = bool(gameplay, "client-skin-lookup", false);
             Map<String, Object> values = section(root, "storage");
             keys(values, Set.of("type", "namespace", "server-id", "flush-interval-seconds",
                     "sync-interval-seconds", "lease-seconds", "sql", "redis"), "storage");
@@ -238,6 +240,7 @@ public final class TSFServerConfig {
         gameplay.put("max-skin-layers", config.maxSkinLayers);
         gameplay.put("body-limb-physics", config.bodyLimbPhysics);
         gameplay.put("body-pose-picking", config.bodyPosePicking);
+        gameplay.put("client-skin-lookup", config.clientSkinLookup);
         Storage s = config.storage;
         Map<String, Object> storage = new LinkedHashMap<>();
         storage.put("type", s.type);
