@@ -30,6 +30,7 @@ public final class TSFServerConfig {
     public boolean bodyLimbPhysics = true;
     public boolean bodyPosePicking = true;
     public boolean clientSkinLookup;
+    public boolean natureLiquidSourceLabels = true;
     private Storage storage = new Storage();
 
     public static TSFServerConfig parse(String json) throws IOException {
@@ -136,7 +137,8 @@ public final class TSFServerConfig {
             Map<String, Object> gameplay = section(root, "gameplay");
             keys(gameplay, Set.of("skin-knife-enabled", "skin-knife-requires-hypnosis",
                     "skin-knife-requires-downed", "expulsion-delay-seconds", "death-leaves-body",
-                    "max-skin-layers", "body-limb-physics", "body-pose-picking", "client-skin-lookup"), "gameplay");
+                    "max-skin-layers", "body-limb-physics", "body-pose-picking", "client-skin-lookup",
+                    "nature-liquid-source-labels"), "gameplay");
             config.skinKnifeEnabled = bool(gameplay, "skin-knife-enabled", true);
             config.skinKnifeRequiresHypnosis = bool(gameplay, "skin-knife-requires-hypnosis", false);
             config.skinKnifeRequiresDowned = bool(gameplay, "skin-knife-requires-downed", false);
@@ -146,6 +148,7 @@ public final class TSFServerConfig {
             config.bodyLimbPhysics = bool(gameplay, "body-limb-physics", true);
             config.bodyPosePicking = bool(gameplay, "body-pose-picking", true);
             config.clientSkinLookup = bool(gameplay, "client-skin-lookup", false);
+            config.natureLiquidSourceLabels = bool(gameplay, "nature-liquid-source-labels", true);
             Map<String, Object> values = section(root, "storage");
             keys(values, Set.of("type", "namespace", "server-id", "flush-interval-seconds",
                     "sync-interval-seconds", "lease-seconds", "sql", "redis"), "storage");
@@ -241,6 +244,7 @@ public final class TSFServerConfig {
         gameplay.put("body-limb-physics", config.bodyLimbPhysics);
         gameplay.put("body-pose-picking", config.bodyPosePicking);
         gameplay.put("client-skin-lookup", config.clientSkinLookup);
+        gameplay.put("nature-liquid-source-labels", config.natureLiquidSourceLabels);
         Storage s = config.storage;
         Map<String, Object> storage = new LinkedHashMap<>();
         storage.put("type", s.type);

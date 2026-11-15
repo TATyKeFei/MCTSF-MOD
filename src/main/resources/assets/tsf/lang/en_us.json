@@ -288,5 +288,9 @@
   "screen.tsf.face.shut": "Shut",
   "message.tsf.body_display_editing": "Pose editing: hold Use with an empty hand to drag parts, scroll for distance, Esc to finish",
   "screen.tsf.display_edit_hint": "Empty your hand to edit; hold Use to drag, Esc to finish",
-  "message.tsf.storage_login_failed": "Unable to acquire TSF data: storage is unavailable or your previous server is still saving. Please retry shortly"
+  "message.tsf.storage_login_failed": "Unable to acquire TSF data: storage is unavailable or your previous server is still saving. Please retry shortly",
+  "screen.tsf.nature_liquid_source_labels": "Semen source labels: %s",
+  "screen.tsf.nature_liquid_source_labels_hint": "Label newly filled bottles with the original source players. Requires NeedsOfNature. Existing labels remain when disabled.",
+  "tooltip.tsf.liquid_source": "%s's semen",
+  "tooltip.tsf.liquid_sources_mixed": "Mixed semen (known player sources: %s)"
 }
