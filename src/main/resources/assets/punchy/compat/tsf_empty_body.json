@@ -1,0 +1,9 @@
+{
+  "itemSpecific": {
+    "tsf:empty_body": {
+      "customAnimation": [
+        { "type": "inspect", "name": "tsf_empty_body_inspect" }
+      ]
+    }
+  }
+}
