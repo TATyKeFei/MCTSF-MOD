@@ -28,6 +28,8 @@ import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureBodies;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureSkins;
 import icu.tatyrealms.tatykefei.item.TSFItems;
 import icu.tatyrealms.tatykefei.item.LatexPotions;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.Items;
 import net.minecraft.core.particles.ParticleTypes;
 import icu.tatyrealms.tatykefei.item.ProtectionTotems;
@@ -1154,6 +1156,8 @@ public final class BodyManager {
                 }
             }
             captureInventory(body, player);
+            captureLatex(body, player);
+            clearLatex(player);
             body.health = Math.max(1, player.getHealth());
             body.food = player.getFoodData().getFoodLevel();
             body.saturation = player.getFoodData().getSaturationLevel();
@@ -1168,6 +1172,7 @@ public final class BodyManager {
         restoreAbilities(player, state);
         state.body = null;
         state.form = form;
+        clearLatex(player);
         state.spiritHost = null;
         state.observedBody = null;
         state.observerFallback = null;
@@ -1636,12 +1641,102 @@ public final class BodyManager {
     }
 
     public void applyLatexPotion(ServerPlayer player, UUID source, ResolvableProfile profile, int level) {
-        PlayerState state = state(player);
-        player.forceAddEffect(LatexPotions.effect(level), null);
-        state.latexSource = source;
-        state.latexProfile = ResolvableProfile.CODEC.encodeStart(JsonOps.INSTANCE, profile).getOrThrow();
+        applyLatexEffect(player, source, profile, LatexPotions.effect(level));
+    }
+
+    public boolean applyLatexEffect(LivingEntity target, UUID source, ResolvableProfile profile,
+            MobEffectInstance effect) {
+        if (!effect.getEffect().equals(LatexPotions.EFFECT) || effect.getDuration() <= 0) {
+            return false;
+        }
+        if (target instanceof ServerPlayer player) {
+            PlayerState state = state(player);
+            if (!player.isAlive() || player.isSpectator() || state.form == Form.SPIRIT || state.form == Form.OBSERVER) {
+                return false;
+            }
+            player.forceAddEffect(new MobEffectInstance(LatexPotions.EFFECT,
+                    effect.getDuration(), effect.getAmplifier(), false, false, true), null);
+            state.latexSource = source;
+            state.latexProfile = ResolvableProfile.CODEC.encodeStart(JsonOps.INSTANCE, profile).getOrThrow();
+            if (state.form == Form.HUMAN) {
+                Body body = store.bodies.get(state.body);
+                if (body != null) {
+                    captureLatex(body, player);
+                }
+            }
+        } else {
+            Body body = bodyForEntity(target);
+            if (body == null) {
+                return false;
+            }
+            body.latexSource = source;
+            body.latexProfile = ResolvableProfile.CODEC.encodeStart(JsonOps.INSTANCE, profile).getOrThrow();
+            body.latexLevel = effect.getAmplifier() + 1;
+            body.latexExpiresAt = server.overworld().getGameTime() + effect.getDuration();
+            if (target instanceof Mannequin mannequin) {
+                ((MannequinAccessor) mannequin).tsf$setProfile(appearanceProfile(body, storedAppearance(body)));
+            }
+        }
         visualsDirty = true;
         save();
+        return true;
+    }
+
+    private void captureLatex(Body body, ServerPlayer player) {
+        var effect = player.getEffect(LatexPotions.EFFECT);
+        PlayerState state = state(player);
+        if (effect == null || state.latexSource == null || state.latexProfile == null) {
+            clearLatex(body);
+            return;
+        }
+        body.latexSource = state.latexSource;
+        body.latexProfile = state.latexProfile.deepCopy();
+        body.latexLevel = effect.getAmplifier() + 1;
+        body.latexExpiresAt = server.overworld().getGameTime() + effect.getDuration();
+    }
+
+    private void clearLatex(ServerPlayer player) {
+        player.removeEffect(LatexPotions.EFFECT);
+        PlayerState state = state(player);
+        state.latexSource = null;
+        state.latexProfile = null;
+        visualsDirty = true;
+    }
+
+    private static void clearLatex(Body body) {
+        body.latexSource = null;
+        body.latexProfile = null;
+        body.latexLevel = 0;
+        body.latexExpiresAt = 0;
+    }
+
+    private boolean hasLatex(Body body) {
+        return body != null && body.latexSource != null && body.latexProfile != null
+                && body.latexExpiresAt > server.overworld().getGameTime();
+    }
+
+    private void restoreLatex(ServerPlayer player, Body body) {
+        clearLatex(player);
+        if (hasLatex(body)) {
+            player.forceAddEffect(new MobEffectInstance(LatexPotions.EFFECT,
+                    (int) Math.min(Integer.MAX_VALUE, body.latexExpiresAt - server.overworld().getGameTime()),
+                    Math.clamp(body.latexLevel, 1, LatexPotions.MAX_LEVEL) - 1, false, false, true), null);
+            PlayerState state = state(player);
+            state.latexSource = body.latexSource;
+            state.latexProfile = body.latexProfile.deepCopy();
+        } else {
+            clearLatex(body);
+        }
+    }
+
+    private ResolvableProfile appearanceProfile(Body body, Body appearance) {
+        if (hasLatex(body)) {
+            return ResolvableProfile.CODEC.parse(JsonOps.INSTANCE, body.latexProfile).getOrThrow();
+        }
+        if (hasLatex(appearance)) {
+            return ResolvableProfile.CODEC.parse(JsonOps.INSTANCE, appearance.latexProfile).getOrThrow();
+        }
+        return profile(appearance);
     }
 
     public void giveBody(GameProfile profile, ServerPlayer recipient) {
@@ -1694,7 +1789,7 @@ public final class BodyManager {
         data.putString("tsf_body_token", body.packedToken.toString());
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(data));
         Body appearance = storedAppearance(body);
-        stack.set(DataComponents.PROFILE, profile(appearance));
+        stack.set(DataComponents.PROFILE, appearanceProfile(body, appearance));
         stack.set(DataComponents.CUSTOM_NAME, Component.translatable("item.tsf.named_body", appearance.name));
         return stack;
     }
@@ -1853,6 +1948,7 @@ public final class BodyManager {
         state.zipperReturnForm = null;
         body.zipperCarrier = null;
         body.occupant = player.getUUID();
+        restoreLatex(player, body);
         clearVanillaInventory(player);
         for (int slot = 0; slot < Math.min(body.inventory.size(), player.getInventory().getContainerSize()); slot++) {
             player.getInventory().setItem(slot, decodeItem(body.inventory.get(slot)));
@@ -2016,7 +2112,7 @@ public final class BodyManager {
         data.putString("tsf_body", body.id.toString());
         data.putString("tsf_skin_token", body.skinToken.toString());
         skin.set(DataComponents.CUSTOM_DATA, CustomData.of(data));
-        skin.set(DataComponents.PROFILE, profile(body));
+        skin.set(DataComponents.PROFILE, appearanceProfile(body, body));
         skin.set(DataComponents.CUSTOM_NAME, Component.translatable("item.tsf.named_skin", body.name));
         return skin;
     }
@@ -2490,7 +2586,7 @@ public final class BodyManager {
             }
             if (entity instanceof Mannequin mannequin) {
                 Body appearance = body.skinPlaced ? body : storedAppearance(body);
-                ((MannequinAccessor) mannequin).tsf$setProfile(profile(appearance));
+                ((MannequinAccessor) mannequin).tsf$setProfile(appearanceProfile(body, appearance));
                 refreshEquipmentProfiles(mannequin);
             }
         }
@@ -2509,6 +2605,16 @@ public final class BodyManager {
                 ItemStack stack = item.getItem().copy();
                 if (refreshSkinItemProfile(stack)) {
                     item.setItem(stack);
+                }
+            }
+        }
+        for (ServerLevel level : server.getAllLevels()) {
+            for (Entity entity : level.getAllEntities()) {
+                if (entity instanceof ItemEntity item && item.getItem().is(TSFItems.EMPTY_BODY)) {
+                    ItemStack stack = item.getItem().copy();
+                    if (refreshSkinItemProfile(stack)) {
+                        item.setItem(stack);
+                    }
                 }
             }
         }
@@ -2533,7 +2639,7 @@ public final class BodyManager {
             return false;
         }
         Body appearance = stack.is(TSFItems.SKIN_SUIT) ? body : storedAppearance(body);
-        ResolvableProfile updated = profile(appearance);
+        ResolvableProfile updated = appearanceProfile(body, appearance);
         if (updated.equals(stack.get(DataComponents.PROFILE))) {
             return false;
         }
@@ -2619,7 +2725,7 @@ public final class BodyManager {
             ((EmptyBodyHolder) mannequin).tsf$setFoldedSkin(true);
         }
         MannequinAccessor accessor = (MannequinAccessor) mannequin;
-        accessor.tsf$setProfile(profile(appearance));
+        accessor.tsf$setProfile(appearanceProfile(body, appearance));
         accessor.tsf$setImmovable(body.displayMounted);
         accessor.tsf$setHideDescription(true);
         mannequin.noPhysics = false;
@@ -2701,7 +2807,7 @@ public final class BodyManager {
                 holder.tsf$setEmptyBody(true);
                 holder.tsf$setFoldedSkin(body.skinPlaced);
                 Body appearance = body.skinPlaced ? body : storedAppearance(body);
-                ((MannequinAccessor) entity).tsf$setProfile(profile(appearance));
+                ((MannequinAccessor) entity).tsf$setProfile(appearanceProfile(body, appearance));
                 if (entity instanceof Mannequin mannequin) {
                     refreshEquipmentProfiles(mannequin);
                 }
@@ -2722,6 +2828,10 @@ public final class BodyManager {
 
     public void died(ServerPlayer player) {
         PlayerState state = state(player);
+        Body latexBody = store.bodies.get(state.body);
+        if (latexBody != null && state.form == Form.HUMAN) {
+            clearLatex(latexBody);
+        }
         state.latexSource = null;
         state.latexProfile = null;
         natureBodies.remove(player.getUUID());
@@ -2859,10 +2969,13 @@ public final class BodyManager {
         }
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             PlayerState state = state(player);
-            if (state.latexProfile != null && !player.hasEffect(LatexPotions.EFFECT)) {
-                state.latexSource = null;
-                state.latexProfile = null;
-                visualsDirty = true;
+            if (state.latexProfile != null && (!player.hasEffect(LatexPotions.EFFECT)
+                    || state.form == Form.SPIRIT || state.form == Form.OBSERVER)) {
+                clearLatex(player);
+                Body body = store.bodies.get(state.body);
+                if (state.form == Form.HUMAN && body != null) {
+                    clearLatex(body);
+                }
             }
             if (pendingNatureRestores.remove(player.getUUID())) {
                 natureBodies.remove(player.getUUID());
@@ -2947,6 +3060,17 @@ public final class BodyManager {
         }
         if (ticks % 5 == 0) {
             synchronizeObservers();
+        }
+        boolean latexExpired = false;
+        for (Body body : localBodies().values()) {
+            if (body.occupant == null && body.latexProfile != null && !hasLatex(body)) {
+                clearLatex(body);
+                latexExpired = true;
+            }
+        }
+        if (latexExpired) {
+            refreshSkinProfiles();
+            visualsDirty = true;
         }
         if (visualsDirty || recoveryChanged) {
             if (visualsDirty) {
@@ -3289,7 +3413,10 @@ public final class BodyManager {
             long now = System.currentTimeMillis();
             records.forEach((key, data) -> {
                 var object = data.getAsJsonObject();
-                if (key.startsWith("b:")) storageTimer(object, "skinRecoveryAt", time, now);
+                if (key.startsWith("b:")) {
+                    storageTimer(object, "skinRecoveryAt", time, now);
+                    storageTimer(object, "latexExpiresAt", time, now);
+                }
                 else {
                     storageTimer(object, "expulsionAt", time, now);
                     storageTimer(object, "hypnosisUntil", time, now);
@@ -3395,6 +3522,7 @@ public final class BodyManager {
         long now = System.currentTimeMillis();
         state.bodies.values().forEach(body -> {
             if (body.skinRecoveryAt != 0) body.skinRecoveryAt = Math.max(1, time + Math.max(0, body.skinRecoveryAt - now) / 50);
+            if (body.latexExpiresAt != 0) body.latexExpiresAt = Math.max(1, time + Math.max(0, body.latexExpiresAt - now) / 50);
         });
         state.players.values().forEach(player -> {
             if (player.expulsionAt != 0) player.expulsionAt = Math.max(1, time + Math.max(0, player.expulsionAt - now) / 50);

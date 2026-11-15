@@ -17,7 +17,10 @@ import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.core.component.DataComponentGetter;
 import net.minecraft.world.item.alchemy.PotionContents;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.ItemLore;
@@ -50,11 +53,28 @@ public final class LatexPotions {
     }
 
     public static Optional<NatureLiquidSources.Source> source(ItemStack stack) {
-        if (!stack.is(TSFItems.LATEX_POTION)) {
+        if (!isLatexItem(stack)) {
             return Optional.empty();
         }
-        return stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag()
+        return sourceData(stack);
+    }
+
+    public static Optional<NatureLiquidSources.Source> sourceData(DataComponentGetter components) {
+        return components.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag()
                 .read(SOURCE_KEY, NatureLiquidSources.Source.CODEC);
+    }
+
+    public static boolean isLatexItem(ItemStack stack) {
+        return stack.is(TSFItems.LATEX_POTION) || stack.is(TSFItems.LATEX_SPLASH_POTION)
+                || stack.is(TSFItems.LATEX_LINGERING_POTION) || stack.is(TSFItems.LATEX_ARROW);
+    }
+
+    public static Item potionType(ItemStack stack) {
+        if (stack.is(Items.SPLASH_POTION) || stack.is(TSFItems.LATEX_SPLASH_POTION)) {
+            return TSFItems.LATEX_SPLASH_POTION;
+        }
+        return stack.is(Items.LINGERING_POTION) || stack.is(TSFItems.LATEX_LINGERING_POTION)
+                ? TSFItems.LATEX_LINGERING_POTION : TSFItems.LATEX_POTION;
     }
 
     public static int level(ItemStack stack) {
@@ -67,14 +87,20 @@ public final class LatexPotions {
     }
 
     public static ItemStack create(NatureLiquidSources.Source source, ResolvableProfile profile, int level) {
+        return create(source, profile, level, TSFItems.LATEX_POTION);
+    }
+
+    public static ItemStack create(NatureLiquidSources.Source source, ResolvableProfile profile, int level, Item item) {
         level = Math.clamp(level, 1, MAX_LEVEL);
-        ItemStack stack = new ItemStack(TSFItems.LATEX_POTION);
+        ItemStack stack = new ItemStack(item);
         stack.set(DataComponents.PROFILE, profile);
         stack.set(DataComponents.POTION_CONTENTS, new PotionContents(Optional.empty(), Optional.of(COLOR),
                 List.of(effect(level)), Optional.empty()));
         stack.set(DataComponents.LORE, new ItemLore(List.of(
                 Component.translatable("tooltip.tsf.latex_target", source.name()).withStyle(ChatFormatting.GRAY),
-                Component.translatable("tooltip.tsf.latex_level", roman(level), level * 20).withStyle(ChatFormatting.GRAY))));
+                Component.translatable("tooltip.tsf.latex_level", roman(level),
+                        java.math.BigDecimal.valueOf(level * 20.0 * stack.getOrDefault(DataComponents.POTION_DURATION_SCALE, 1.0F))
+                                .stripTrailingZeros().toPlainString()).withStyle(ChatFormatting.GRAY))));
         int storedLevel = level;
         CustomData.update(DataComponents.CUSTOM_DATA, stack, data -> {
             data.store(SOURCE_KEY, NatureLiquidSources.Source.CODEC, source);
@@ -85,6 +111,29 @@ public final class LatexPotions {
 
     public static ItemStack create(GameProfile profile, int level) {
         return create(new NatureLiquidSources.Source(profile.id(), profile.name()), ResolvableProfile.createResolved(profile), level);
+    }
+
+    public static ItemStack create(GameProfile profile, int level, Item item) {
+        return create(new NatureLiquidSources.Source(profile.id(), profile.name()), ResolvableProfile.createResolved(profile), level, item);
+    }
+
+    public static ItemStack convert(ItemStack stack, Item item) {
+        var source = source(stack).orElseThrow();
+        return create(source, stack.getOrDefault(DataComponents.PROFILE, profile(source)), level(stack), item);
+    }
+
+    public static Item.Properties properties(Item.Properties properties) {
+        return properties.component(DataComponents.POTION_CONTENTS, new PotionContents(Optional.empty(), Optional.of(COLOR),
+                List.of(), Optional.empty())).component(DataComponents.LORE, ItemLoreText.translated("tooltip.tsf.latex_potion"));
+    }
+
+    public static boolean apply(LivingEntity target, ItemStack carrier, MobEffectInstance effect) {
+        var source = source(carrier);
+        if (source.isEmpty() || BodyManager.get() == null) {
+            return false;
+        }
+        return BodyManager.get().applyLatexEffect(target, source.get().uuid(),
+                carrier.getOrDefault(DataComponents.PROFILE, profile(source.get())), effect);
     }
 
     public static ResolvableProfile profile(NatureLiquidSources.Source source) {

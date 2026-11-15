@@ -298,5 +298,8 @@
   "tooltip.tsf.latex_potion": "Brew an Oozing potion with a single player's semen bottle; changes appearance while keeping your name",
   "tooltip.tsf.latex_target": "Appearance: %s",
   "tooltip.tsf.latex_level": "Level %s · %s minutes",
-  "message.tsf.latex_potion_given": "Gave %s's level %s Latex Potion to %s"
+  "message.tsf.latex_potion_given": "Gave %s’s level %s %s to %s",
+  "item.tsf.latex_splash_potion": "Splash Potion of Latex",
+  "item.tsf.latex_lingering_potion": "Lingering Potion of Latex",
+  "item.tsf.latex_arrow": "Arrow of Latex"
 }

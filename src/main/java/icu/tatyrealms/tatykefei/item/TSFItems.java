@@ -61,6 +61,10 @@ public final class TSFItems {
     public static final Item SOUL_PROJECTION_POTION = register("soul_projection_potion", properties -> new BodyPotionItem(properties, false));
     public static final Item PERSONALITY_EXPULSION_POTION = register("personality_expulsion_potion", properties -> new BodyPotionItem(properties, true));
     public static final Item LATEX_POTION = register("latex_potion", LatexPotionItem::new);
+    public static final Item LATEX_SPLASH_POTION = register("latex_splash_potion", LatexSplashPotionItem::new);
+    public static final Item LATEX_LINGERING_POTION = register("latex_lingering_potion", LatexLingeringPotionItem::new);
+    public static final Item LATEX_ARROW = register("latex_arrow", properties -> new ArrowItem(
+            LatexPotions.properties(properties.stacksTo(64)).component(DataComponents.POTION_DURATION_SCALE, 0.125F)));
     public static final Item SOUL_PROJECTION_SPLASH_POTION = register("soul_projection_splash_potion", properties -> new BodySplashPotionItem(properties, false));
     public static final Item PERSONALITY_EXPULSION_SPLASH_POTION = register("personality_expulsion_splash_potion", properties -> new BodySplashPotionItem(properties, true));
     public static final Item SOUL_PROJECTION_LINGERING_POTION = register("soul_projection_lingering_potion", properties -> new BodyLingeringPotionItem(properties, false));
@@ -108,6 +112,9 @@ public final class TSFItems {
                     output.accept(SOUL_PROJECTION_POTION);
                     output.accept(PERSONALITY_EXPULSION_POTION);
                     output.accept(LATEX_POTION);
+                    output.accept(LATEX_SPLASH_POTION);
+                    output.accept(LATEX_LINGERING_POTION);
+                    output.accept(LATEX_ARROW);
                     output.accept(SOUL_PROJECTION_SPLASH_POTION);
                     output.accept(PERSONALITY_EXPULSION_SPLASH_POTION);
                     output.accept(SOUL_PROJECTION_LINGERING_POTION);
@@ -121,6 +128,8 @@ public final class TSFItems {
             entries.accept(SOUL_PROJECTION_POTION);
             entries.accept(PERSONALITY_EXPULSION_POTION);
             entries.accept(LATEX_POTION);
+            entries.accept(LATEX_SPLASH_POTION);
+            entries.accept(LATEX_LINGERING_POTION);
             entries.accept(SOUL_PROJECTION_SPLASH_POTION);
             entries.accept(PERSONALITY_EXPULSION_SPLASH_POTION);
             entries.accept(SOUL_PROJECTION_LINGERING_POTION);
@@ -129,10 +138,12 @@ public final class TSFItems {
         CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.COMBAT).register(entries -> {
             entries.accept(SOUL_PROJECTION_ARROW);
             entries.accept(PERSONALITY_EXPULSION_ARROW);
+            entries.accept(LATEX_ARROW);
         });
         for (Item item : List.of(SOUL_PROJECTION_SPLASH_POTION, PERSONALITY_EXPULSION_SPLASH_POTION,
                 SOUL_PROJECTION_LINGERING_POTION, PERSONALITY_EXPULSION_LINGERING_POTION,
-                SOUL_PROJECTION_ARROW, PERSONALITY_EXPULSION_ARROW)) {
+                SOUL_PROJECTION_ARROW, PERSONALITY_EXPULSION_ARROW,
+                LATEX_SPLASH_POTION, LATEX_LINGERING_POTION, LATEX_ARROW)) {
             DispenserBlock.registerProjectileBehavior(item);
         }
         DispenserBlock.registerBehavior(SKIN_SUIT, new AccessoryDispenserBehavior());

@@ -9,6 +9,8 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import icu.tatyrealms.tatykefei.body.BodyManager;
 import icu.tatyrealms.tatykefei.item.LatexPotions;
+import icu.tatyrealms.tatykefei.item.TSFItems;
+import net.minecraft.world.item.Item;
 import java.util.UUID;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.RejectedExecutionException;
@@ -32,19 +34,26 @@ public final class GiveCommand {
                 .requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
                 // 保留玩家名、UUID 和在线玩家选择器，以及可选的收件人。
                 .then(Commands.literal("body").then(Commands.argument("player", EntityArgument.entity())
-                        .executes(context -> execute(context, context.getSource().getPlayerOrException(), 0))
+                        .executes(context -> execute(context, context.getSource().getPlayerOrException(), 0, TSFItems.EMPTY_BODY))
                         .then(Commands.argument("recipient", EntityArgument.player()).executes(context ->
-                                execute(context, EntityArgument.getPlayer(context, "recipient"), 0)))))
-                .then(Commands.literal("latex_potion").then(Commands.argument("player", EntityArgument.entity())
-                        .then(Commands.argument("level", IntegerArgumentType.integer(1, LatexPotions.MAX_LEVEL))
-                                .executes(context -> execute(context, context.getSource().getPlayerOrException(),
-                                        IntegerArgumentType.getInteger(context, "level")))
-                                .then(Commands.argument("recipient", EntityArgument.player()).executes(context ->
-                                        execute(context, EntityArgument.getPlayer(context, "recipient"),
-                                                IntegerArgumentType.getInteger(context, "level")))))));
+                                execute(context, EntityArgument.getPlayer(context, "recipient"), 0, TSFItems.EMPTY_BODY)))))
+                .then(potionBranch("latex_potion", TSFItems.LATEX_POTION))
+                .then(potionBranch("latex_splash_potion", TSFItems.LATEX_SPLASH_POTION))
+                .then(potionBranch("latex_lingering_potion", TSFItems.LATEX_LINGERING_POTION))
+                .then(potionBranch("latex_arrow", TSFItems.LATEX_ARROW));
     }
 
-    private static int execute(CommandContext<CommandSourceStack> context, ServerPlayer recipient, int latexLevel) throws CommandSyntaxException {
+    private static LiteralArgumentBuilder<CommandSourceStack> potionBranch(String name, Item item) {
+        return Commands.literal(name).then(Commands.argument("player", EntityArgument.entity())
+                .then(Commands.argument("level", IntegerArgumentType.integer(1, LatexPotions.MAX_LEVEL))
+                        .executes(context -> execute(context, context.getSource().getPlayerOrException(),
+                                IntegerArgumentType.getInteger(context, "level"), item))
+                        .then(Commands.argument("recipient", EntityArgument.player()).executes(context ->
+                                execute(context, EntityArgument.getPlayer(context, "recipient"),
+                                        IntegerArgumentType.getInteger(context, "level"), item)))));
+    }
+
+    private static int execute(CommandContext<CommandSourceStack> context, ServerPlayer recipient, int latexLevel, Item item) throws CommandSyntaxException {
         CommandSourceStack source = context.getSource();
         var server = source.getServer();
         BodyManager manager = BodyManager.get();
@@ -54,8 +63,8 @@ public final class GiveCommand {
                 throw EntityArgument.ERROR_ONLY_PLAYERS_ALLOWED.create();
             }
             ServerPlayer player = selector.findSinglePlayer(source);
-            give(manager, player.getGameProfile(), player, recipient, latexLevel);
-            success(source, player.getGameProfile().name(), recipient, latexLevel);
+            give(manager, player.getGameProfile(), player, recipient, latexLevel, item);
+            success(source, player.getGameProfile().name(), recipient, latexLevel, item);
             return 1;
         }
         // 在线玩家不存在时仍保留输入的名字或 UUID，交给档案查询。
@@ -69,8 +78,8 @@ public final class GiveCommand {
         }
         ServerPlayer online = id == null ? server.getPlayerList().getPlayerByName(query) : server.getPlayerList().getPlayer(id);
         if (online != null) {
-            give(manager, online.getGameProfile(), online, recipient, latexLevel);
-            success(source, online.getGameProfile().name(), recipient, latexLevel);
+            give(manager, online.getGameProfile(), online, recipient, latexLevel, item);
+            success(source, online.getGameProfile().name(), recipient, latexLevel, item);
             return 1;
         }
         try {
@@ -96,8 +105,8 @@ public final class GiveCommand {
                         } else if (profile.isEmpty()) {
                             source.sendFailure(Component.translatable("message.tsf.body_profile_not_found", query));
                         } else {
-                            give(manager, profile.get(), null, recipient, latexLevel);
-                            success(source, profile.get().name(), recipient, latexLevel);
+                            give(manager, profile.get(), null, recipient, latexLevel, item);
+                            success(source, profile.get().name(), recipient, latexLevel, item);
                         }
                     });
                 } catch (RejectedExecutionException ignored) {
@@ -111,9 +120,9 @@ public final class GiveCommand {
         return 1;
     }
 
-    private static void give(BodyManager manager, GameProfile profile, ServerPlayer online, ServerPlayer recipient, int latexLevel) {
+    private static void give(BodyManager manager, GameProfile profile, ServerPlayer online, ServerPlayer recipient, int latexLevel, Item item) {
         if (latexLevel > 0) {
-            recipient.getInventory().placeItemBackInInventory(LatexPotions.create(profile, latexLevel), Prediction.SERVER_ONLY);
+            recipient.getInventory().placeItemBackInInventory(LatexPotions.create(profile, latexLevel, item), Prediction.SERVER_ONLY);
         } else if (online != null) {
             manager.giveBody(online, recipient);
         } else {
@@ -121,9 +130,9 @@ public final class GiveCommand {
         }
     }
 
-    private static void success(CommandSourceStack source, String name, ServerPlayer recipient, int latexLevel) {
+    private static void success(CommandSourceStack source, String name, ServerPlayer recipient, int latexLevel, Item item) {
         source.sendSuccess(() -> latexLevel > 0
-                ? Component.translatable("message.tsf.latex_potion_given", name, latexLevel, recipient.getGameProfile().name())
+                ? Component.translatable("message.tsf.latex_potion_given", name, latexLevel, item.getName(item.getDefaultInstance()), recipient.getGameProfile().name())
                 : Component.translatable("message.tsf.body_given", name, recipient.getGameProfile().name()), true);
     }
 }

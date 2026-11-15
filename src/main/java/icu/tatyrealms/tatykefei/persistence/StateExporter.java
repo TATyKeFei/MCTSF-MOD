@@ -37,6 +37,7 @@ public final class StateExporter {
                 players++;
             } else {
                 timer(data, "skinRecoveryAt", gameTime, now);
+                timer(data, "latexExpiresAt", gameTime, now);
                 bodies++;
             }
             records.put(key, data);

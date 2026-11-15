@@ -23,8 +23,10 @@ public final class LatexBrewingRecipe extends BrewingRecipe {
             MapCodec.unit(LatexBrewingRecipe::new), StreamCodec.unit(new LatexBrewingRecipe()));
 
     public LatexBrewingRecipe() {
-        super(new PotionIngredient(Ingredient.of(Items.POTION, TSFItems.LATEX_POTION), Optional.empty()),
-                PotionIngredient.of(Items.POTION), new ItemStackTemplate(TSFItems.LATEX_POTION));
+        super(new PotionIngredient(Ingredient.of(Items.POTION, Items.SPLASH_POTION, Items.LINGERING_POTION,
+                        TSFItems.LATEX_POTION, TSFItems.LATEX_SPLASH_POTION, TSFItems.LATEX_LINGERING_POTION), Optional.empty()),
+                new PotionIngredient(Ingredient.of(Items.POTION, Items.GUNPOWDER, Items.DRAGON_BREATH), Optional.empty()),
+                new ItemStackTemplate(TSFItems.LATEX_POTION));
     }
 
     public static void initialize() {
@@ -33,16 +35,23 @@ public final class LatexBrewingRecipe extends BrewingRecipe {
 
     @Override
     public boolean matches(BrewingInput input) {
+        if (input.reagent().is(Items.GUNPOWDER)) {
+            return input.input().is(TSFItems.LATEX_POTION) && LatexPotions.source(input.input()).isPresent();
+        }
+        if (input.reagent().is(Items.DRAGON_BREATH)) {
+            return input.input().is(TSFItems.LATEX_SPLASH_POTION) && LatexPotions.source(input.input()).isPresent();
+        }
         var source = LatexPotions.reagentSource(input.reagent());
         if (source.isEmpty()) {
             return false;
         }
         ItemStack potion = input.input();
-        if (potion.is(TSFItems.LATEX_POTION)) {
+        if (LatexPotions.isLatexItem(potion) && !potion.is(TSFItems.LATEX_ARROW)) {
             return LatexPotions.source(potion).map(previous -> !previous.uuid().equals(source.get().uuid())
                     || LatexPotions.level(potion) < LatexPotions.MAX_LEVEL).orElse(false);
         }
-        return potion.is(Items.POTION) && potion.getOrDefault(DataComponents.POTION_CONTENTS, PotionContents.EMPTY).is(Potions.OOZING);
+        return (potion.is(Items.POTION) || potion.is(Items.SPLASH_POTION) || potion.is(Items.LINGERING_POTION))
+                && potion.getOrDefault(DataComponents.POTION_CONTENTS, PotionContents.EMPTY).is(Potions.OOZING);
     }
 
     @Override
@@ -50,12 +59,18 @@ public final class LatexBrewingRecipe extends BrewingRecipe {
         if (!matches(input)) {
             return ItemStack.EMPTY;
         }
+        if (input.reagent().is(Items.GUNPOWDER)) {
+            return LatexPotions.convert(input.input(), TSFItems.LATEX_SPLASH_POTION);
+        }
+        if (input.reagent().is(Items.DRAGON_BREATH)) {
+            return LatexPotions.convert(input.input(), TSFItems.LATEX_LINGERING_POTION);
+        }
         var source = LatexPotions.reagentSource(input.reagent()).orElseThrow();
         int level = LatexPotions.source(input.input()).filter(previous -> previous.uuid().equals(source.uuid()))
                 .map(previous -> LatexPotions.level(input.input()) + 1).orElse(1);
         var profile = level > 1 ? input.input().getOrDefault(DataComponents.PROFILE, LatexPotions.profile(source))
                 : LatexPotions.profile(source);
-        return LatexPotions.create(source, profile, level);
+        return LatexPotions.create(source, profile, level, LatexPotions.potionType(input.input()));
     }
 
     @Override

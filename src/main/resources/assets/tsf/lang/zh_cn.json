@@ -298,5 +298,8 @@
   "tooltip.tsf.latex_potion": "使用渗浆药水和单一玩家来源的精液瓶炼制，只改变外观，不改变名字",
   "tooltip.tsf.latex_target": "变身目标：%s",
   "tooltip.tsf.latex_level": "%s级 · 持续%s分钟",
-  "message.tsf.latex_potion_given": "已将 %s 的 %s 级乳胶药水给予 %s"
+  "message.tsf.latex_potion_given": "已将 %s 的 %s 级%s给予 %s",
+  "item.tsf.latex_splash_potion": "喷溅型乳胶药水",
+  "item.tsf.latex_lingering_potion": "滞留型乳胶药水",
+  "item.tsf.latex_arrow": "乳胶之箭"
 }

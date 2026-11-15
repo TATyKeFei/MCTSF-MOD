@@ -17,6 +17,10 @@ public final class Body {
     public UUID owner;
     public String name;
     public JsonElement profile;
+    public UUID latexSource;
+    public JsonElement latexProfile;
+    public int latexLevel;
+    public long latexExpiresAt;
     public UUID occupant;
     public UUID entityId;
     public UUID packedToken;
