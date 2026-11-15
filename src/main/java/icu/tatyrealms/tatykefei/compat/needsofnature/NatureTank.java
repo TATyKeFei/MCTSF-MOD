@@ -7,5 +7,6 @@ public final class NatureTank {
     public String donorVariant;
     public String honeyBase;
     public String donors;
+    public NatureLiquidSources sources;
     public long lastIncrease = -1;
 }

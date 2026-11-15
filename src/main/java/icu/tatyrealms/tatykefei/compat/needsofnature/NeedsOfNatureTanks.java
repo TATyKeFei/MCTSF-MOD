@@ -60,6 +60,18 @@ public final class NeedsOfNatureTanks {
         return METHODS.get(method).invoke(player, arguments);
     }
 
+    public static int stored(Object tank) {
+        if (holder == null || !holder.isInstance(tank)) {
+            return 0;
+        }
+        try {
+            return (int) METHODS.get("getLiquidStored").invoke(tank);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            disable(exception);
+            return 0;
+        }
+    }
+
     public static NatureTank capture(ServerPlayer player) {
         if (holder == null || !holder.isInstance(player)) {
             return null;
@@ -74,6 +86,7 @@ public final class NeedsOfNatureTanks {
             Identifier honey = (Identifier) invoke(player, "getFertileNectarHoneyBaseEntityTypeId");
             tank.honeyBase = honey == null ? null : honey.toString();
             tank.donors = (String) encodeDonors.invoke(null, invoke(player, "getRecentLiquidDonors"));
+            tank.sources = NeedsOfNatureSources.get(player);
             tank.lastIncrease = (long) invoke(player, "getLastLiquidIncreaseTick");
             return tank;
         } catch (ReflectiveOperationException | LinkageError exception) {
@@ -103,6 +116,7 @@ public final class NeedsOfNatureTanks {
                 invoke(player, "setFertileNectarHoneyBaseEntityTypeId", tank.honeyBase == null ? null : Identifier.tryParse(tank.honeyBase));
                 invoke(player, "setRecentLiquidDonors", decodeDonors.invoke(null, tank.donors == null ? "" : tank.donors));
                 invoke(player, "setLastLiquidIncreaseTick", tank.lastIncrease);
+                NeedsOfNatureSources.set(player, tank.sources);
             }
             synchronize.invoke(null, player);
         } catch (ReflectiveOperationException | LinkageError exception) {

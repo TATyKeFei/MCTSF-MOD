@@ -19,6 +19,8 @@ gameplay:
   body-pose-picking: true
   # 开启后客户端会向 Mojang 查询肉体账号的最新皮肤，查不到时显示默认皮肤
   client-skin-lookup: false
+  # 新装瓶时添加精液来源标签；关闭后已生成的标签仍保留
+  nature-liquid-source-labels: true
 
 # 存储和同步参数修改后需要重启
 # 同步范围为 TSF 数据，原版背包和世界文件需要独立的同步方案
