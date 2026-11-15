@@ -1912,7 +1912,7 @@ public final class BodyManager {
             return;
         }
         if (state(player).form != Form.HUMAN || !player.getMainHandItem().is(TSFItems.SKIN_KNIFE)
-                || !near(player, target, 5) || state(target).form != Form.HUMAN || target.isSpectator()) {
+                || !near(player, target, 3) || state(target).form != Form.HUMAN || target.isSpectator()) {
             message(player, "invalid_target");
             return;
         }

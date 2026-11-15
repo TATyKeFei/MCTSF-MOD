@@ -28,6 +28,7 @@ import net.minecraft.world.item.SplashPotionItem;
 import net.minecraft.world.item.LingeringPotionItem;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.level.block.DispenserBlock;
+import net.minecraft.world.item.component.AttackRange;
 import net.minecraft.world.item.component.Consumables;
 import net.minecraft.world.item.alchemy.PotionContents;
 import java.util.List;
@@ -47,6 +48,8 @@ public final class TSFItems {
     public static final Item SKIN_KNIFE = register("skin_knife", properties -> new Item(properties
             // 攻击速度 3.2，攻击冷却为原版铁剑的一半
             .sword(ToolMaterial.IRON, 3.0F, -0.8F)
+            // 攻击距离固定 3 格，创造模式不再使用默认的 5 格
+            .component(DataComponents.ATTACK_RANGE, new AttackRange(0.0F, 3.0F, 0.0F, 3.0F, 0.0F, 1.0F))
             // 铁砧修复使用紫水晶碎片
             .repairable(Items.AMETHYST_SHARD)));
     public static final Item SKIN_SUIT = register("skin_suit", SkinSuitItem::new);
