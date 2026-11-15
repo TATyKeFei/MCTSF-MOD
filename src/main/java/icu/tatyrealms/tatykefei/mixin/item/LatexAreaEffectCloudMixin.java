@@ -51,7 +51,7 @@ public abstract class LatexAreaEffectCloudMixin {
         }
     }
 
-    @WrapOperation(method = "tick", at = @At(value = "INVOKE",
+    @WrapOperation(method = "serverTick", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/world/entity/LivingEntity;addEffect(Lnet/minecraft/world/effect/MobEffectInstance;Lnet/minecraft/world/entity/Entity;)Z"))
     private boolean tsf$applyLatex(LivingEntity target, MobEffectInstance effect, Entity source, Operation<Boolean> original) {
         return effect.getEffect().equals(LatexPotions.EFFECT) && LatexPotions.source(tsf$latexPotion).isPresent()
