@@ -235,6 +235,8 @@
   "message.tsf.carbon_chat_unavailable": "CarbonChat 聊天兼容暂不可用，请查看服务端日志",
   "screen.tsf.display_edit": "调整姿势",
   "screen.tsf.display_reset": "重置姿势",
+  "screen.tsf.display_reset_progress": "重置姿势 (%s/3)",
+  "screen.tsf.display_reset_hint": "1 秒内连续点击三次以重置姿势",
   "screen.tsf.display_face": "表情：%s",
   "screen.tsf.display_face_hint": "选择展示架肉体的表情，需要安装 Punchy 表情模组",
   "screen.tsf.face_pick": "选择表情",

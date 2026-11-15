@@ -235,6 +235,8 @@
   "message.tsf.carbon_chat_unavailable": "CarbonChat integration is unavailable; check the server log",
   "screen.tsf.display_edit": "Adjust Pose",
   "screen.tsf.display_reset": "Reset Pose",
+  "screen.tsf.display_reset_progress": "Reset Pose (%s/3)",
+  "screen.tsf.display_reset_hint": "Click three times within 1 second to reset the pose",
   "screen.tsf.display_face": "Expression: %s",
   "screen.tsf.display_face_hint": "Choose the display body's expression. Requires Punchy Expressions",
   "screen.tsf.face_pick": "Choose Expression",

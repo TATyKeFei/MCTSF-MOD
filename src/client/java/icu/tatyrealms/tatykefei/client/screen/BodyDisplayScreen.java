@@ -10,7 +10,12 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
 public final class BodyDisplayScreen extends Screen {
+    private static final long RESET_CLICK_WINDOW_MS = 1000L;
+
     private BodyDisplayPayload settings;
+    private int resetClicks;
+    private long resetFirstClick;
+    private Button resetButton;
 
     public BodyDisplayScreen(BodyDisplayPayload settings) {
         super(Component.translatable("screen.tsf.body_display"));
@@ -64,12 +69,41 @@ public final class BodyDisplayScreen extends Screen {
                 .bounds(left, top + 120, buttonWidth, 20).build());
         edit.active = settings.poseable() && settings.entity() >= 0 && minecraft.player.getMainHandItem().isEmpty();
         edit.setTooltip(Tooltip.create(Component.translatable("screen.tsf.display_edit_hint")));
-        Button reset = addRenderableWidget(Button.builder(Component.translatable("screen.tsf.display_reset"), button ->
-                send(BodyDisplayPayload.RESET, settings.showName(), settings.poseable()))
-                .bounds(left, top + 144, buttonWidth, 20).build());
-        reset.active = settings.poseable() && settings.entity() >= 0;
+        resetClicks = 0;
+        resetFirstClick = 0;
+        resetButton = addRenderableWidget(Button.builder(Component.translatable("screen.tsf.display_reset"), button -> {
+            long now = System.currentTimeMillis();
+            if (resetClicks == 0 || now - resetFirstClick > RESET_CLICK_WINDOW_MS) {
+                resetClicks = 1;
+                resetFirstClick = now;
+            } else {
+                resetClicks++;
+            }
+            if (resetClicks >= 3) {
+                resetClicks = 0;
+                resetFirstClick = 0;
+                resetButton.setMessage(Component.translatable("screen.tsf.display_reset"));
+                send(BodyDisplayPayload.RESET, settings.showName(), settings.poseable());
+            } else {
+                resetButton.setMessage(Component.translatable("screen.tsf.display_reset_progress", resetClicks));
+            }
+        })
+                .bounds(left, top + 144, buttonWidth, 20)
+                .tooltip(Tooltip.create(Component.translatable("screen.tsf.display_reset_hint"))).build());
+        resetButton.active = settings.poseable() && settings.entity() >= 0;
         addRenderableWidget(Button.builder(Component.translatable("gui.done"), button -> onClose())
                 .bounds(left, top + 172, buttonWidth, 20).build());
+    }
+
+    @Override
+    public void tick() {
+        if (resetClicks > 0 && System.currentTimeMillis() - resetFirstClick > RESET_CLICK_WINDOW_MS) {
+            resetClicks = 0;
+            resetFirstClick = 0;
+            if (resetButton != null) {
+                resetButton.setMessage(Component.translatable("screen.tsf.display_reset"));
+            }
+        }
     }
 
     private int columnLeft() {
