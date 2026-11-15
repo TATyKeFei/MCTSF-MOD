@@ -60,6 +60,7 @@ public final class TSFItems {
     public static final Item BODY_REGENERATION_TOTEM = register("body_regeneration_totem", BodyRegenerationTotemItem::new);
     public static final Item SOUL_PROJECTION_POTION = register("soul_projection_potion", properties -> new BodyPotionItem(properties, false));
     public static final Item PERSONALITY_EXPULSION_POTION = register("personality_expulsion_potion", properties -> new BodyPotionItem(properties, true));
+    public static final Item LATEX_POTION = register("latex_potion", LatexPotionItem::new);
     public static final Item SOUL_PROJECTION_SPLASH_POTION = register("soul_projection_splash_potion", properties -> new BodySplashPotionItem(properties, false));
     public static final Item PERSONALITY_EXPULSION_SPLASH_POTION = register("personality_expulsion_splash_potion", properties -> new BodySplashPotionItem(properties, true));
     public static final Item SOUL_PROJECTION_LINGERING_POTION = register("soul_projection_lingering_potion", properties -> new BodyLingeringPotionItem(properties, false));
@@ -106,6 +107,7 @@ public final class TSFItems {
                     output.accept(BODY_REGENERATION_TOTEM);
                     output.accept(SOUL_PROJECTION_POTION);
                     output.accept(PERSONALITY_EXPULSION_POTION);
+                    output.accept(LATEX_POTION);
                     output.accept(SOUL_PROJECTION_SPLASH_POTION);
                     output.accept(PERSONALITY_EXPULSION_SPLASH_POTION);
                     output.accept(SOUL_PROJECTION_LINGERING_POTION);
@@ -118,6 +120,7 @@ public final class TSFItems {
         CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.FOOD_AND_DRINKS).register(entries -> {
             entries.accept(SOUL_PROJECTION_POTION);
             entries.accept(PERSONALITY_EXPULSION_POTION);
+            entries.accept(LATEX_POTION);
             entries.accept(SOUL_PROJECTION_SPLASH_POTION);
             entries.accept(PERSONALITY_EXPULSION_SPLASH_POTION);
             entries.accept(SOUL_PROJECTION_LINGERING_POTION);

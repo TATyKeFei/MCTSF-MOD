@@ -194,7 +194,7 @@
   "message.tsf.body_profile_failed": "查询 %s 的正版档案失败，请检查服务器网络后重试",
   "message.tsf.body_profile_timeout": "查询 %s 的正版档案超时，请稍后重试",
   "message.tsf.body_profile_busy": "正版档案查询繁忙，请稍后重试",
-  "message.tsf.body_recipient_offline": "接收者已离线，已取消发放肉体",
+  "message.tsf.body_recipient_offline": "接收者已离线，已取消发放物品",
   "message.tsf.invalid_body_item": "这具空肉体无法放置，可能已被放下或管理员恢复",
   "message.tsf.body_packed": "你的空肉体已被收起，需要先放下才能返回",
   "message.tsf.regeneration_slime_only": "肉体再生图腾只能为人格史莱姆再生肉体",
@@ -292,5 +292,11 @@
   "screen.tsf.nature_liquid_source_labels": "精液来源标签：%s",
   "screen.tsf.nature_liquid_source_labels_hint": "为新装瓶的精液标记最初来源玩家，需要自然之需；关闭后已生成的标签仍保留",
   "tooltip.tsf.liquid_source": "%s的精液",
-  "tooltip.tsf.liquid_sources_mixed": "混合精液（已知玩家来源：%s）"
+  "tooltip.tsf.liquid_sources_mixed": "混合精液（已知玩家来源：%s）",
+  "item.tsf.latex_potion": "乳胶药水",
+  "effect.tsf.latex": "乳胶",
+  "tooltip.tsf.latex_potion": "使用渗浆药水和单一玩家来源的精液瓶炼制，只改变外观，不改变名字",
+  "tooltip.tsf.latex_target": "变身目标：%s",
+  "tooltip.tsf.latex_level": "%s级 · 持续%s分钟",
+  "message.tsf.latex_potion_given": "已将 %s 的 %s 级乳胶药水给予 %s"
 }

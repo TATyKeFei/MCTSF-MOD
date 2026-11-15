@@ -15,6 +15,7 @@ public abstract class InventoryScreenMixin {
     @ModifyVariable(method = "extractEntityInInventoryFollowsMouse", at = @At("HEAD"), argsOnly = true)
     private static LivingEntity tsf$slimePreview(LivingEntity entity) {
         return entity instanceof AbstractClientPlayer player && BodyManager.form(player) == Form.SLIME
+                && !TSFClient.latex(player.getUUID())
                 ? TSFClient.slime(player) : entity;
     }
 }

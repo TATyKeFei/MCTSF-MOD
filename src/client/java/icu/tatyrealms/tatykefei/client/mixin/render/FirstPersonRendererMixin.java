@@ -1,6 +1,7 @@
 package icu.tatyrealms.tatykefei.client.mixin.render;
 
 import icu.tatyrealms.tatykefei.body.BodyManager;
+import icu.tatyrealms.tatykefei.client.TSFClient;
 import icu.tatyrealms.tatykefei.state.Form;
 import icu.tatyrealms.tatykefei.client.observer.ObserverView;
 import icu.tatyrealms.tatykefei.client.compat.needsofnature.NeedsOfNatureObserver;
@@ -21,6 +22,7 @@ public abstract class FirstPersonRendererMixin {
         }
         var player = Minecraft.getInstance().player;
         if (player != null && BodyManager.form(player) != Form.HUMAN && ObserverView.target() == null
+                && !(BodyManager.form(player) == Form.SLIME && TSFClient.latex(player.getUUID()))
                 && !(BodyManager.form(player) == Form.SPIRIT
                 && (BodyManager.spiritSpear(player.getMainHandItem()) || BodyManager.spiritSpear(player.getOffhandItem())))) {
             callback.cancel();

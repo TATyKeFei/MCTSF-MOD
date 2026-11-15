@@ -35,7 +35,8 @@ public abstract class LevelExtractorMixin {
     @ModifyArg(method = "extractVisibleEntities", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/client/renderer/extract/LevelExtractor;extractEntity(Lnet/minecraft/world/entity/Entity;F)Lnet/minecraft/client/renderer/entity/state/EntityRenderState;"), index = 0)
     private Entity tsf$slime(Entity entity) {
-        if (entity instanceof AbstractClientPlayer player && BodyManager.form(player) == Form.SLIME) {
+        if (entity instanceof AbstractClientPlayer player && BodyManager.form(player) == Form.SLIME
+                && !TSFClient.latex(player.getUUID())) {
             return TSFClient.slime(player);
         }
         return entity;

@@ -194,7 +194,7 @@
   "message.tsf.body_profile_failed": "Could not look up %s. Check the server's network connection and try again.",
   "message.tsf.body_profile_timeout": "The profile lookup for %s timed out. Try again later.",
   "message.tsf.body_profile_busy": "Profile lookups are busy. Try again later.",
-  "message.tsf.body_recipient_offline": "The recipient went offline. Body delivery was cancelled.",
+  "message.tsf.body_recipient_offline": "The recipient went offline. Item delivery was cancelled.",
   "message.tsf.invalid_body_item": "This body cannot be placed. It may already be placed or recovered by an administrator.",
   "message.tsf.body_packed": "Your empty body is packed away. Place it before returning.",
   "message.tsf.regeneration_slime_only": "This totem can only regenerate a personality slime's body.",
@@ -292,5 +292,11 @@
   "screen.tsf.nature_liquid_source_labels": "Semen source labels: %s",
   "screen.tsf.nature_liquid_source_labels_hint": "Label newly filled bottles with the original source players. Requires NeedsOfNature. Existing labels remain when disabled.",
   "tooltip.tsf.liquid_source": "%s's semen",
-  "tooltip.tsf.liquid_sources_mixed": "Mixed semen (known player sources: %s)"
+  "tooltip.tsf.liquid_sources_mixed": "Mixed semen (known player sources: %s)",
+  "item.tsf.latex_potion": "Latex Potion",
+  "effect.tsf.latex": "Latex",
+  "tooltip.tsf.latex_potion": "Brew an Oozing potion with a single player's semen bottle; changes appearance while keeping your name",
+  "tooltip.tsf.latex_target": "Appearance: %s",
+  "tooltip.tsf.latex_level": "Level %s · %s minutes",
+  "message.tsf.latex_potion_given": "Gave %s's level %s Latex Potion to %s"
 }

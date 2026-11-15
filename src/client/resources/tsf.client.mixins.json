@@ -20,6 +20,7 @@
     "render.WingsLayerMixin",
     "input.KeyboardInputMixin",
     "render.FirstPersonRendererMixin",
+    "render.LatexEffectNameMixin",
     "render.ItemModelResolverMixin",
     "render.ItemStackRenderStateMixin",
     "render.ItemLayerRenderStateMixin",

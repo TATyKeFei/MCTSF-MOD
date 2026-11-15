@@ -10,7 +10,9 @@ import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureHypnosis;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureTanks;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureBodies;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureSkins;
-import icu.tatyrealms.tatykefei.command.GiveBodyCommand;
+import icu.tatyrealms.tatykefei.command.GiveCommand;
+import icu.tatyrealms.tatykefei.item.LatexPotions;
+import icu.tatyrealms.tatykefei.item.LatexBrewingRecipe;
 import icu.tatyrealms.tatykefei.command.StorageCommand;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import icu.tatyrealms.tatykefei.network.Action;
@@ -74,6 +76,8 @@ public final class TSF implements ModInitializer {
     @Override
     public void onInitialize() {
         TSFItems.initialize();
+        LatexPotions.initialize();
+        LatexBrewingRecipe.initialize();
         BodyDisplayBlockEntity.initialize();
         TrinketsCompat.initialize();
         CarbonChatCompat.initialize();
@@ -397,7 +401,7 @@ public final class TSF implements ModInitializer {
                                     }
                                     return 1;
                                 }))
-                        .then(GiveBodyCommand.create())
+                        .then(GiveCommand.create())
                         .then(StorageCommand.create())
                         .then(Commands.literal("recover")
                                 .requires(source -> source.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))

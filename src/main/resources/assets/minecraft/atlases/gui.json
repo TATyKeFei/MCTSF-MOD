@@ -1,0 +1,9 @@
+{
+  "sources": [
+    {
+      "type": "minecraft:single",
+      "resource": "tsf:effect/latex",
+      "sprite": "tsf:mob_effect/latex"
+    }
+  ]
+}

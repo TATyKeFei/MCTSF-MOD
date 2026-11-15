@@ -99,8 +99,9 @@ public final class TSFClient implements ClientModInitializer {
             PROFILES.clear();
             for (VisualState visual : GSON.fromJson(payload.json(), VisualState[].class)) {
                 VISUALS.put(visual.player(), visual);
-                if (visual.profile() != null) {
-                    ResolvableProfile.CODEC.parse(JsonOps.INSTANCE, visual.profile()).result()
+                var profileData = visual.latexProfile() == null ? visual.profile() : visual.latexProfile();
+                if (profileData != null) {
+                    ResolvableProfile.CODEC.parse(JsonOps.INSTANCE, profileData).result()
                             .ifPresent(profile -> PROFILES.put(visual.player(), profile));
                 }
             }
@@ -166,6 +167,11 @@ public final class TSFClient implements ClientModInitializer {
 
     public static VisualState visual(UUID player) {
         return VISUALS.get(player);
+    }
+
+    public static boolean latex(UUID player) {
+        VisualState visual = VISUALS.get(player);
+        return visual != null && visual.latexProfile() != null;
     }
 
     public static PlayerSkin skin(UUID player) {

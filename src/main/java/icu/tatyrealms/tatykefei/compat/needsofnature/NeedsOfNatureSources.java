@@ -40,8 +40,14 @@ public final class NeedsOfNatureSources {
 
     public static void labelBottle(Object tank, ItemStack stack) {
         NatureLiquidSources sources = get(tank);
-        if (!TSFServerConfig.get().natureLiquidSourceLabels || stack.isEmpty() || !stack.is(Items.POTION)
+        if (stack.isEmpty() || !stack.is(Items.POTION)
                 || sources.players().isEmpty()) {
+            return;
+        }
+        // 来源供炼制使用，显示开关只控制可见标签。
+        NatureLiquidSources.CODEC.encodeStart(NbtOps.INSTANCE, sources).result().ifPresent(tag ->
+                CustomData.update(DataComponents.CUSTOM_DATA, stack, data -> data.put(DATA_KEY, tag)));
+        if (!TSFServerConfig.get().natureLiquidSourceLabels) {
             return;
         }
         String names = sources.players().stream().map(NatureLiquidSources.Source::name)
@@ -54,7 +60,5 @@ public final class NeedsOfNatureSources {
         if (lore.lines().size() < ItemLore.MAX_LINES) {
             stack.set(DataComponents.LORE, lore.withLineAdded(line));
         }
-        NatureLiquidSources.CODEC.encodeStart(NbtOps.INSTANCE, sources).result().ifPresent(tag ->
-                CustomData.update(DataComponents.CUSTOM_DATA, stack, data -> data.put(DATA_KEY, tag)));
     }
 }

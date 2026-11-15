@@ -1,11 +1,14 @@
 package icu.tatyrealms.tatykefei.state;
 
+import com.google.gson.JsonElement;
 import java.util.UUID;
 
 public final class PlayerState {
     public String storageServer;
     public Form form = Form.HUMAN;
     public boolean normalRespawn;
+    public UUID latexSource;
+    public JsonElement latexProfile;
     public Integer slimeColor;
     public UUID slimeBottleToken;
     public String slimeBottleDimension;

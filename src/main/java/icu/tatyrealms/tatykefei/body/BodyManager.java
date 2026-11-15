@@ -2,6 +2,7 @@ package icu.tatyrealms.tatykefei.body;
 
 import icu.tatyrealms.tatykefei.compat.needsofnature.NatureAppearance;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NatureTank;
+import icu.tatyrealms.tatykefei.compat.needsofnature.NatureLiquidSources;
 import icu.tatyrealms.tatykefei.observer.ObserverChat;
 import icu.tatyrealms.tatykefei.compat.carbonchat.CarbonChatCompat;
 import icu.tatyrealms.tatykefei.observer.ObserverSync;
@@ -26,6 +27,7 @@ import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureTanks;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureBodies;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureSkins;
 import icu.tatyrealms.tatykefei.item.TSFItems;
+import icu.tatyrealms.tatykefei.item.LatexPotions;
 import net.minecraft.world.item.Items;
 import net.minecraft.core.particles.ParticleTypes;
 import icu.tatyrealms.tatykefei.item.ProtectionTotems;
@@ -1620,6 +1622,28 @@ public final class BodyManager {
         return bodyProfiles.resolve(name, id);
     }
 
+    public ResolvableProfile latexProfile(NatureLiquidSources.Source source) {
+        ServerPlayer online = server.getPlayerList().getPlayer(source.uuid());
+        if (online != null) {
+            return online.getProfile();
+        }
+        Body body = store.bodies.get(source.uuid());
+        if (body != null && source.uuid().equals(body.owner) && body.profile != null) {
+            return profile(body);
+        }
+        return source.uuid().version() == 4 ? ResolvableProfile.createUnresolved(source.uuid())
+                : ResolvableProfile.createUnresolved(source.name());
+    }
+
+    public void applyLatexPotion(ServerPlayer player, UUID source, ResolvableProfile profile, int level) {
+        PlayerState state = state(player);
+        player.forceAddEffect(LatexPotions.effect(level), null);
+        state.latexSource = source;
+        state.latexProfile = ResolvableProfile.CODEC.encodeStart(JsonOps.INSTANCE, profile).getOrThrow();
+        visualsDirty = true;
+        save();
+    }
+
     public void giveBody(GameProfile profile, ServerPlayer recipient) {
         giveBody(profile.id(), profile.name(), ResolvableProfile.createResolved(profile),
                 NeedsOfNatureBodies.available() ? new NatureAppearance() : null, recipient);
@@ -2698,6 +2722,8 @@ public final class BodyManager {
 
     public void died(ServerPlayer player) {
         PlayerState state = state(player);
+        state.latexSource = null;
+        state.latexProfile = null;
         natureBodies.remove(player.getUUID());
         pendingNatureRestores.remove(player.getUUID());
         releaseZipperBody(player);
@@ -2833,6 +2859,11 @@ public final class BodyManager {
         }
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             PlayerState state = state(player);
+            if (state.latexProfile != null && !player.hasEffect(LatexPotions.EFFECT)) {
+                state.latexSource = null;
+                state.latexProfile = null;
+                visualsDirty = true;
+            }
             if (pendingNatureRestores.remove(player.getUUID())) {
                 natureBodies.remove(player.getUUID());
                 updateNatureBody(player);
@@ -2962,7 +2993,8 @@ public final class BodyManager {
                     state.hypnotist, state.hypnotist == null ? 0 : state.hypnosisRestrictions,
                     appearance == null ? null : appearance.owner,
                     appearance == null || appearance.natureSkin == null ? null : appearance.natureSkin.id,
-                    state.observerChatPrivate, controllers.contains(player.getUUID())));
+                    state.observerChatPrivate, controllers.contains(player.getUUID()),
+                    state.latexSource, state.latexProfile));
         }
         return visuals;
     }

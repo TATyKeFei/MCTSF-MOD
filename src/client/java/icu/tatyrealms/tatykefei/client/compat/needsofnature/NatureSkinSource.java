@@ -10,11 +10,17 @@ public final class NatureSkinSource {
 
     public static UUID texture(UUID player) {
         VisualState visual = TSFClient.visual(player);
+        if (visual != null && visual.latexSource() != null) {
+            return visual.latexSource();
+        }
         return visual != null && visual.natureSkin() != null ? visual.natureSkin() : owner(player);
     }
 
     public static UUID owner(UUID player) {
         VisualState visual = TSFClient.visual(player);
+        if (visual != null && visual.latexSource() != null) {
+            return visual.latexSource();
+        }
         return visual != null && visual.appearanceOwner() != null ? visual.appearanceOwner() : player;
     }
 
