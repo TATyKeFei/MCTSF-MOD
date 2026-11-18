@@ -24,6 +24,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.decoration.Mannequin;
@@ -170,8 +171,9 @@ public final class BodyRigManager implements AutoCloseable {
             return;
         }
         if (payload.operation() == BodyDisplayPayload.MOVE_HORIZONTAL || payload.operation() == BodyDisplayPayload.MOVE_VERTICAL
-                || payload.operation() == BodyDisplayPayload.MOVE_DEPTH) {
-            moveDisplay(player, payload, bodies);
+                || payload.operation() == BodyDisplayPayload.MOVE_DEPTH || payload.operation() == BodyDisplayPayload.ROTATE_X
+                || payload.operation() == BodyDisplayPayload.ROTATE_Y) {
+            transformDisplay(player, payload, bodies);
             return;
         }
         DisplaySession session = menus.get(player.getUUID());
@@ -206,7 +208,7 @@ public final class BodyRigManager implements AutoCloseable {
         } else if (body != null && body.id.equals(session.body)) {
             if (payload.operation() == BodyDisplayPayload.RESET && settings.poseable()) {
                 endEditors(body);
-                body.rigPose = BodyRigPose.create(true, "ceiling".equals(body.displayFace), body.yaw);
+                body.rigPose = defaultPose(body);
                 Entity entity = body.entityId == null ? null : player.level().getEntity(body.entityId);
                 if (entity != null) {
                     synchronizePose(body, entity);
@@ -234,7 +236,7 @@ public final class BodyRigManager implements AutoCloseable {
         sendSettings(player, session.pos, body, BodyDisplayPayload.SNAPSHOT);
     }
 
-    private void moveDisplay(ServerPlayer player, BodyDisplayPayload payload, Map<UUID, Body> bodies) {
+    private void transformDisplay(ServerPlayer player, BodyDisplayPayload payload, Map<UUID, Body> bodies) {
         DisplaySession session = editors.get(player.getUUID());
         if (session == null || session.level != player.level() || !session.pos.equals(payload.pos())
                 || !Float.isFinite(payload.offset()) || !player.getMainHandItem().isEmpty()
@@ -250,6 +252,26 @@ public final class BodyRigManager implements AutoCloseable {
         }
         var settings = settings(session.level, session.pos);
         if (!settings.poseable()) {
+            return;
+        }
+        if (payload.operation() == BodyDisplayPayload.ROTATE_X || payload.operation() == BodyDisplayPayload.ROTATE_Y) {
+            float degrees = Mth.wrapDegrees(payload.offset());
+            if (degrees != 0) {
+                ensurePose(body);
+                Vec3 axis = payload.operation() == BodyDisplayPayload.ROTATE_X
+                        ? BodyDisplayBlock.horizontalAxis(settings.getBlockState()) : Vec3.Y_AXIS;
+                BodyRigPose rotated = body.rigPose.rotateAroundFeet(axis, degrees);
+                if (rotated.valid()) {
+                    body.rigPose = rotated;
+                    if (payload.operation() == BodyDisplayPayload.ROTATE_X) {
+                        body.displayRotationX = Mth.wrapDegrees(body.displayRotationX + degrees);
+                    } else {
+                        body.displayRotationY = Mth.wrapDegrees(body.displayRotationY + degrees);
+                    }
+                    synchronizePose(body, entity);
+                    manager.rigChanged();
+                }
+            }
             return;
         }
         float horizontalOffset = settings.horizontalOffset();
@@ -393,6 +415,8 @@ public final class BodyRigManager implements AutoCloseable {
         String dimension = body.dimension;
         Vec3 previousPosition = new Vec3(body.x, body.y, body.z);
         float previousYaw = body.yaw;
+        float previousRotationX = body.displayRotationX;
+        float previousRotationY = body.displayRotationY;
         BodyRigPose previousPose = body.rigPose;
         var display = settings(player.level(), pos);
         Vec3 target = displayPosition(pos, state, display.horizontalOffset(), display.verticalOffset(), display.depthOffset());
@@ -405,6 +429,8 @@ public final class BodyRigManager implements AutoCloseable {
         body.y = target.y;
         body.z = target.z;
         body.yaw = facing.toYRot();
+        body.displayRotationX = 0;
+        body.displayRotationY = 0;
         body.rigPose = pose;
         body.packedToken = null;
         manager.spawnBody(body);
@@ -418,6 +444,8 @@ public final class BodyRigManager implements AutoCloseable {
             body.y = previousPosition.y;
             body.z = previousPosition.z;
             body.yaw = previousYaw;
+            body.displayRotationX = previousRotationX;
+            body.displayRotationY = previousRotationY;
             body.rigPose = previousPose;
             body.displayFace = null;
             return;
@@ -479,8 +507,20 @@ public final class BodyRigManager implements AutoCloseable {
 
     private static void ensurePose(Body body) {
         if (body.rigPose == null || !body.rigPose.valid() || body.rigPose.mounted != body.displayMounted) {
-            body.rigPose = BodyRigPose.create(body.displayMounted, "ceiling".equals(body.displayFace), body.yaw);
+            body.rigPose = defaultPose(body);
         }
+    }
+
+    private static BodyRigPose defaultPose(Body body) {
+        BodyRigPose pose = BodyRigPose.create(body.displayMounted, "ceiling".equals(body.displayFace), body.yaw);
+        if (body.displayMounted && body.displayRotationX != 0 && Float.isFinite(body.displayRotationX)) {
+            Vec3 axis = new Vec3(Direction.fromYRot(body.yaw).getClockWise().getUnitVec3i());
+            pose = pose.rotateAroundFeet(axis, body.displayRotationX);
+        }
+        if (body.displayMounted && body.displayRotationY != 0 && Float.isFinite(body.displayRotationY)) {
+            pose = pose.rotateAroundFeet(Vec3.Y_AXIS, body.displayRotationY);
+        }
+        return pose;
     }
 
     public void forget(Body body, ServerLevel level) {
@@ -492,6 +532,8 @@ public final class BodyRigManager implements AutoCloseable {
         grabs.entrySet().removeIf(entry -> entry.getValue().body == body);
         body.displayMounted = false;
         body.displayFace = null;
+        body.displayRotationX = 0;
+        body.displayRotationY = 0;
         body.rigPose = null;
     }
 

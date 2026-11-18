@@ -24,6 +24,8 @@ public record BodyDisplayPayload(BlockPos pos, int operation, boolean showName, 
     public static final int MOVE_VERTICAL = 11;
     public static final int MOVE_DEPTH = 12;
     public static final int RESET_POSITION = 13;
+    public static final int ROTATE_X = 14;
+    public static final int ROTATE_Y = 15;
     public static final Type<BodyDisplayPayload> TYPE = new Type<>(TSF.id("body_display"));
     public static final StreamCodec<FriendlyByteBuf, BodyDisplayPayload> CODEC = CustomPacketPayload.codec(
             (payload, buffer) -> {
@@ -51,6 +53,10 @@ public record BodyDisplayPayload(BlockPos pos, int operation, boolean showName, 
 
     public static BodyDisplayPayload move(BlockPos pos, int operation, int entity, float offset) {
         return new BodyDisplayPayload(pos, operation, false, false, true, false, entity, "", "", offset);
+    }
+
+    public static BodyDisplayPayload rotate(BlockPos pos, int entity, int operation, float degrees) {
+        return move(pos, operation, entity, degrees);
     }
 
     @Override

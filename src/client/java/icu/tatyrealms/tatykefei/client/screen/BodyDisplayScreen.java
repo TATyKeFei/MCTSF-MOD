@@ -16,9 +16,8 @@ public final class BodyDisplayScreen extends Screen {
     private static final int ROW_HEIGHT = 22;
 
     private BodyDisplayPayload settings;
-    private int resetClicks;
-    private long resetFirstClick;
-    private Button resetButton;
+    private final ResetConfirmation resetPose = new ResetConfirmation("screen.tsf.display_reset", BodyDisplayPayload.RESET);
+    private final ResetConfirmation resetPosition = new ResetConfirmation("screen.tsf.display_reset_position", BodyDisplayPayload.RESET_POSITION);
     private EditBox name;
 
     public BodyDisplayScreen(BodyDisplayPayload settings) {
@@ -93,45 +92,64 @@ public final class BodyDisplayScreen extends Screen {
                 .bounds(left, top + 6 * ROW_HEIGHT, buttonWidth, 20).build());
         edit.active = settings.poseable() && settings.entity() >= 0 && minecraft.player.getMainHandItem().isEmpty();
         edit.setTooltip(Tooltip.create(Component.translatable("screen.tsf.display_edit_hint")));
-        resetClicks = 0;
-        resetFirstClick = 0;
-        resetButton = addRenderableWidget(Button.builder(Component.translatable("screen.tsf.display_reset"), button -> {
-            long now = System.currentTimeMillis();
-            if (resetClicks == 0 || now - resetFirstClick > RESET_CLICK_WINDOW_MS) {
-                resetClicks = 1;
-                resetFirstClick = now;
-            } else {
-                resetClicks++;
-            }
-            if (resetClicks >= 3) {
-                resetClicks = 0;
-                resetFirstClick = 0;
-                resetButton.setMessage(Component.translatable("screen.tsf.display_reset"));
-                send(BodyDisplayPayload.RESET, settings.showName(), settings.poseable());
-            } else {
-                resetButton.setMessage(Component.translatable("screen.tsf.display_reset_progress", resetClicks));
-            }
-        })
-                .bounds(left, top + 7 * ROW_HEIGHT, buttonWidth, 20)
-                .tooltip(Tooltip.create(Component.translatable("screen.tsf.display_reset_hint"))).build());
-        resetButton.active = settings.poseable() && settings.entity() >= 0;
-        addRenderableWidget(Button.builder(Component.translatable("screen.tsf.display_reset_position"), button ->
-                send(BodyDisplayPayload.RESET_POSITION, settings.showName(), settings.poseable()))
-                .bounds(left, top + 8 * ROW_HEIGHT, buttonWidth, 20)
-                .tooltip(Tooltip.create(Component.translatable("screen.tsf.display_reset_position_hint"))).build()).active =
-                settings.poseable() && settings.entity() >= 0;
+        int resetWidth = (buttonWidth - 4) / 2;
+        int resetTop = top + 7 * ROW_HEIGHT;
+        resetPose.addButton(left, resetTop, resetWidth);
+        resetPosition.addButton(left + resetWidth + 4, resetTop, buttonWidth - resetWidth - 4);
         addRenderableWidget(Button.builder(Component.translatable("gui.done"), button -> onClose())
-                .bounds(left, top + 9 * ROW_HEIGHT + 4, buttonWidth, 20).build());
+                .bounds(left, top + 8 * ROW_HEIGHT + 4, buttonWidth, 20).build());
     }
 
     @Override
     public void tick() {
-        if (resetClicks > 0 && System.currentTimeMillis() - resetFirstClick > RESET_CLICK_WINDOW_MS) {
-            resetClicks = 0;
-            resetFirstClick = 0;
-            if (resetButton != null) {
-                resetButton.setMessage(Component.translatable("screen.tsf.display_reset"));
+        long now = System.currentTimeMillis();
+        resetPose.expire(now);
+        resetPosition.expire(now);
+    }
+
+    private final class ResetConfirmation {
+        private final String key;
+        private final int operation;
+        private Button button;
+        private int clicks;
+        private long firstClick;
+
+        private ResetConfirmation(String key, int operation) {
+            this.key = key;
+            this.operation = operation;
+        }
+
+        private void addButton(int left, int top, int width) {
+            clicks = 0;
+            button = addRenderableWidget(Button.builder(Component.translatable(key), ignored -> click())
+                    .bounds(left, top, width, 20)
+                    .tooltip(Tooltip.create(Component.translatable(key + "_hint"))).build());
+            button.active = settings.poseable() && settings.entity() >= 0;
+        }
+
+        private void click() {
+            long now = System.currentTimeMillis();
+            expire(now);
+            if (clicks++ == 0) {
+                firstClick = now;
             }
+            if (clicks == 3) {
+                clear();
+                ClientPlayNetworking.send(BodyDisplayPayload.request(settings.pos(), operation));
+            } else {
+                button.setMessage(Component.translatable(key + "_progress", clicks));
+            }
+        }
+
+        private void expire(long now) {
+            if (clicks > 0 && now - firstClick > RESET_CLICK_WINDOW_MS) {
+                clear();
+            }
+        }
+
+        private void clear() {
+            clicks = 0;
+            button.setMessage(Component.translatable(key));
         }
     }
 

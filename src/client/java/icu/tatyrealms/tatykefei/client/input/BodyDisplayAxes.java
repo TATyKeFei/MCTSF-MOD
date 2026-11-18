@@ -8,6 +8,7 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gizmos.Gizmos;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
@@ -15,8 +16,11 @@ import net.minecraft.world.phys.Vec3;
 final class BodyDisplayAxes {
     private static final double LENGTH = 0.38;
     private static final double PICK_RADIUS = 0.085;
+    private static final double ROTATION_RADIUS = 0.56;
+    private static final int ROTATION_SEGMENTS = 32;
     private static final double REACH = 7;
     private static Drag drag;
+    private static RotationDrag rotationDrag;
 
     private enum Axis {
         HORIZONTAL(BodyDisplayPayload.MOVE_HORIZONTAL, BodyDisplayBlock.MAX_HORIZONTAL_OFFSET, 0xFFEF6256),
@@ -42,11 +46,56 @@ final class BodyDisplayAxes {
         }
     }
 
+    private enum RotationRing {
+        X(BodyDisplayPayload.ROTATE_X, 0xFFFFD34D) {
+            @Override
+            Vec3 axis(BlockState state) {
+                return BodyDisplayBlock.horizontalAxis(state);
+            }
+
+            @Override
+            Vec3 first(BlockState state) {
+                return Vec3.Y_AXIS;
+            }
+        },
+        Y(BodyDisplayPayload.ROTATE_Y, 0xFF57E6E6) {
+            @Override
+            Vec3 axis(BlockState state) {
+                return Vec3.Y_AXIS;
+            }
+
+            @Override
+            Vec3 first(BlockState state) {
+                return BodyDisplayBlock.horizontalAxis(state);
+            }
+        };
+
+        private final int operation;
+        private final int color;
+
+        RotationRing(int operation, int color) {
+            this.operation = operation;
+            this.color = color;
+        }
+
+        abstract Vec3 axis(BlockState state);
+
+        abstract Vec3 first(BlockState state);
+
+        private Vec3 second(BlockState state) {
+            return axis(state).cross(first(state));
+        }
+    }
+
     private record Projection(double alongAxis, double distanceSquared) {
     }
 
     private record Drag(Axis axis, Vec3 center, Vec3 direction, double initialProjection, double initialOffset,
             float lastSent) {
+    }
+
+    private record RotationDrag(RotationRing ring, Vec3 center, Vec3 axis, Vec3 first, Vec3 second,
+            double lastAngle) {
     }
 
     private BodyDisplayAxes() {
@@ -59,6 +108,9 @@ final class BodyDisplayAxes {
             for (Axis axis : Axis.values()) {
                 draw(center, axis.direction(state), axis.color, drag != null && drag.axis == axis);
             }
+            for (RotationRing ring : RotationRing.values()) {
+                drawRotationRing(center, ring, state, rotationDrag != null && rotationDrag.ring == ring);
+            }
         }
     }
 
@@ -66,6 +118,20 @@ final class BodyDisplayAxes {
         float width = active ? 4 : 2.5F;
         Gizmos.arrow(center, center.add(axis.scale(LENGTH)), color, width).setAlwaysOnTop();
         Gizmos.arrow(center, center.subtract(axis.scale(LENGTH)), color, width).setAlwaysOnTop();
+    }
+
+    private static void drawRotationRing(Vec3 center, RotationRing ring, BlockState state, boolean active) {
+        Vec3 first = ring.first(state);
+        Vec3 second = ring.second(state);
+        Vec3 previous = center.add(first.scale(ROTATION_RADIUS));
+        float width = active ? 4 : 2.5F;
+        for (int index = 1; index <= ROTATION_SEGMENTS; index++) {
+            double angle = 2 * Math.PI * index / ROTATION_SEGMENTS;
+            Vec3 point = center.add(first.scale(ROTATION_RADIUS * Math.cos(angle)))
+                    .add(second.scale(ROTATION_RADIUS * Math.sin(angle)));
+            Gizmos.line(previous, point, ring.color, width).setAlwaysOnTop();
+            previous = point;
+        }
     }
 
     private static Vec3 axisCenter(Entity body, BlockState state, float partialTick) {
@@ -76,12 +142,11 @@ final class BodyDisplayAxes {
         if (pose == null || !pose.mounted) {
             return null;
         }
-        Vec3 feet = pose.point(6).add(pose.point(7)).scale(0.5);
-        return body.getPosition(partialTick).add(feet);
+        return body.getPosition(partialTick).add(pose.feetCenter());
     }
 
     static boolean start(Minecraft client, Entity body, BlockPos pos) {
-        if (drag != null) {
+        if (active()) {
             return true;
         }
         Camera camera = client.gameRenderer.mainCamera();
@@ -105,6 +170,28 @@ final class BodyDisplayAxes {
                 nearest = hit;
             }
         }
+        RotationRing selectedRing = null;
+        Vec3 selectedRingHit = null;
+        double selectedRingError = Double.POSITIVE_INFINITY;
+        for (RotationRing ring : RotationRing.values()) {
+            Vec3 ringHit = projectRing(camera, center, ring.axis(state), true);
+            if (ringHit == null) {
+                continue;
+            }
+            double error = Math.abs(ringHit.length() - ROTATION_RADIUS);
+            if (error <= PICK_RADIUS && error < selectedRingError) {
+                selectedRing = ring;
+                selectedRingHit = ringHit;
+                selectedRingError = error;
+            }
+        }
+        if (selectedRing != null && (nearest == null || selectedRingError * selectedRingError < nearest.distanceSquared)) {
+            Vec3 ringAxis = selectedRing.axis(state);
+            Vec3 first = selectedRing.first(state);
+            rotationDrag = new RotationDrag(selectedRing, center, ringAxis, first, selectedRing.second(state),
+                    ringAngle(selectedRingHit, first, selectedRing.second(state)));
+            return true;
+        }
         if (selectedAxis == null) {
             return false;
         }
@@ -117,12 +204,26 @@ final class BodyDisplayAxes {
     }
 
     static void tick(Minecraft client, Entity body, BlockPos pos) {
-        if (drag == null) {
+        if (!active()) {
             return;
         }
         if (!client.options.keyAttack.isDown() || !client.mouseHandler.isMouseGrabbed()
                 || !ClientPlayNetworking.canSend(BodyDisplayPayload.TYPE)) {
             clear();
+            return;
+        }
+        if (rotationDrag != null) {
+            Vec3 hit = projectRing(client.gameRenderer.mainCamera(), rotationDrag.center, rotationDrag.axis, false);
+            if (hit != null && hit.lengthSqr() > PICK_RADIUS * PICK_RADIUS) {
+                double angle = ringAngle(hit, rotationDrag.first, rotationDrag.second);
+                float degrees = (float) Mth.wrapDegrees(Math.toDegrees(angle - rotationDrag.lastAngle));
+                if (Math.abs(degrees) >= 0.1F) {
+                    ClientPlayNetworking.send(BodyDisplayPayload.rotate(pos, body.getId(), rotationDrag.ring.operation,
+                            degrees));
+                    rotationDrag = new RotationDrag(rotationDrag.ring, rotationDrag.center, rotationDrag.axis,
+                            rotationDrag.first, rotationDrag.second, angle);
+                }
+            }
             return;
         }
         Projection projection = project(client.gameRenderer.mainCamera(), drag.center, drag.direction, false);
@@ -136,6 +237,21 @@ final class BodyDisplayAxes {
         }
         ClientPlayNetworking.send(BodyDisplayPayload.move(pos, drag.axis.operation, body.getId(), offset));
         drag = new Drag(drag.axis, drag.center, drag.direction, drag.initialProjection, drag.initialOffset, offset);
+    }
+
+    private static Vec3 projectRing(Camera camera, Vec3 center, Vec3 axis, boolean picking) {
+        Vec3 ray = new Vec3(camera.forwardVector());
+        double alignment = ray.dot(axis);
+        if (Math.abs(alignment) < 0.01) {
+            return null;
+        }
+        Vec3 relative = camera.position().subtract(center);
+        double distance = -relative.dot(axis) / alignment;
+        return distance < 0 || picking && distance > REACH ? null : relative.add(ray.scale(distance));
+    }
+
+    private static double ringAngle(Vec3 hit, Vec3 first, Vec3 second) {
+        return Math.atan2(hit.dot(second), hit.dot(first));
     }
 
     private static Projection project(Camera camera, Vec3 center, Vec3 axis, boolean picking) {
@@ -158,10 +274,11 @@ final class BodyDisplayAxes {
     }
 
     static boolean active() {
-        return drag != null;
+        return drag != null || rotationDrag != null;
     }
 
     static void clear() {
         drag = null;
+        rotationDrag = null;
     }
 }

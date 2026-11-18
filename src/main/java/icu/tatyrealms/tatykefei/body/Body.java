@@ -40,6 +40,8 @@ public final class Body {
     public boolean displayMounted;
     public long displayPosition;
     public String displayFace;
+    public float displayRotationX;
+    public float displayRotationY;
     public BodyRigPose rigPose;
     public float health = 20;
     public int food = 20;

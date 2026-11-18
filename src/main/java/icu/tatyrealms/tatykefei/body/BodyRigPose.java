@@ -101,6 +101,25 @@ public final class BodyRigPose {
         return copy;
     }
 
+    public Vec3 feetCenter() {
+        return point(6).lerp(point(7), 0.5);
+    }
+
+    public BodyRigPose rotateAroundFeet(Vec3 axis, float degrees) {
+        Vec3 pivot = feetCenter();
+        double radians = Math.toRadians(degrees);
+        double cosine = Math.cos(radians);
+        double sine = Math.sin(radians);
+        BodyRigPose rotated = copy();
+        for (int node = 0; node < COUNT; node++) {
+            Vec3 relative = point(node).subtract(pivot);
+            Vec3 parallel = axis.scale(axis.dot(relative));
+            rotated.set(node, pivot.add(parallel).add(relative.subtract(parallel).scale(cosine))
+                    .add(axis.cross(relative).scale(sine)));
+        }
+        return rotated;
+    }
+
     public Basis basis() {
         Vec3 down = point(0).subtract(point(1)).normalize();
         if (down.lengthSqr() < 0.5) {
