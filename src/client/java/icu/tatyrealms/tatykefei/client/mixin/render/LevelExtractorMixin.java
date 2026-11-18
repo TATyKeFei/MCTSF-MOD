@@ -3,6 +3,7 @@ package icu.tatyrealms.tatykefei.client.mixin.render;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import icu.tatyrealms.tatykefei.client.compat.needsofnature.NeedsOfNatureObserver;
 import icu.tatyrealms.tatykefei.client.TSFClient;
+import icu.tatyrealms.tatykefei.client.input.BodyDragging;
 import icu.tatyrealms.tatykefei.client.observer.ObserverView;
 import icu.tatyrealms.tatykefei.body.BodyManager;
 import icu.tatyrealms.tatykefei.state.Form;
@@ -16,10 +17,17 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.state.level.PlayerRenderState;
 
 @Mixin(LevelExtractor.class)
 public abstract class LevelExtractorMixin {
+    @Inject(method = "extract", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/renderer/extract/LevelExtractor;extractGizmos()V"))
+    private void tsf$displayAxes(DeltaTracker delta, Camera camera, float partialTick, CallbackInfo callback) {
+        BodyDragging.renderAxes(Minecraft.getInstance(), partialTick);
+    }
+
     @ModifyExpressionValue(method = "extractVisibleEntities", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/client/Camera;entity()Lnet/minecraft/world/entity/Entity;", ordinal = 0))
     private Entity tsf$showAnimatedObserverBody(Entity entity) {

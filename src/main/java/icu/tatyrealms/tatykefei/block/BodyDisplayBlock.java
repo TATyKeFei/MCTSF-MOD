@@ -30,11 +30,15 @@ import net.minecraft.world.level.block.state.properties.AttachFace;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 public final class BodyDisplayBlock extends FaceAttachedHorizontalDirectionalBlock implements EntityBlock {
+    public static final float MAX_HORIZONTAL_OFFSET = 0.6F;
+    public static final float MAX_VERTICAL_OFFSET = 1.0F;
+    public static final float MAX_DEPTH_OFFSET = 0.6F;
     public static final BooleanProperty HIDDEN = BooleanProperty.create("hidden");
     public static final BooleanProperty OCCUPIED = BooleanProperty.create("occupied");
     public static final BodyDisplayBlock INSTANCE = register();
@@ -49,6 +53,23 @@ public final class BodyDisplayBlock extends FaceAttachedHorizontalDirectionalBlo
         super(properties);
         registerDefaultState(stateDefinition.any().setValue(FACE, AttachFace.FLOOR)
                 .setValue(FACING, Direction.NORTH).setValue(HIDDEN, false).setValue(OCCUPIED, false));
+    }
+
+    public static Vec3 horizontalAxis(BlockState state) {
+        return new Vec3(state.getValue(FACING).getClockWise().getUnitVec3i());
+    }
+
+    public static Vec3 depthAxis(BlockState state) {
+        return new Vec3(state.getValue(FACING).getUnitVec3i());
+    }
+
+    public static Vec3 bodyOrigin(BlockPos pos, BlockState state) {
+        Vec3 origin = Vec3.atBottomCenterOf(pos);
+        return switch (state.getValue(FACE)) {
+            case FLOOR -> origin.add(0, 0.13, 0);
+            case CEILING -> origin.add(0, -0.6, 0);
+            case WALL -> origin.add(depthAxis(state).scale(0.15)).add(0, -0.25, 0);
+        };
     }
 
     @Override

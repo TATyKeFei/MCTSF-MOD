@@ -49,6 +49,8 @@ public abstract class MannequinMixin implements EmptyBodyHolder, Leashable {
     @Unique
     private static final EntityDataAccessor<Boolean> TSF_SHOW_NAME = SynchedEntityData.defineId(Mannequin.class, EntityDataSerializers.BOOLEAN);
     @Unique
+    private static final EntityDataAccessor<String> TSF_DISPLAY_NAME = SynchedEntityData.defineId(Mannequin.class, EntityDataSerializers.STRING);
+    @Unique
     private static final EntityDataAccessor<Boolean> TSF_POSEABLE = SynchedEntityData.defineId(Mannequin.class, EntityDataSerializers.BOOLEAN);
     @Unique
     private static final EntityDataAccessor<Boolean> TSF_SHOW_CAPE = SynchedEntityData.defineId(Mannequin.class, EntityDataSerializers.BOOLEAN);
@@ -61,6 +63,7 @@ public abstract class MannequinMixin implements EmptyBodyHolder, Leashable {
         builder.define(TSF_SKIN, false);
         builder.define(TSF_RIG, "");
         builder.define(TSF_SHOW_NAME, false);
+        builder.define(TSF_DISPLAY_NAME, "");
         builder.define(TSF_POSEABLE, true);
         builder.define(TSF_SHOW_CAPE, true);
         builder.define(TSF_FACE, "");
@@ -69,6 +72,11 @@ public abstract class MannequinMixin implements EmptyBodyHolder, Leashable {
     @Override
     public boolean tsf$showDisplayName() {
         return ((Mannequin) (Object) this).getEntityData().get(TSF_SHOW_NAME);
+    }
+
+    @Override
+    public String tsf$displayName() {
+        return ((Mannequin) (Object) this).getEntityData().get(TSF_DISPLAY_NAME);
     }
 
     @Override
@@ -87,12 +95,13 @@ public abstract class MannequinMixin implements EmptyBodyHolder, Leashable {
     }
 
     @Override
-    public void tsf$setDisplayOptions(boolean showName, boolean poseable, boolean showCape, String face) {
+    public void tsf$setDisplayOptions(boolean showName, boolean poseable, boolean showCape, String face, String displayName) {
         var data = ((Mannequin) (Object) this).getEntityData();
         data.set(TSF_SHOW_NAME, showName);
         data.set(TSF_POSEABLE, poseable);
         data.set(TSF_SHOW_CAPE, showCape);
         data.set(TSF_FACE, face == null ? "" : face);
+        data.set(TSF_DISPLAY_NAME, displayName);
     }
 
     @Override

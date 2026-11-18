@@ -1850,7 +1850,7 @@ public final class BodyManager {
     }
 
     public void configureDisplay(ServerPlayer player, icu.tatyrealms.tatykefei.network.BodyDisplayPayload payload) {
-        bodyRigs.configure(player, payload, localBodies().values());
+        bodyRigs.configure(player, payload, localBodies());
     }
 
     public void removeDisplay(ServerLevel level, BlockPos pos) {

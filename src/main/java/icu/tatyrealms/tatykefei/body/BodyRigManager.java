@@ -161,12 +161,17 @@ public final class BodyRigManager implements AutoCloseable {
         Entity entity = body == null || body.entityId == null ? null : player.level().getEntity(body.entityId);
         ServerPlayNetworking.send(player, new BodyDisplayPayload(pos, operation, settings.showName(),
                 settings.poseable(), settings.showCape(), settings.hideStand(), entity == null ? -1 : entity.getId(),
-                settings.face()));
+                settings.face(), settings.displayName(), 0));
     }
 
-    public void configure(ServerPlayer player, BodyDisplayPayload payload, Collection<Body> bodies) {
+    public void configure(ServerPlayer player, BodyDisplayPayload payload, Map<UUID, Body> bodies) {
         if (payload.operation() == BodyDisplayPayload.STOP_EDIT) {
             endEditing(player);
+            return;
+        }
+        if (payload.operation() == BodyDisplayPayload.MOVE_HORIZONTAL || payload.operation() == BodyDisplayPayload.MOVE_VERTICAL
+                || payload.operation() == BodyDisplayPayload.MOVE_DEPTH) {
+            moveDisplay(player, payload, bodies);
             return;
         }
         DisplaySession session = menus.get(player.getUUID());
@@ -181,17 +186,21 @@ public final class BodyRigManager implements AutoCloseable {
             menus.remove(player.getUUID());
             return;
         }
-        Body body = displayed(player.level(), session.pos, bodies);
+        Body body = displayed(player.level(), session.pos, bodies.values());
         var settings = settings(player.level(), session.pos);
-        if (payload.operation() == BodyDisplayPayload.UPDATE) {
-            settings.configure(payload.showName(), payload.poseable(), payload.showCape(), payload.face(), payload.hideStand());
+        if (payload.operation() == BodyDisplayPayload.UPDATE || payload.operation() == BodyDisplayPayload.RENAME) {
+            if (payload.operation() == BodyDisplayPayload.RENAME) {
+                settings.setDisplayName(payload.displayName());
+            } else {
+                settings.configure(payload.showName(), payload.poseable(), payload.showCape(), payload.face(), payload.hideStand());
+            }
             if (body != null) {
                 if (!settings.poseable()) {
                     endEditors(body);
                 }
                 Entity entity = body.entityId == null ? null : player.level().getEntity(body.entityId);
-                if (entity != null) {
-                    prepare(body, entity);
+                if (entity instanceof EmptyBodyHolder holder) {
+                    applyDisplayOptions(holder, settings);
                 }
             }
         } else if (body != null && body.id.equals(session.body)) {
@@ -203,7 +212,18 @@ public final class BodyRigManager implements AutoCloseable {
                     synchronizePose(body, entity);
                 }
                 manager.rigChanged();
-            } else if (payload.operation() == BodyDisplayPayload.EDIT && settings.poseable() && player.getMainHandItem().isEmpty()) {
+            } else if (payload.operation() == BodyDisplayPayload.RESET_POSITION && settings.poseable()) {
+                endEditors(body);
+                settings.setOffsets(0, 0, 0);
+                Entity entity = body.entityId == null ? null : player.level().getEntity(body.entityId);
+                if (entity != null) {
+                    Vec3 target = displayPosition(session.pos, settings.getBlockState(), 0, 0, 0);
+                    positionDisplay(body, entity, target);
+                    entity.syncPosition = true;
+                }
+                manager.rigChanged();
+            } else if (payload.operation() == BodyDisplayPayload.EDIT && settings.poseable() && player.getMainHandItem().isEmpty()
+                    && body.entityId != null && player.level().getEntity(body.entityId) != null) {
                 endEditing(player);
                 editors.put(player.getUUID(), session);
                 menus.remove(player.getUUID());
@@ -212,6 +232,66 @@ public final class BodyRigManager implements AutoCloseable {
             }
         }
         sendSettings(player, session.pos, body, BodyDisplayPayload.SNAPSHOT);
+    }
+
+    private void moveDisplay(ServerPlayer player, BodyDisplayPayload payload, Map<UUID, Body> bodies) {
+        DisplaySession session = editors.get(player.getUUID());
+        if (session == null || session.level != player.level() || !session.pos.equals(payload.pos())
+                || !Float.isFinite(payload.offset()) || !player.getMainHandItem().isEmpty()
+                || !canConfigure(player, session.pos)) {
+            return;
+        }
+        Body body = bodies.get(session.body);
+        Entity entity = session.level.getEntity(payload.entity());
+        if (body == null || !(entity instanceof Mannequin) || entity.isRemoved() || !entity.getUUID().equals(body.entityId)
+                || !body.displayMounted || body.displayPosition != session.pos.asLong()
+                || player.distanceToSqr(entity) > 49 || grabs.values().stream().anyMatch(grab -> grab.body == body)) {
+            return;
+        }
+        var settings = settings(session.level, session.pos);
+        if (!settings.poseable()) {
+            return;
+        }
+        float horizontalOffset = settings.horizontalOffset();
+        float verticalOffset = settings.verticalOffset();
+        float depthOffset = settings.depthOffset();
+        switch (payload.operation()) {
+            case BodyDisplayPayload.MOVE_HORIZONTAL -> horizontalOffset = Math.clamp(payload.offset(),
+                    -BodyDisplayBlock.MAX_HORIZONTAL_OFFSET, BodyDisplayBlock.MAX_HORIZONTAL_OFFSET);
+            case BodyDisplayPayload.MOVE_VERTICAL -> verticalOffset = Math.clamp(payload.offset(),
+                    -BodyDisplayBlock.MAX_VERTICAL_OFFSET, BodyDisplayBlock.MAX_VERTICAL_OFFSET);
+            case BodyDisplayPayload.MOVE_DEPTH -> depthOffset = Math.clamp(payload.offset(),
+                    -BodyDisplayBlock.MAX_DEPTH_OFFSET, BodyDisplayBlock.MAX_DEPTH_OFFSET);
+            default -> {
+                return;
+            }
+        }
+        var state = settings.getBlockState();
+        Vec3 target = displayPosition(session.pos, state, horizontalOffset, verticalOffset, depthOffset);
+        BlockPos targetBlock = BlockPos.containing(target);
+        if (session.level.isOutsideBuildHeight(targetBlock) || !session.level.getWorldBorder().isWithinBounds(targetBlock)
+                || (horizontalOffset == settings.horizontalOffset() && verticalOffset == settings.verticalOffset()
+                        && depthOffset == settings.depthOffset())) {
+            return;
+        }
+        settings.setOffsets(horizontalOffset, verticalOffset, depthOffset);
+        positionDisplay(body, entity, target);
+        entity.syncPosition = true;
+        manager.rigChanged();
+    }
+
+    private static Vec3 displayPosition(BlockPos pos, BlockState state, float horizontal, float vertical, float depth) {
+        return BodyDisplayBlock.bodyOrigin(pos, state).add(BodyDisplayBlock.horizontalAxis(state).scale(horizontal))
+                .add(0, vertical, 0).add(BodyDisplayBlock.depthAxis(state).scale(depth));
+    }
+
+    private static void positionDisplay(Body body, Entity entity, Vec3 target) {
+        body.x = target.x;
+        body.y = target.y;
+        body.z = target.z;
+        if (entity.position().distanceToSqr(target) > 1.0E-8) {
+            entity.setPos(target);
+        }
     }
 
     private void endEditors(Body body) {
@@ -238,8 +318,7 @@ public final class BodyRigManager implements AutoCloseable {
             manager.rigChanged();
         }
         if (session != null) {
-            ServerPlayNetworking.send(player, new BodyDisplayPayload(session.pos, BodyDisplayPayload.END_EDIT,
-                    false, false, true, false, -1, ""));
+            ServerPlayNetworking.send(player, BodyDisplayPayload.request(session.pos, BodyDisplayPayload.END_EDIT));
         }
     }
 
@@ -299,14 +378,7 @@ public final class BodyRigManager implements AutoCloseable {
         }
         AttachFace face = state.getValue(BodyDisplayBlock.FACE);
         Direction facing = state.getValue(BodyDisplayBlock.FACING);
-        Vec3 origin = Vec3.atBottomCenterOf(pos);
-        if (face == AttachFace.FLOOR) {
-            origin = origin.add(0, 0.13, 0);
-        } else if (face == AttachFace.CEILING) {
-            origin = origin.add(0, -0.6, 0);
-        } else {
-            origin = origin.add(facing.getStepX() * 0.15, -0.25, facing.getStepZ() * 0.15);
-        }
+        Vec3 origin = BodyDisplayBlock.bodyOrigin(pos, state);
         BodyRigPose pose = BodyRigPose.create(true, face == AttachFace.CEILING, facing.toYRot());
         for (int part = 0; part < 6; part++) {
             Vec3 center = origin.add(pose.part(part).center());
@@ -322,14 +394,16 @@ public final class BodyRigManager implements AutoCloseable {
         Vec3 previousPosition = new Vec3(body.x, body.y, body.z);
         float previousYaw = body.yaw;
         BodyRigPose previousPose = body.rigPose;
+        var display = settings(player.level(), pos);
+        Vec3 target = displayPosition(pos, state, display.horizontalOffset(), display.verticalOffset(), display.depthOffset());
         body.entityId = null;
         body.displayMounted = true;
         body.displayPosition = pos.asLong();
         body.displayFace = face.getSerializedName();
         body.dimension = player.level().dimension().identifier().toString();
-        body.x = origin.x;
-        body.y = origin.y;
-        body.z = origin.z;
+        body.x = target.x;
+        body.y = target.y;
+        body.z = target.z;
         body.yaw = facing.toYRot();
         body.rigPose = pose;
         body.packedToken = null;
@@ -388,10 +462,19 @@ public final class BodyRigManager implements AutoCloseable {
         if (body.displayMounted) {
             ServerLevel level = (ServerLevel) entity.level();
             BlockPos pos = BlockPos.of(body.displayPosition);
+            if (!level.getBlockState(pos).is(BodyDisplayBlock.INSTANCE)) {
+                return;
+            }
             setDisplayOccupied(level, pos, true);
             var options = settings(level, pos);
-            holder.tsf$setDisplayOptions(options.showName(), options.poseable(), options.showCape(), options.face());
+            applyDisplayOptions(holder, options);
+            positionDisplay(body, entity, displayPosition(pos, options.getBlockState(), options.horizontalOffset(),
+                    options.verticalOffset(), options.depthOffset()));
         }
+    }
+
+    private static void applyDisplayOptions(EmptyBodyHolder holder, BodyDisplayBlockEntity options) {
+        holder.tsf$setDisplayOptions(options.showName(), options.poseable(), options.showCape(), options.face(), options.displayName());
     }
 
     private static void ensurePose(Body body) {

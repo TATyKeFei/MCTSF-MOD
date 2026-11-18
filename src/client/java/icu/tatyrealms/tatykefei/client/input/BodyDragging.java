@@ -47,8 +47,7 @@ public final class BodyDragging {
         }
         stop();
         if (ClientPlayNetworking.canSend(BodyDisplayPayload.TYPE)) {
-            ClientPlayNetworking.send(new BodyDisplayPayload(display.pos(), BodyDisplayPayload.STOP_EDIT,
-                    false, false, true, false, -1, ""));
+            ClientPlayNetworking.send(BodyDisplayPayload.request(display.pos(), BodyDisplayPayload.STOP_EDIT));
         }
         clear();
         return true;
@@ -58,10 +57,25 @@ public final class BodyDragging {
         grabbed = null;
         editing = null;
         display = null;
+        BodyDisplayAxes.clear();
+    }
+
+    public static boolean startOffset(Minecraft client) {
+        return allowed(client) && grabbed == null && BodyDisplayAxes.start(client, editing, display.pos());
+    }
+
+    public static boolean movingDisplay() {
+        return BodyDisplayAxes.active();
+    }
+
+    public static void renderAxes(Minecraft client, float partialTick) {
+        if (allowed(client) && !editing.isRemoved() && editing.level() == client.level) {
+            BodyDisplayAxes.render(editing, display.pos(), partialTick);
+        }
     }
 
     public static boolean start(Minecraft client) {
-        if (grabbed != null) {
+        if (grabbed != null || BodyDisplayAxes.active()) {
             return true;
         }
         if (!allowed(client)) {
@@ -102,6 +116,9 @@ public final class BodyDragging {
         if (editing != null && (!allowed(client) || editing.isRemoved() || editing.level() != client.level
                 || client.player.distanceToSqr(editing) > 49)) {
             finishEditing();
+        }
+        if (editing != null) {
+            BodyDisplayAxes.tick(client, editing, display.pos());
         }
         if (grabbed == null) {
             return;

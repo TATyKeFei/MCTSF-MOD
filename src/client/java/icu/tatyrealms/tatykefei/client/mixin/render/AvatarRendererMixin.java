@@ -74,7 +74,9 @@ public abstract class AvatarRendererMixin {
         if (emptyBody) {
             if (avatar instanceof icu.tatyrealms.tatykefei.state.EmptyBodyHolder holder && holder.tsf$isMounted()) {
                 state.showCape &= holder.tsf$showCape();
-                state.nameTag = holder.tsf$showDisplayName() && state.distanceToCameraSq < 4096 ? avatar.getDisplayName() : null;
+                state.nameTag = holder.tsf$showDisplayName() && state.distanceToCameraSq < 4096
+                        ? (holder.tsf$displayName().isEmpty() ? avatar.getDisplayName() : Component.literal(holder.tsf$displayName()))
+                        : null;
                 var pose = ((EmptyBodyRenderState) state).tsf$rig();
                 if (pose != null) {
                     var bounds = pose.bounds();
