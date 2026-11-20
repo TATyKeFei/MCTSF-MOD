@@ -26,14 +26,14 @@ final class AsyncBodyPhysics implements AutoCloseable {
     }
 
     Future<Result> submit(BodyRigPose livePose, BodyRigPhysics livePhysics, Vec3 position,
-            List<AABB> collisions, int part, Vec3 target, boolean simulate) {
+            List<AABB> collisions, int part, Vec3 target, boolean simulate, boolean torsoSupported) {
         BodyRigPose pose = livePose.copy();
         BodyRigPhysics physics = livePhysics.copy();
         List<AABB> boxes = List.copyOf(collisions);
         try {
             return executor.submit(() -> {
                 double[] before = pose.points.clone();
-                physics.step(position, boxes, pose, part, target, simulate);
+                physics.step(position, boxes, pose, part, target, simulate, torsoSupported);
                 double displacement = 0;
                 for (int node = 0; node < BodyRigPose.COUNT; node++) {
                     int index = node * 3;

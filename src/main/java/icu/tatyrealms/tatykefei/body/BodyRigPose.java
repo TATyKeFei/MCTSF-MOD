@@ -16,6 +16,7 @@ public final class BodyRigPose {
     public static final int COUNT = 8;
     public static final int HEAD_PART = 0;
     public static final int TORSO_PART = 1;
+    static final int SIDE_NODE = 2;
     public boolean mounted;
     public double[] points = new double[COUNT * 3];
 
@@ -63,7 +64,7 @@ public final class BodyRigPose {
         Vec3 neck = pelvis.subtract(down.scale(TORSO));
         pose.set(0, pelvis);
         pose.set(1, neck);
-        pose.set(2, neck.add(right.scale(0.3125 * SCALE)).add(down.scale(0.125 * SCALE)));
+        pose.setSide(right, down);
         pose.set(3, neck.subtract(down.scale(HEAD)));
         pose.set(4, pose.shoulder(false).add(down.scale(ARM)));
         pose.set(5, pose.shoulder(true).add(down.scale(ARM)));
@@ -125,12 +126,16 @@ public final class BodyRigPose {
         if (down.lengthSqr() < 0.5) {
             down = new Vec3(0, -1, 0);
         }
-        Vec3 side = point(2).subtract(point(1));
+        Vec3 side = point(SIDE_NODE).subtract(point(1));
         Vec3 right = side.subtract(down.scale(side.dot(down))).normalize();
         if (right.lengthSqr() < 0.5) {
             right = (Math.abs(down.y) < 0.9 ? new Vec3(0, 1, 0) : new Vec3(1, 0, 0)).cross(down).normalize();
         }
         return new Basis(right, down, right.cross(down).normalize());
+    }
+
+    void setSide(Vec3 right, Vec3 down) {
+        set(SIDE_NODE, point(1).add(right.scale(0.3125 * SCALE)).add(down.scale(0.125 * SCALE)));
     }
 
     public Vec3 shoulder(boolean right) {

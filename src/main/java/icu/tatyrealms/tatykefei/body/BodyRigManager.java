@@ -14,6 +14,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
@@ -66,6 +67,7 @@ public final class BodyRigManager implements AutoCloseable {
         boolean onGround;
         boolean sleeping;
         boolean paused;
+        boolean torsoSupported;
         int quietSamples;
         int interval = 1;
         long nextStep;
@@ -668,6 +670,7 @@ public final class BodyRigManager implements AutoCloseable {
         });
         Map<UUID, Grab> held = new HashMap<>();
         grabs.values().forEach(grab -> held.put(grab.body.id, grab));
+        Set<UUID> supportedTorsos = enabled ? BodyTorsoCollisions.resolve(bodies, entities) : Set.of();
         List<Candidate> candidates = new ArrayList<>();
         for (var entry : List.copyOf(entities.entrySet())) {
             Body body = bodies.get(entry.getKey());
@@ -704,6 +707,12 @@ public final class BodyRigManager implements AutoCloseable {
             if (state.entity != entity) {
                 discardSimulation(body.id);
                 continue;
+            }
+            boolean torsoSupported = supportedTorsos.contains(body.id);
+            if (state.torsoSupported != torsoSupported) {
+                state.torsoSupported = torsoSupported;
+                state.cancel();
+                state.wake(body.rigPose);
             }
             boolean moved = state.observedPosition.distanceToSqr(entity.position()) > 0.000025
                     || state.onGround != entity.onGround();
@@ -778,7 +787,7 @@ public final class BodyRigManager implements AutoCloseable {
                 continue;
             }
             state.pending = worker.submit(body.rigPose, state.physics, entity.position(), state.snapshot.boxes,
-                    candidate.grab == null ? -1 : candidate.grab.part, candidate.target, !body.displayMounted);
+                    candidate.grab == null ? -1 : candidate.grab.part, candidate.target, !body.displayMounted, state.torsoSupported);
             if (state.pending == null) {
                 break;
             }

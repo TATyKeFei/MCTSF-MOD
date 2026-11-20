@@ -23,7 +23,8 @@ public final class BodyRigPhysics {
         lastPosition = position;
     }
 
-    public void step(Vec3 position, List<AABB> collisions, BodyRigPose pose, int grabbedPart, Vec3 target, boolean simulate) {
+    public void step(Vec3 position, List<AABB> collisions, BodyRigPose pose, int grabbedPart, Vec3 target, boolean simulate,
+            boolean torsoSupported) {
         if (lastPosition == null) {
             reset(pose, position);
         }
@@ -34,15 +35,23 @@ public final class BodyRigPhysics {
         }
         lastPosition = position;
         Vec3 pelvis = pose.point(0);
+        BodyRigPose.Basis basis = pose.basis();
         if (simulate) {
             for (int node = 1; node < previous.length; node++) {
+                if (node == BodyRigPose.SIDE_NODE) {
+                    continue;
+                }
                 Vec3 current = pose.point(node);
                 Vec3 velocity = current.subtract(previous[node]).scale(0.84).subtract(movement.scale(0.25));
                 if (velocity.length() > 0.18) {
                     velocity = velocity.normalize().scale(0.18);
                 }
                 previous[node] = current;
-                pose.set(node, current.add(velocity).add(0, -0.024, 0));
+                velocity = velocity.add(0, -0.024, 0);
+                if (node == BodyRigPose.TORSO_PART && torsoSupported && velocity.y < 0) {
+                    velocity = new Vec3(velocity.x, 0, velocity.z);
+                }
+                pose.set(node, current.add(velocity));
             }
         }
         int node = grabbedPart < 0 ? -1 : BodyRigPose.node(grabbedPart);
@@ -56,29 +65,34 @@ public final class BodyRigPhysics {
             if (Thread.currentThread().isInterrupted()) {
                 return;
             }
-            constrain(pose);
+            basis = constrain(pose, basis);
             if (simulate || node >= 0) {
                 collide(position, collisions, pose);
             }
         }
         // Collision projections must never leave stretched limbs in the rendered pose.
-        constrain(pose);
+        constrain(pose, basis);
         if (!simulate) {
             reset(pose, position);
         }
     }
 
-    public static void constrain(BodyRigPose pose) {
+    private static BodyRigPose.Basis constrain(BodyRigPose pose, BodyRigPose.Basis previousBasis) {
         length(pose, 1, pose.point(0), BodyRigPose.TORSO);
         Vec3 neck = pose.point(1);
-        var basis = pose.basis();
-        pose.set(2, neck.add(basis.right().scale(0.3125 * BodyRigPose.SCALE))
-                .add(basis.down().scale(0.125 * BodyRigPose.SCALE)));
+        Vec3 down = pose.point(0).subtract(neck).normalize();
+        Vec3 right = previousBasis.right().subtract(down.scale(previousBasis.right().dot(down))).normalize();
+        if (right.lengthSqr() < 0.5) {
+            right = down.cross(previousBasis.forward()).normalize();
+        }
+        pose.setSide(right, down);
+        BodyRigPose.Basis basis = pose.basis();
         limited(pose, 3, neck, basis.down().reverse(), BodyRigPose.HEAD, 0.15);
         limited(pose, 4, pose.shoulder(false), basis.down(), BodyRigPose.ARM, -0.9);
         limited(pose, 5, pose.shoulder(true), basis.down(), BodyRigPose.ARM, -0.9);
         limited(pose, 6, pose.hip(false), basis.down(), BodyRigPose.LEG, -0.25);
         limited(pose, 7, pose.hip(true), basis.down(), BodyRigPose.LEG, -0.25);
+        return basis;
     }
 
     private static void length(BodyRigPose pose, int node, Vec3 joint, double length) {
