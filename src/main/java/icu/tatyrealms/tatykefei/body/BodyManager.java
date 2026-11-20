@@ -2618,7 +2618,7 @@ public final class BodyManager {
                 }
             }
         }
-        broadcast();
+        broadcast(true);
     }
 
     private void refreshEquipmentProfiles(Mannequin mannequin) {
@@ -3073,11 +3073,12 @@ public final class BodyManager {
             visualsDirty = true;
         }
         if (visualsDirty || recoveryChanged) {
-            if (visualsDirty) {
+            boolean updateDisplayNames = visualsDirty;
+            if (updateDisplayNames) {
                 save();
             }
             visualsDirty = false;
-            broadcast();
+            broadcast(updateDisplayNames);
         }
         if (ticks % 200 == 0) {
             for (Body body : store.bodies.values()) {
@@ -3130,12 +3131,14 @@ public final class BodyManager {
         }
     }
 
-    private void broadcast() {
+    private void broadcast(boolean updateDisplayNames) {
         List<VisualState> snapshot = visuals();
-        CarbonChatCompat.updateIdentities(snapshot);
-        if (!server.getPlayerList().getPlayers().isEmpty()) {
-            server.getPlayerList().broadcastAll(new ClientboundPlayerInfoUpdatePacket(
-                    EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME), server.getPlayerList().getPlayers()));
+        if (updateDisplayNames) {
+            CarbonChatCompat.updateIdentities(snapshot);
+            if (!server.getPlayerList().getPlayers().isEmpty()) {
+                server.getPlayerList().broadcastAll(new ClientboundPlayerInfoUpdatePacket(
+                        EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME), server.getPlayerList().getPlayers()));
+            }
         }
         String json = GSON.toJson(snapshot);
         List<Body> appearances = natureAppearances();
