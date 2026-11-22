@@ -10,6 +10,7 @@ import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureHypnosis;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureTanks;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureBodies;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureSkins;
+import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureProtection;
 import icu.tatyrealms.tatykefei.command.GiveCommand;
 import icu.tatyrealms.tatykefei.item.LatexPotions;
 import icu.tatyrealms.tatykefei.item.LatexBrewingRecipe;
@@ -88,6 +89,7 @@ public final class TSF implements ModInitializer {
         NeedsOfNatureTanks.initialize();
         NeedsOfNatureBodies.initialize();
         NeedsOfNatureSkins.initialize();
+        NeedsOfNatureProtection.initialize();
         PayloadTypeRegistry.serverboundPlay().register(ActionPayload.TYPE, ActionPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(StatePayload.TYPE, StatePayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(AnimationPayload.TYPE, AnimationPayload.CODEC);

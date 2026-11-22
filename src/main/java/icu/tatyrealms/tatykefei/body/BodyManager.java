@@ -26,6 +26,7 @@ import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureHypnosis;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureTanks;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureBodies;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureSkins;
+import icu.tatyrealms.tatykefei.compat.needsofnature.NeedsOfNatureProtection;
 import icu.tatyrealms.tatykefei.item.TSFItems;
 import icu.tatyrealms.tatykefei.item.LatexPotions;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -1016,6 +1017,10 @@ public final class BodyManager {
             message(player, "invalid_target");
             return true;
         }
+        if (state(player).form == Form.SLIME && NeedsOfNatureProtection.protects(target)) {
+            NeedsOfNatureProtection.notifyBlocked(player, target.getUUID(), target.getGameProfile().name());
+            return true;
+        }
         if (!NeedsOfNatureCompat.canChangeBody(player) || !NeedsOfNatureCompat.canChangeBody(target)) {
             return true;
         }
@@ -1365,6 +1370,10 @@ public final class BodyManager {
             return;
         }
         BodyAnimation animation = BodyAnimation.TAKEOVER;
+        if (state(player).form == Form.SLIME && NeedsOfNatureProtection.protects(target)) {
+            NeedsOfNatureProtection.notifyBlocked(player, target.getUUID(), target.getGameProfile().name());
+            return;
+        }
         if (ProtectionTotems.blocks(player, target, ProtectionTotems.Kind.POSSESSION)) {
             return;
         }
@@ -2081,6 +2090,14 @@ public final class BodyManager {
     private boolean protectBody(ServerPlayer actor, Body body, ProtectionTotems.Kind kind) {
         if (actor.getUUID().equals(body.owner)) {
             return false;
+        }
+        if (kind == ProtectionTotems.Kind.POSSESSION && state(actor).form == Form.SLIME) {
+            for (var entry : body.accessories.entrySet()) {
+                if (NeedsOfNatureProtection.protects(entry.getKey(), decodeItem(entry.getValue()))) {
+                    NeedsOfNatureProtection.notifyBlocked(actor, body.owner, body.name);
+                    return true;
+                }
+            }
         }
         for (var item : ProtectionTotems.items(kind)) {
             for (int slot = 0; slot < body.inventory.size(); slot++) {
