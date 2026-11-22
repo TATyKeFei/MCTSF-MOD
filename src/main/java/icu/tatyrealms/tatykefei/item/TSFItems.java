@@ -37,9 +37,9 @@ import net.minecraft.world.level.Level;
 
 public final class TSFItems {
     public static final Item PHONE = register("phone", PhoneItem::new);
-    public static final Item HYPNOSIS_PROTECTION_TOTEM = protection("hypnosis_protection_totem", 5);
-    public static final Item LIN_ZHENGYING_TALISMAN = protection("lin_zhengying_talisman", 5);
-    public static final Item TSF_PROTECTION_TOTEM = protection("tsf_protection_totem", 15);
+    public static final Item HYPNOSIS_PROTECTION_TOTEM = protection("hypnosis_protection_totem", false);
+    public static final Item LIN_ZHENGYING_TALISMAN = protection("lin_zhengying_talisman", false);
+    public static final Item TSF_PROTECTION_TOTEM = protection("tsf_protection_totem", true);
     public static final Item POSSESSION_SPEAR = register("possession_spear", properties -> new SpiritSpearItem(properties
             .component(DataComponents.LORE, ItemLoreText.translated("tooltip.tsf.possession_spear"))));
     public static final Item SNATCHING_SPEAR = register("snatching_spear", properties -> new SpiritSpearItem(properties
@@ -82,9 +82,15 @@ public final class TSFItems {
                 factory.apply(new Item.Properties().setId(key).stacksTo(1)));
     }
 
-    private static Item protection(String name, int uses) {
-        return register(name, properties -> new Item(properties.durability(uses)
-                .component(DataComponents.LORE, ItemLoreText.translated("tooltip.tsf." + name))));
+    private static Item protection(String name, boolean unlimited) {
+        return register(name, properties -> {
+            properties.durability(30).enchantable(1)
+                    .component(DataComponents.LORE, ItemLoreText.translated("tooltip.tsf." + name));
+            if (unlimited) {
+                properties.component(DataComponents.UNBREAKABLE, net.minecraft.util.Unit.INSTANCE);
+            }
+            return new Item(properties);
+        });
     }
 
     public static void initialize() {

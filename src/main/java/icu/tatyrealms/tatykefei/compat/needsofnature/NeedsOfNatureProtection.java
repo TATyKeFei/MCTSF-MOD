@@ -2,6 +2,7 @@ package icu.tatyrealms.tatykefei.compat.needsofnature;
 
 import icu.tatyrealms.tatykefei.body.BodyManager;
 import icu.tatyrealms.tatykefei.compat.trinkets.TrinketsCompat;
+import icu.tatyrealms.tatykefei.item.ProtectionTotems;
 import java.lang.reflect.Method;
 import java.util.UUID;
 import net.fabricmc.loader.api.FabricLoader;
@@ -70,7 +71,8 @@ public final class NeedsOfNatureProtection {
     }
 
     public static void notifyBlocked(ServerPlayer actor, UUID owner, String name) {
-        BodyManager.message(actor, "plug_blocked", name);
+        int seconds = ProtectionTotems.failed(actor, ProtectionTotems.Kind.POSSESSION);
+        BodyManager.message(actor, "plug_blocked", name, seconds);
         ServerPlayer target = actor.level().getServer().getPlayerList().getPlayer(owner);
         if (target != null) {
             BodyManager.message(target, "plug_saved");

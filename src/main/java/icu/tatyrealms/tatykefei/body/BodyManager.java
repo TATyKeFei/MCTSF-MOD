@@ -301,7 +301,7 @@ public final class BodyManager {
         PlayerState state = state(player);
         natureSkins.capture(nativeBody(player));
         natureSkins.capture(appearance(player));
-        ProtectionTotems.clear(player.getUUID());
+        // 保留防护失败冷却，避免通过重新连接立即重试
         cancelHypnosis(player);
         NeedsOfNatureCompat.endSession(player);
         if (state.spiritHost != null) {
@@ -505,9 +505,6 @@ public final class BodyManager {
     }
 
     private boolean ready(ServerPlayer player) {
-        if (ProtectionTotems.coolingDown(player)) {
-            return false;
-        }
         long now = server.overworld().getGameTime();
         Long previous = cooldowns.get(player.getUUID());
         if (previous != null && now - previous < 8) {
@@ -541,7 +538,7 @@ public final class BodyManager {
             message(player, "invalid_target");
             return true;
         }
-        if (ProtectionTotems.coolingDown(player)) {
+        if (!ProtectionTotems.canAttempt(player, ProtectionTotems.Kind.HYPNOSIS)) {
             return true;
         }
         hypnosisSessions.put(player.getUUID(), new HypnosisSession(target.getUUID(), server.overworld().getGameTime()));
@@ -1017,6 +1014,9 @@ public final class BodyManager {
             message(player, "invalid_target");
             return true;
         }
+        if (state(player).form != Form.HUMAN && !ProtectionTotems.canAttempt(player, ProtectionTotems.Kind.POSSESSION)) {
+            return true;
+        }
         if (state(player).form == Form.SLIME && NeedsOfNatureProtection.protects(target)) {
             NeedsOfNatureProtection.notifyBlocked(player, target.getUUID(), target.getGameProfile().name());
             return true;
@@ -1287,6 +1287,9 @@ public final class BodyManager {
     }
 
     private void attachSpirit(ServerPlayer player, ServerPlayer target) {
+        if (!ProtectionTotems.canAttempt(player, ProtectionTotems.Kind.POSSESSION)) {
+            return;
+        }
         if (!NeedsOfNatureCompat.canChangeBody(player) || !NeedsOfNatureCompat.canChangeBody(target)) {
             return;
         }
@@ -1358,6 +1361,9 @@ public final class BodyManager {
         }
         if (!validPossessionTarget(player, target) || !spearHit && !near(player, target, 5)) {
             message(player, "invalid_target");
+            return;
+        }
+        if (!ProtectionTotems.canAttempt(player, ProtectionTotems.Kind.POSSESSION)) {
             return;
         }
         if (!NeedsOfNatureCompat.canChangeBody(player) || !NeedsOfNatureCompat.canChangeBody(target)) {
@@ -2090,6 +2096,9 @@ public final class BodyManager {
     private boolean protectBody(ServerPlayer actor, Body body, ProtectionTotems.Kind kind) {
         if (actor.getUUID().equals(body.owner)) {
             return false;
+        }
+        if (!ProtectionTotems.canAttempt(actor, kind)) {
+            return true;
         }
         if (kind == ProtectionTotems.Kind.POSSESSION && state(actor).form == Form.SLIME) {
             for (var entry : body.accessories.entrySet()) {
