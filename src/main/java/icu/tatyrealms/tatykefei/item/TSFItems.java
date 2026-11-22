@@ -39,7 +39,6 @@ public final class TSFItems {
     public static final Item PHONE = register("phone", PhoneItem::new);
     public static final Item HYPNOSIS_PROTECTION_TOTEM = protection("hypnosis_protection_totem", 5);
     public static final Item LIN_ZHENGYING_TALISMAN = protection("lin_zhengying_talisman", 5);
-    public static final Item SKIN_PROTECTION_TOTEM = protection("skin_protection_totem", 5);
     public static final Item TSF_PROTECTION_TOTEM = protection("tsf_protection_totem", 15);
     public static final Item POSSESSION_SPEAR = register("possession_spear", properties -> new SpiritSpearItem(properties
             .component(DataComponents.LORE, ItemLoreText.translated("tooltip.tsf.possession_spear"))));
@@ -100,7 +99,6 @@ public final class TSFItems {
                     output.accept(PHONE);
                     output.accept(HYPNOSIS_PROTECTION_TOTEM);
                     output.accept(LIN_ZHENGYING_TALISMAN);
-                    output.accept(SKIN_PROTECTION_TOTEM);
                     output.accept(TSF_PROTECTION_TOTEM);
                     output.accept(POSSESSION_SPEAR);
                     output.accept(SNATCHING_SPEAR);

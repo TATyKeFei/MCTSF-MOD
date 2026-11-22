@@ -34,12 +34,11 @@ public final class ProtectionTotems {
     }
 
     public static Item[] items(Kind kind) {
-        Item specific = switch (kind) {
-            case HYPNOSIS -> TSFItems.HYPNOSIS_PROTECTION_TOTEM;
-            case POSSESSION -> TSFItems.LIN_ZHENGYING_TALISMAN;
-            case SKIN -> TSFItems.SKIN_PROTECTION_TOTEM;
+        return switch (kind) {
+            case HYPNOSIS -> new Item[]{TSFItems.HYPNOSIS_PROTECTION_TOTEM, TSFItems.TSF_PROTECTION_TOTEM};
+            case POSSESSION -> new Item[]{TSFItems.LIN_ZHENGYING_TALISMAN, TSFItems.TSF_PROTECTION_TOTEM};
+            case SKIN -> new Item[]{TSFItems.TSF_PROTECTION_TOTEM};
         };
-        return new Item[]{specific, TSFItems.TSF_PROTECTION_TOTEM};
     }
 
     public static boolean blocks(ServerPlayer actor, ServerPlayer target, Kind kind) {
