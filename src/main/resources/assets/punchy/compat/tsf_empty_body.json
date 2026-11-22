@@ -4,6 +4,11 @@
       "customAnimation": [
         { "type": "inspect", "name": "tsf_empty_body_inspect" }
       ]
+    },
+    "tsf:skin_suit": {
+      "customAnimation": [
+        { "type": "inspect", "name": "tsf_skin_suit_inspect" }
+      ]
     }
   }
 }

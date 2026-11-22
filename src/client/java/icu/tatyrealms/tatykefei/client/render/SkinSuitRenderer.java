@@ -56,6 +56,8 @@ public final class SkinSuitRenderer implements SpecialModelRenderer<PlayerSkinRe
         transform(poses);
         wide.setupAnim(new AvatarRenderState());
         wide.root().getExtentsForGui(poses, output);
+        slim.setupAnim(new AvatarRenderState());
+        slim.root().getExtentsForGui(poses, output);
     }
 
     @Override

@@ -1,7 +1,13 @@
 {
   "parent": "tsf:item/skin_suit_display",
   "display": {
-    "gui": {"rotation": [30, -25, 0], "scale": [0.85, 0.85, 0.85]},
-    "fixed": {"rotation": [-90, 180, 0], "translation": [0, 0, -1.35], "scale": [1, 1, 1]}
+    "gui": {"rotation": [35, -25, 0], "translation": [0, -1, 0], "scale": [1.05, 1.05, 1.05]},
+    "ground": {"translation": [0, -1.5, 0], "scale": [0.6, 0.6, 0.6]},
+    "fixed": {"rotation": [-90, 180, 0], "translation": [0, 0, -1.35], "scale": [1, 1, 1]},
+    "on_shelf": {"translation": [0, -4, 0], "scale": [0.75, 0.75, 0.75]},
+    "firstperson_righthand": {"rotation": [15, 160, -10], "translation": [-1, 1.5, -1], "scale": [0.85, 0.85, 0.85]},
+    "firstperson_lefthand": {"rotation": [15, 160, -10], "translation": [-1, 1.5, -1], "scale": [0.85, 0.85, 0.85]},
+    "thirdperson_righthand": {"rotation": [75, 0, 0], "translation": [0, 2, 1], "scale": [0.75, 0.75, 0.75]},
+    "thirdperson_lefthand": {"rotation": [75, 0, 0], "translation": [0, 2, 1], "scale": [0.75, 0.75, 0.75]}
   }
 }

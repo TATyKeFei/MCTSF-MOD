@@ -1,0 +1,54 @@
+{
+  "format_version": "1.8.0",
+  "animations": {
+    "tsf_skin_suit_inspect": {
+      "animation_length": 5.6,
+      "loop": false,
+      "bones": {
+        "right_arm": {
+          "rotation": {
+            "0.0": { "post": [18, 0, 0] },
+            "0.45": { "post": [62, -8, -28], "easing": "easeInOutSine" },
+            "1.8": { "post": [62, -8, -28] },
+            "3.25": { "post": [35, 22, 18], "easing": "easeInOutSine" },
+            "4.7": { "post": [35, 22, 18] },
+            "5.6": { "post": [0, 0, 0], "easing": "easeOutSine" }
+          },
+          "position": {
+            "0.0": { "post": [0, 0, 0] },
+            "0.45": { "post": [2.3, 2.2, -2.4], "easing": "easeInOutSine" },
+            "3.25": { "post": [-1.2, 2.8, -2.8], "easing": "easeInOutSine" },
+            "5.6": { "post": [0, 0, 0], "easing": "easeOutSine" }
+          }
+        },
+        "left_arm": {
+          "rotation": {
+            "0.0": { "post": [14, 0, 0] },
+            "0.45": { "post": [48, 10, 22], "easing": "easeInOutSine" },
+            "1.8": { "post": [48, 10, 22] },
+            "3.25": { "post": [70, -14, -18], "easing": "easeInOutSine" },
+            "4.7": { "post": [70, -14, -18] },
+            "5.6": { "post": [0, 0, 0], "easing": "easeOutSine" }
+          },
+          "position": {
+            "0.0": { "post": [0, 0, 0] },
+            "0.45": { "post": [-2.3, 2.2, -2.4], "easing": "easeInOutSine" },
+            "3.25": { "post": [1.2, 2.8, -2.8], "easing": "easeInOutSine" },
+            "5.6": { "post": [0, 0, 0], "easing": "easeOutSine" }
+          }
+        },
+        "itemgrip_right": {
+          "rotation": {
+            "0.0": { "post": [0, 0, 0] },
+            "0.45": { "post": [0, 0, -16], "easing": "easeInOutSine" },
+            "3.25": { "post": [0, 0, 18], "easing": "easeInOutSine" },
+            "5.6": { "post": [0, 0, 0], "easing": "easeOutSine" }
+          }
+        }
+      },
+      "timeline": {
+        "0.0": "use_keyframes_v2;dual_handed;anim_speed_1;"
+      }
+    }
+  }
+}
