@@ -2,7 +2,46 @@ plugins {
     id 'net.fabricmc.fabric-loom' version "${loom_version}"
 }
 
-version = project.mod_version
+def gitCommit = providers.exec {
+    commandLine("git", "rev-parse", "--short=7", "HEAD")
+}.standardOutput.asText.get().trim()
+
+def gitDirty = !providers.exec {
+    commandLine("git", "status", "--porcelain")
+}.standardOutput.asText.get().trim().isEmpty()
+
+version = "${project.minecraft_version}-${project.mod_version}"
+if (project.include_git_commit.toBoolean()) {
+    def commit = null
+    try {
+        def result = providers.exec {
+            commandLine("git", "rev-parse", "--short=7", "HEAD")
+            ignoreExitValue = true
+        }
+        def out = result.standardOutput.asText.get().trim()
+        def err = result.standardError.asText.get().trim()
+        if (result.result.get().exitValue != 0 || !out) {
+            throw new GradleException(
+                "include_git_commit=true 但获取 git commit 失败\n" +
+                "可能原因：当前目录不是 git 仓库、HEAD 不存在、或 git 未安装\n" +
+                "不需要这个功能可在gradle.properties将include_git_commit设为false解决\n" +
+                "git stderr: ${err ?: '(empty)'}"
+            )
+        }
+        commit = out
+    } catch (GradleException e) {
+        throw e
+    } catch (Exception e) {
+        throw new GradleException(
+            "include_git_commit=true 但无法执行 git 命令，请确认 git 已安装并在 PATH 中。\n" +
+            "不需要这个功能可在gradle.properties将include_git_commit设为false解决\n" +
+            "原始错误: ${e.message}",
+            e
+        )
+    }
+    version += "+${commit}"
+}
+
 group = project.maven_group
 
 base {
@@ -64,5 +103,3 @@ tasks.register('texturePack', Zip) {
     archiveFileName = 'tsf-textures-26.3.zip'
     destinationDirectory = layout.buildDirectory.dir('libs')
 }
-
-
