@@ -15,7 +15,7 @@ import net.minecraft.world.level.Level;
 
 public final class LatexArrowRecipe extends CustomRecipe {
     public static final RecipeSerializer<LatexArrowRecipe> SERIALIZER = new RecipeSerializer<>(
-            MapCodec.unit(LatexArrowRecipe::new), StreamCodec.unit(new LatexArrowRecipe()));
+            MapCodec.unit(LatexArrowRecipe::new), RecipeStreamCodecs.empty(LatexArrowRecipe::new));
 
     public static void initialize() {
         Registry.register(BuiltInRegistries.RECIPE_SERIALIZER, TSF.id("latex_arrow"), SERIALIZER);

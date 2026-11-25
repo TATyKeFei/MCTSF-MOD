@@ -21,7 +21,7 @@ import net.minecraft.world.item.crafting.RecipeSerializer;
 
 public final class LatexBrewingRecipe extends BrewingRecipe {
     public static final RecipeSerializer<BrewingRecipe> SERIALIZER = new RecipeSerializer<>(
-            MapCodec.unit(LatexBrewingRecipe::new), StreamCodec.unit(new LatexBrewingRecipe()));
+            MapCodec.unit(LatexBrewingRecipe::new), RecipeStreamCodecs.empty(LatexBrewingRecipe::new));
 
     public LatexBrewingRecipe() {
         super(new PotionIngredient(Ingredient.of(Items.POTION, Items.SPLASH_POTION, Items.LINGERING_POTION,

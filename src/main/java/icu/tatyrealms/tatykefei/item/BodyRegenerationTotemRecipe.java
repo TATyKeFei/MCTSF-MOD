@@ -25,7 +25,7 @@ import net.minecraft.world.level.Level;
 /** 肉体再生图腾：任意玩家来源的精液瓶、金胡萝卜和骨头无序合成。 */
 public final class BodyRegenerationTotemRecipe extends CustomRecipe {
     public static final RecipeSerializer<BodyRegenerationTotemRecipe> SERIALIZER = new RecipeSerializer<>(
-            MapCodec.unit(BodyRegenerationTotemRecipe::new), StreamCodec.unit(new BodyRegenerationTotemRecipe()));
+            MapCodec.unit(BodyRegenerationTotemRecipe::new), RecipeStreamCodecs.empty(BodyRegenerationTotemRecipe::new));
 
     public static void initialize() {
         Registry.register(BuiltInRegistries.RECIPE_SERIALIZER, TSF.id("body_regeneration_totem"), SERIALIZER);
