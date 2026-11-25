@@ -15,6 +15,7 @@ import icu.tatyrealms.tatykefei.command.GiveCommand;
 import icu.tatyrealms.tatykefei.item.LatexPotions;
 import icu.tatyrealms.tatykefei.item.LatexBrewingRecipe;
 import icu.tatyrealms.tatykefei.item.LatexArrowRecipe;
+import icu.tatyrealms.tatykefei.item.BodyRegenerationTotemRecipe;
 import icu.tatyrealms.tatykefei.command.StorageCommand;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import icu.tatyrealms.tatykefei.network.Action;
@@ -81,6 +82,7 @@ public final class TSF implements ModInitializer {
         LatexPotions.initialize();
         LatexBrewingRecipe.initialize();
         LatexArrowRecipe.initialize();
+        BodyRegenerationTotemRecipe.initialize();
         BodyDisplayBlockEntity.initialize();
         TrinketsCompat.initialize();
         CarbonChatCompat.initialize();
