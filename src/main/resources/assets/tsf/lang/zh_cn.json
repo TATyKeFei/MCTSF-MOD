@@ -74,6 +74,7 @@
   "message.tsf.config_saved": "TSF 服务端设置已保存。",
   "message.tsf.animation_busy": "请先结束当前动画，再进行肉体或皮物操作。",
   "item.tsf.phone": "催眠手机",
+  "item.tsf.player_liquid_bottle": "玩家精液瓶",
   "item.tsf.possession_spear": "附身之矛",
   "item.tsf.snatching_spear": "夺舍之矛",
   "tooltip.tsf.possession_spear": "灵魂状态下按住右键架矛，移动击中玩家后依附并跟随其视角，对方仍可自由操作；短按 U 解除，长按 U 约 1 秒回体",

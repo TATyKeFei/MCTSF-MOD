@@ -74,6 +74,7 @@
   "message.tsf.config_saved": "TSF server settings saved.",
   "message.tsf.animation_busy": "Finish the current animation before changing bodies or skins.",
   "item.tsf.phone": "Hypnosis Phone",
+  "item.tsf.player_liquid_bottle": "Player liquid bottle",
   "item.tsf.possession_spear": "Possession Spear",
   "item.tsf.snatching_spear": "Snatching Spear",
   "tooltip.tsf.possession_spear": "In spirit form, hold right-click to ready the spear, then move to hit a player and follow their view without taking control. Tap U to detach; hold U for about 1 second to return home.",
