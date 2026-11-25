@@ -116,15 +116,15 @@ public final class TSFItems {
                     output.accept(SOUL_PROJECTION_POTION);
                     output.accept(PERSONALITY_EXPULSION_POTION);
                     output.accept(LATEX_POTION);
-                    output.accept(LATEX_SPLASH_POTION);
-                    output.accept(LATEX_LINGERING_POTION);
-                    output.accept(LATEX_ARROW);
                     output.accept(SOUL_PROJECTION_SPLASH_POTION);
                     output.accept(PERSONALITY_EXPULSION_SPLASH_POTION);
+                    output.accept(LATEX_SPLASH_POTION);
                     output.accept(SOUL_PROJECTION_LINGERING_POTION);
                     output.accept(PERSONALITY_EXPULSION_LINGERING_POTION);
+                    output.accept(LATEX_LINGERING_POTION);
                     output.accept(SOUL_PROJECTION_ARROW);
                     output.accept(PERSONALITY_EXPULSION_ARROW);
+                    output.accept(LATEX_ARROW);
                     output.accept(ZIPPER);
                 })
                 .build());
@@ -132,12 +132,12 @@ public final class TSFItems {
             entries.accept(SOUL_PROJECTION_POTION);
             entries.accept(PERSONALITY_EXPULSION_POTION);
             entries.accept(LATEX_POTION);
-            entries.accept(LATEX_SPLASH_POTION);
-            entries.accept(LATEX_LINGERING_POTION);
             entries.accept(SOUL_PROJECTION_SPLASH_POTION);
             entries.accept(PERSONALITY_EXPULSION_SPLASH_POTION);
+            entries.accept(LATEX_SPLASH_POTION);
             entries.accept(SOUL_PROJECTION_LINGERING_POTION);
             entries.accept(PERSONALITY_EXPULSION_LINGERING_POTION);
+            entries.accept(LATEX_LINGERING_POTION);
         });
         CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.COMBAT).register(entries -> {
             entries.accept(SOUL_PROJECTION_ARROW);
