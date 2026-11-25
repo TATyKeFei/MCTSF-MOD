@@ -1179,12 +1179,18 @@ public final class BodyManager {
             body.health = Math.max(1, player.getHealth());
             body.food = player.getFoodData().getFoodLevel();
             body.saturation = player.getFoodData().getSaturationLevel();
+            body.experienceProgress = player.experienceProgress;
+            body.experienceLevel = player.experienceLevel;
+            body.totalExperience = player.totalExperience;
             locate(body, player);
             body.occupant = null;
             clearVanillaInventory(player);
             spawnBody(body);
             player.setHealth(Math.min(8, player.getMaxHealth()));
             player.getFoodData().setFoodLevel(20);
+            player.experienceProgress = 0;
+            player.experienceLevel = 0;
+            player.totalExperience = 0;
             refreshInventory(player);
         }
         restoreAbilities(player, state);
@@ -1988,6 +1994,9 @@ public final class BodyManager {
         player.setHealth(Math.min(body.health, player.getMaxHealth()));
         player.getFoodData().setFoodLevel(body.food);
         player.getFoodData().setSaturation(body.saturation);
+        player.experienceProgress = body.experienceProgress;
+        player.experienceLevel = body.experienceLevel;
+        player.totalExperience = body.totalExperience;
         for (var entry : body.accessories.entrySet()) {
             ItemStack accessory = decodeItem(entry.getValue());
             TrinketsCompat.Slot slot = TrinketsCompat.slots(player).stream()
@@ -2904,6 +2913,9 @@ public final class BodyManager {
                 body.inventory.clear();
                 body.health = 20;
                 body.food = 20;
+                body.experienceProgress = 0;
+                body.experienceLevel = 0;
+                body.totalExperience = 0;
                 if (!state.normalRespawn) {
                     spawnBody(body);
                 }
@@ -3442,6 +3454,9 @@ public final class BodyManager {
             Body body = store.bodies.get(state.body);
             if (state.form == Form.HUMAN && body != null && player.getUUID().equals(body.occupant)) {
                 captureTank(body, player);
+                body.experienceProgress = player.experienceProgress;
+                body.experienceLevel = player.experienceLevel;
+                body.totalExperience = player.totalExperience;
             }
         }
         Map<UUID, UUID> carriers = storageCarriers();

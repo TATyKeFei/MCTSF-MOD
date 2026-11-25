@@ -46,6 +46,10 @@ public final class Body {
     public float health = 20;
     public int food = 20;
     public float saturation = 5;
+    // 肉体自身的经验值，附身期间由占用者的经验值写入
+    public float experienceProgress;
+    public int experienceLevel;
+    public int totalExperience;
     public NatureTank natureTank;
     public NatureAppearance natureAppearance;
     public NatureSkin natureSkin;
