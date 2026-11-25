@@ -52,6 +52,12 @@ public final class LatexPotions {
                 .map(sources -> sources.players().getFirst());
     }
 
+    /** 判断是否为任意玩家产出的液体瓶：先看自然需求记录的来源实体，再看乳胶来源标签。 */
+    public static boolean isPlayerLiquidBottle(ItemStack stack) {
+        return stack.is(Items.POTION)
+                && (NeedsOfNatureSources.bottledFromPlayer(stack) || reagentSource(stack).isPresent());
+    }
+
     public static Optional<NatureLiquidSources.Source> source(ItemStack stack) {
         if (!isLatexItem(stack)) {
             return Optional.empty();

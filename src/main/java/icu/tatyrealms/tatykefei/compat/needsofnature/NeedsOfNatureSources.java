@@ -16,6 +16,8 @@ import net.minecraft.world.item.component.ItemLore;
 
 public final class NeedsOfNatureSources {
     public static final String DATA_KEY = "tsf:liquid_sources";
+    /** 自然需求记录液体瓶来源实体类型所用的键。 */
+    public static final String LIQUID_ENTITY_KEY = "liquid_entity";
 
     private NeedsOfNatureSources() {
     }
@@ -36,6 +38,13 @@ public final class NeedsOfNatureSources {
                     player.getUUID(), player.getGameProfile().name())), false);
         }
         return NatureLiquidSources.UNKNOWN;
+    }
+
+    /** 判断液体瓶是否来自玩家实体。 */
+    public static boolean bottledFromPlayer(ItemStack stack) {
+        return !stack.isEmpty() && "minecraft:player".equals(stack
+                .getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag()
+                .getString(LIQUID_ENTITY_KEY));
     }
 
     public static void labelBottle(Object tank, ItemStack stack) {

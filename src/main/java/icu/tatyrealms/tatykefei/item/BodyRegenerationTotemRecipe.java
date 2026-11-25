@@ -35,7 +35,7 @@ public final class BodyRegenerationTotemRecipe extends CustomRecipe {
             if (stack.isEmpty()) {
                 continue;
             }
-            if (LatexPotions.reagentSource(stack).isPresent()) {
+            if (LatexPotions.isPlayerLiquidBottle(stack)) {
                 potions++;
             } else if (stack.is(Items.GOLDEN_CARROT)) {
                 carrots++;
