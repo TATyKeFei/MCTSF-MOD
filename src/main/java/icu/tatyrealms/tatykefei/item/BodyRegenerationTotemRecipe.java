@@ -13,6 +13,8 @@ import net.minecraft.world.item.ItemStackTemplate;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CustomRecipe;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.PlacementInfo;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.item.crafting.display.RecipeDisplay;
 import net.minecraft.world.item.crafting.display.ShapelessCraftingRecipeDisplay;
@@ -59,6 +61,13 @@ public final class BodyRegenerationTotemRecipe extends CustomRecipe {
     public boolean isSpecial() {
         // 声明为非特殊配方，JEI 等配方查看器才会把它当作普通无序配方显示
         return false;
+    }
+
+    @Override
+    public PlacementInfo placementInfo() {
+        // 提供可摆放的材料表，避免服务端加载时按空材料表把配方忽略
+        return PlacementInfo.create(List.of(
+                Ingredient.of(Items.POTION), Ingredient.of(Items.GOLDEN_CARROT), Ingredient.of(Items.BONE)));
     }
 
     @Override

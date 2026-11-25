@@ -44,7 +44,7 @@ public final class NeedsOfNatureSources {
     public static boolean bottledFromPlayer(ItemStack stack) {
         return !stack.isEmpty() && "minecraft:player".equals(stack
                 .getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag()
-                .getString(LIQUID_ENTITY_KEY));
+                .getString(LIQUID_ENTITY_KEY).orElse(""));
     }
 
     public static void labelBottle(Object tank, ItemStack stack) {

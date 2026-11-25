@@ -52,10 +52,29 @@ public final class LatexPotions {
                 .map(sources -> sources.players().getFirst());
     }
 
-    /** 判断是否为任意玩家产出的液体瓶：先看自然需求记录的来源实体，再看乳胶来源标签。 */
+    /** 判断是否为任意玩家产出的液体瓶：先看自然需求记录的来源实体，再看药水类型与乳胶来源标签 */
     public static boolean isPlayerLiquidBottle(ItemStack stack) {
         return stack.is(Items.POTION)
-                && (NeedsOfNatureSources.bottledFromPlayer(stack) || reagentSource(stack).isPresent());
+                && (NeedsOfNatureSources.bottledFromPlayer(stack)
+                        || reagentSource(stack).isPresent()
+                        || isUntaggedPlayerLiquid(stack));
+    }
+
+    /** 判断是否为没有具体实体来源、药水仍为自然需求液体的瓶子 */
+    private static boolean isUntaggedPlayerLiquid(ItemStack stack) {
+        String entityType = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag()
+                .getString(NeedsOfNatureSources.LIQUID_ENTITY_KEY).orElse("");
+        if (!entityType.isEmpty()) {
+            return false;
+        }
+        PotionContents contents = stack.get(DataComponents.POTION_CONTENTS);
+        if (contents == null) {
+            return false;
+        }
+        return contents.potion()
+                .map(potion -> BuiltInRegistries.POTION.getKey(potion.value()))
+                .map(id -> "needsofnature:liquid".equals(id.toString()))
+                .orElse(false);
     }
 
     public static Optional<NatureLiquidSources.Source> source(ItemStack stack) {
