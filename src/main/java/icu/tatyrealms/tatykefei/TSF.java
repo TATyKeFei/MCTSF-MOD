@@ -348,10 +348,6 @@ public final class TSF implements ModInitializer {
     private void registerCommands() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(
                 Commands.literal("tsf")
-                        .executes(context -> {
-                            BodyManager.get().openPhone(context.getSource().getPlayerOrException());
-                            return 1;
-                        })
                         .then(Commands.literal("return").executes(context -> {
                             BodyManager.get().handle(context.getSource().getPlayerOrException(), new ActionPayload(Action.RETURN, ""));
                             return 1;

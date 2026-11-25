@@ -401,7 +401,20 @@ public final class BodyManager {
             message(player, "need_phone");
             return;
         }
+        if (!hasHypnosisTarget(player)) {
+            message(player, "no_hypnosis_target");
+            return;
+        }
         synchronize(player, true);
+    }
+
+    private boolean hasHypnosisTarget(ServerPlayer player) {
+        for (ServerPlayer other : server.getPlayerList().getPlayers()) {
+            if (player.getUUID().equals(state(other).hypnotist) && hasActiveHypnosis(other)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean hasPhoneAccess(ServerPlayer player) {
