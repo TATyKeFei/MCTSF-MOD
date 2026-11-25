@@ -2,6 +2,7 @@ package icu.tatyrealms.tatykefei.item;
 
 import com.mojang.serialization.MapCodec;
 import icu.tatyrealms.tatykefei.TSF;
+import net.fabricmc.fabric.api.recipe.v1.sync.RecipeSynchronization;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.codec.StreamCodec;
@@ -18,6 +19,8 @@ public final class LatexArrowRecipe extends CustomRecipe {
 
     public static void initialize() {
         Registry.register(BuiltInRegistries.RECIPE_SERIALIZER, TSF.id("latex_arrow"), SERIALIZER);
+        // 声明该序列化器的配方需要同步到客户端，JEI 等配方查看器才能读取
+        RecipeSynchronization.synchronizeRecipeSerializer(SERIALIZER);
     }
 
     @Override
