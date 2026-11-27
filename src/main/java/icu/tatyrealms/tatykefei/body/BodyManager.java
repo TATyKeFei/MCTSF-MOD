@@ -141,6 +141,7 @@ public final class BodyManager {
     private final Map<UUID, Integer> lastSkinRecoverySeconds = new HashMap<>();
     private final Map<UUID, ServerPlayer> observerTargets = new HashMap<>();
     private final Map<UUID, ObserverSync> observerSnapshots = new HashMap<>();
+    private boolean switchingBodies;
     private boolean visualsDirty;
     private int ticks;
 
@@ -218,7 +219,8 @@ public final class BodyManager {
         return store.players.computeIfAbsent(player.getUUID(), ignored -> {
             PlayerState state = new PlayerState();
             state.storageServer = statePersistence.serverId();
-            state.body = player.getUUID();
+            state.homeBody = UUID.randomUUID();
+            state.body = state.homeBody;
             return state;
         });
     }
@@ -252,9 +254,11 @@ public final class BodyManager {
         if (state.slimeBottleToken == null && state.slimeBottleDimension != null) {
             finishSlimeRelease(player);
         }
+        boolean unavailableBody = false;
         if (state.form == Form.HUMAN) {
             Body body = store.bodies.get(state.body);
             if (!local(body) || !player.getUUID().equals(body.occupant)) {
+                unavailableBody = true;
                 state.form = Form.SLIME;
                 state.body = null;
                 message(player, "body_unavailable");
@@ -263,19 +267,30 @@ public final class BodyManager {
         if (state.form == Form.HUMAN && state.zipperReturnForm == Form.HUMAN) {
             storeZipperBody(player, state.zipperReturnBody);
         }
-        Body current = store.bodies.get(state.body);
-        if (state.form == Form.HUMAN && current != null) {
-            if (current.natureTank == null) {
-                captureTank(current, player);
-            } else {
+        if (player.isAlive()) {
+            Body current = store.bodies.get(state.body);
+            if (state.form == Form.HUMAN && current != null) {
+                if (!current.playerDataInitialized) {
+                    // 旧版活跃肉体的数据只存在原版玩家存档中，首次登录时迁移
+                    if (current.natureTank != null) {
+                        NeedsOfNatureTanks.restore(player, current.natureTank);
+                    }
+                    BodyDataStorage.capture(current, player);
+                    captureTank(current, player);
+                }
+                BodyDataStorage.restore(current, player);
                 NeedsOfNatureTanks.restore(player, current.natureTank);
+            } else {
+                if (state.detachedData == null) {
+                    state.detachedData = BodyData.detached();
+                    // 仅迁移原本就处于离体形态的玩家，不能导入失效肉体的旧背包
+                    if (!unavailableBody) {
+                        BodyDataStorage.capture(state.detachedData, player);
+                    }
+                }
+                BodyDataStorage.restore(state.detachedData, player);
+                NeedsOfNatureTanks.restore(player, null);
             }
-        } else {
-            Body observed = store.bodies.get(state.observedBody);
-            if (state.form == Form.OBSERVER && observed != null && observed.natureTank == null) {
-                captureTank(observed, player);
-            }
-            NeedsOfNatureTanks.restore(player, null);
         }
         clearHypnosis(player);
         cancelHypnosis(player);
@@ -295,6 +310,7 @@ public final class BodyManager {
         lastSkinLayers.put(player.getUUID(), layers(player).stream().map(layer -> layer.body.id).toList());
         visualsDirty = true;
         save();
+        submitSave();
     }
 
     public void left(ServerPlayer player) {
@@ -999,6 +1015,13 @@ public final class BodyManager {
     }
 
     private void enterEmptyZipper(ServerPlayer player, Body body, Vec3 destination) {
+        changeBodies(List.of(player), body, () -> {
+            enterEmptyBodyZipper(player, body, destination);
+            return null;
+        });
+    }
+
+    private void enterEmptyBodyZipper(ServerPlayer player, Body body, Vec3 destination) {
         PlayerState state = state(player);
         UUID returnBody = state.zipperReturnForm == null ? state.body : state.zipperReturnBody;
         Form returnForm = state.zipperReturnForm == null ? state.form : state.zipperReturnForm;
@@ -1017,6 +1040,13 @@ public final class BodyManager {
     }
 
     public boolean enterZipper(ServerPlayer player, ServerPlayer target) {
+        if (!wearingZipper(target)) {
+            return false;
+        }
+        return changeBodies(List.of(player, target), null, () -> enterBodyZipper(player, target));
+    }
+
+    private boolean enterBodyZipper(ServerPlayer player, ServerPlayer target) {
         if (!wearingZipper(target)) {
             return false;
         }
@@ -1066,6 +1096,13 @@ public final class BodyManager {
     }
 
     private void leaveZipper(ServerPlayer player, boolean animate) {
+        changeBodies(List.of(player), null, () -> {
+            leaveBodyZipper(player, animate);
+            return null;
+        });
+    }
+
+    private void leaveBodyZipper(ServerPlayer player, boolean animate) {
         Vec3 exit = safePosition(player.level(), player.position(), true);
         if (exit == null) {
             message(player, "no_space");
@@ -1143,6 +1180,13 @@ public final class BodyManager {
     }
 
     private void detach(ServerPlayer player, Form form) {
+        changeBodies(List.of(player), null, () -> {
+            detachBody(player, form);
+            return null;
+        });
+    }
+
+    private void detachBody(ServerPlayer player, Form form) {
         PlayerState state = state(player);
         releaseZipperBody(player);
         state.zipperReturnBody = null;
@@ -1159,38 +1203,19 @@ public final class BodyManager {
             if (body == null) {
                 body = nativeBody(player);
             }
-            captureTank(body, player);
-            NeedsOfNatureTanks.restore(player, null);
             body.skinnableHypnotized = hypnotized(player);
             body.skinnableDowned = NeedsOfNatureCompat.isDowned(player);
             layers(player);
-            for (TrinketsCompat.Slot slot : TrinketsCompat.slots(player)) {
-                if (skinBody(slot.stack()) != null) {
-                    body.skinLayers.add(encodeItem(slot.stack()));
-                    slot.clear();
-                } else if (slot.name().startsWith("chest/necklace/") && slot.stack().is(TSFItems.ZIPPER)) {
-                    body.accessories.put(slot.name(), encodeItem(slot.stack()));
-                    slot.clear();
-                }
-            }
-            captureInventory(body, player);
-            captureLatex(body, player);
-            clearLatex(player);
-            body.health = Math.max(1, player.getHealth());
-            body.food = player.getFoodData().getFoodLevel();
-            body.saturation = player.getFoodData().getSaturationLevel();
-            body.experienceProgress = player.experienceProgress;
-            body.experienceLevel = player.experienceLevel;
-            body.totalExperience = player.totalExperience;
+            captureBody(body, player);
+            body.health = Math.max(1, body.health);
             locate(body, player);
             body.occupant = null;
-            clearVanillaInventory(player);
+            if (state.detachedData == null) {
+                state.detachedData = BodyData.detached();
+            }
+            BodyDataStorage.restore(state.detachedData, player);
+            NeedsOfNatureTanks.restore(player, null);
             spawnBody(body);
-            player.setHealth(Math.min(8, player.getMaxHealth()));
-            player.getFoodData().setFoodLevel(20);
-            player.experienceProgress = 0;
-            player.experienceLevel = 0;
-            player.totalExperience = 0;
             refreshInventory(player);
         }
         restoreAbilities(player, state);
@@ -1408,6 +1433,13 @@ public final class BodyManager {
     }
 
     private void transferControl(ServerPlayer player, ServerPlayer target, Body body, Vec3 destination) {
+        changeBodies(List.of(player, target), body, () -> {
+            transferBodyControl(player, target, body, destination);
+            return null;
+        });
+    }
+
+    private void transferBodyControl(ServerPlayer player, ServerPlayer target, Body body, Vec3 destination) {
         UUID returnBody = state(target).zipperReturnBody;
         Form returnForm = state(target).zipperReturnForm;
         detach(target, returnForm == null ? Form.OBSERVER : returnForm == Form.SPIRIT ? Form.SPIRIT : Form.SLIME);
@@ -1954,20 +1986,27 @@ public final class BodyManager {
     }
 
     private void enter(ServerPlayer player, Body body, Vec3 destination) {
-        if (!local(body)) {
-            message(player, "body_unavailable");
-            return;
+        changeBodies(List.of(player), body, () -> {
+            enterBody(player, body, destination);
+            return null;
+        });
+    }
+
+    private void enterBody(ServerPlayer player, Body body, Vec3 destination) {
+        if (!local(body) || body.occupant != null && !player.getUUID().equals(body.occupant)) {
+            throw new IllegalStateException("Cannot enter unavailable body: " + body.id);
+        }
+        BodyDataStorage.Prepared prepared = BodyDataStorage.prepare(body, player);
+        PlayerState state = state(player);
+        if (state.form == Form.HUMAN) {
+            throw new IllegalStateException("Current body must be detached before switching");
         }
         player.closeContainer();
-        List<ItemStack> carried = new ArrayList<>();
-        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
-            ItemStack stack = player.getInventory().getItem(slot);
-            if (!stack.isEmpty() && !spiritSpear(stack)) {
-                carried.add(stack.copy());
-            }
+        if (state.detachedData == null) {
+            state.detachedData = BodyData.detached();
         }
+        BodyDataStorage.capture(state.detachedData, player);
         removeBodyEntity(body);
-        PlayerState state = state(player);
         if (state.form == Form.OBSERVER) {
             player.setCamera(player);
             player.setGameMode(GameType.byName(state.savedGameMode, GameType.SURVIVAL));
@@ -1982,46 +2021,26 @@ public final class BodyManager {
         state.zipperReturnForm = null;
         body.zipperCarrier = null;
         body.occupant = player.getUUID();
-        restoreLatex(player, body);
-        clearVanillaInventory(player);
-        for (int slot = 0; slot < Math.min(body.inventory.size(), player.getInventory().getContainerSize()); slot++) {
-            player.getInventory().setItem(slot, decodeItem(body.inventory.get(slot)));
-        }
-        body.inventory.clear();
-        player.getInventory().setSelectedSlot(body.selectedSlot);
+        invalidateSkinLayers(player);
         applyForm(player);
         player.teleportTo(level(body.dimension), destination.x, destination.y, destination.z, Set.of(), body.yaw, 0, false);
-        player.setHealth(Math.min(body.health, player.getMaxHealth()));
-        player.getFoodData().setFoodLevel(body.food);
-        player.getFoodData().setSaturation(body.saturation);
-        player.experienceProgress = body.experienceProgress;
-        player.experienceLevel = body.experienceLevel;
-        player.totalExperience = body.totalExperience;
-        for (var entry : body.accessories.entrySet()) {
-            ItemStack accessory = decodeItem(entry.getValue());
-            TrinketsCompat.Slot slot = TrinketsCompat.slots(player).stream()
-                    .filter(candidate -> candidate.name().equals(entry.getKey()) && candidate.stack().isEmpty()
-                            && candidate.inventory().canPlaceItem(candidate.index(), accessory)).findFirst().orElse(null);
-            if (slot != null) {
-                slot.inventory().setItem(slot.index(), accessory);
-                slot.inventory().setChanged();
-            } else if (!player.getInventory().add(accessory)) {
-                player.drop(accessory, false, Prediction.SERVER_ONLY);
-            }
-        }
-        body.accessories.clear();
-        for (ItemStack stack : carried) {
-            if (!player.getInventory().add(stack)) {
-                player.drop(stack, false, Prediction.SERVER_ONLY);
-            }
-        }
+        prepared.apply(player);
+        restoreLatex(player, body);
         NeedsOfNatureTanks.restore(player, body.natureTank);
         updateNatureBody(player);
         refreshInventory(player);
         lastSkinLayers.put(player.getUUID(), layers(player).stream().map(layer -> layer.body.id).toList());
+        captureBody(body, player);
     }
 
     public void returnToBody(ServerPlayer player) {
+        changeBodies(List.of(player), null, () -> {
+            returnToHomeBody(player);
+            return null;
+        });
+    }
+
+    private void returnToHomeBody(ServerPlayer player) {
         if (state(player).slimeBottleToken != null || hypnotized(player) || !NeedsOfNatureCompat.canChangeBody(player)) {
             return;
         }
@@ -2460,8 +2479,13 @@ public final class BodyManager {
             }
         }
         for (Body parent : localBodies().values()) {
+            // 活跃肉体的背包快照只用于存档，实时归属必须查询当前实体
+            if (parent.occupant != null && server.getPlayerList().getPlayer(parent.occupant) != null) {
+                continue;
+            }
             if (parent.skinLayers.stream().anyMatch(json -> skinBody(decodeItem(json)) == body)
-                    || parent.inventory.stream().anyMatch(json -> skinBody(decodeItem(json)) == body)) {
+                    || parent.inventory.stream().anyMatch(json -> skinBody(decodeItem(json)) == body)
+                    || parent.accessories.values().stream().anyMatch(json -> skinBody(decodeItem(json)) == body)) {
                 ServerPlayer wearer = controller(parent, visited);
                 if (wearer != null) {
                     return wearer;
@@ -2587,21 +2611,102 @@ public final class BodyManager {
         return ItemStack.OPTIONAL_CODEC.encodeStart(server.registryAccess().createSerializationContext(JsonOps.INSTANCE), stack).getOrThrow();
     }
 
-    private void clearVanillaInventory(ServerPlayer player) {
-        // Trinkets 会在 Inventory.clearContent() 末尾清空饰品栏，这里只处理原版背包槽位
-        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
-            player.getInventory().setItem(slot, ItemStack.EMPTY);
+    private void captureBody(Body body, ServerPlayer player) {
+        BodyDataStorage.capture(body, player);
+        captureTank(body, player);
+        captureLatex(body, player);
+        locate(body, player);
+    }
+
+    /** 同一游戏线程内完成切换，所有参与者与肉体一起提交，失败时恢复切换前状态。 */
+    private <T> T changeBodies(List<ServerPlayer> participants, Body extra, java.util.function.Supplier<T> operation) {
+        if (switchingBodies) {
+            return operation.get();
+        }
+        List<PlayerSwitchSnapshot> players = new ArrayList<>();
+        Map<UUID, Body> bodies = new HashMap<>();
+        if (extra != null) {
+            snapshotBody(bodies, extra.id);
+        }
+        for (ServerPlayer player : participants) {
+            PlayerState state = state(player);
+            Body appearance = appearance(player);
+            snapshotBody(bodies, state.body);
+            snapshotBody(bodies, state.homeBody);
+            snapshotBody(bodies, state.zipperReturnBody);
+            snapshotBody(bodies, state.observedBody);
+            snapshotBody(bodies, appearance == null ? null : appearance.id);
+            BodyData data = new BodyData();
+            BodyDataStorage.capture(data, player);
+            data.natureTank = NeedsOfNatureTanks.capture(player);
+            players.add(new PlayerSwitchSnapshot(player, GSON.fromJson(GSON.toJsonTree(state), PlayerState.class),
+                    data, player.level(), player.position(), player.getYRot(), player.getXRot(),
+                    player.gameMode.getGameModeForPlayer(), player.getCamera(), player.getAbilities().mayfly,
+                    player.getAbilities().flying, player.getAbilities().invulnerable, player.isNoGravity()));
+        }
+        switchingBodies = true;
+        try {
+            T result = operation.get();
+            submitSave();
+            return result;
+        } catch (RuntimeException exception) {
+            try {
+                for (UUID id : bodies.keySet()) {
+                    Body current = store.bodies.get(id);
+                    if (current != null) {
+                        removeBodyEntity(current);
+                    }
+                }
+                bodies.forEach((id, body) -> {
+                    body.entityId = null;
+                    store.bodies.put(id, body);
+                    if (local(body)) {
+                        storageLocalBodies.put(id, body);
+                    }
+                });
+                players.forEach(snapshot -> store.players.put(snapshot.player().getUUID(), snapshot.state()));
+                invalidateSkinLayers();
+                for (PlayerSwitchSnapshot snapshot : players) {
+                    ServerPlayer player = snapshot.player();
+                    player.setGameMode(snapshot.gameMode());
+                    applyForm(player);
+                    player.teleportTo(snapshot.level(), snapshot.position().x, snapshot.position().y, snapshot.position().z,
+                            Set.of(), snapshot.yaw(), snapshot.pitch(), false);
+                    BodyDataStorage.restore(snapshot.data(), player);
+                    NeedsOfNatureTanks.restore(player, snapshot.data().natureTank);
+                    natureBodies.remove(player.getUUID());
+                    updateNatureBody(player);
+                    player.getAbilities().mayfly = snapshot.mayFly();
+                    player.getAbilities().flying = snapshot.flying();
+                    player.getAbilities().invulnerable = snapshot.invulnerable();
+                    player.setNoGravity(snapshot.noGravity());
+                    player.onUpdateAbilities();
+                    player.setCamera(snapshot.camera());
+                    updateSpiritSpears(player);
+                    lastSkinLayers.remove(player.getUUID());
+                    refreshInventory(player);
+                }
+                bodies.values().forEach(this::spawnBody);
+                visualsDirty = true;
+            } catch (RuntimeException rollback) {
+                exception.addSuppressed(rollback);
+            }
+            throw exception;
+        } finally {
+            switchingBodies = false;
         }
     }
 
-    private void captureInventory(Body body, ServerPlayer player) {
-        body.inventory.clear();
-        var operations = server.registryAccess().createSerializationContext(JsonOps.INSTANCE);
-        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
-            ItemStack stack = player.getInventory().getItem(slot);
-            body.inventory.add(ItemStack.OPTIONAL_CODEC.encodeStart(operations, spiritSpear(stack) ? ItemStack.EMPTY : stack).getOrThrow());
+    private void snapshotBody(Map<UUID, Body> snapshots, UUID id) {
+        Body body = store.bodies.get(id);
+        if (body != null && !snapshots.containsKey(id)) {
+            snapshots.put(id, GSON.fromJson(GSON.toJsonTree(body), Body.class));
         }
-        body.selectedSlot = player.getInventory().getSelectedSlot();
+    }
+
+    private record PlayerSwitchSnapshot(ServerPlayer player, PlayerState state, BodyData data, ServerLevel level,
+                                        Vec3 position, float yaw, float pitch, GameType gameMode, Entity camera,
+                                        boolean mayFly, boolean flying, boolean invulnerable, boolean noGravity) {
     }
 
     private ItemStack decodeItem(JsonElement json) {
@@ -2872,6 +2977,10 @@ public final class BodyManager {
 
     public void beforeDeath(ServerPlayer player) {
         captureNatureBody(player);
+        Body body = store.bodies.get(state(player).body);
+        if (state(player).form == Form.HUMAN && local(body) && player.getUUID().equals(body.occupant)) {
+            captureBody(body, player);
+        }
     }
 
     public void died(ServerPlayer player) {
@@ -2895,6 +3004,7 @@ public final class BodyManager {
             return;
         }
         state.normalRespawn = !TSFServerConfig.get().deathLeavesBody;
+        state.restoreDetachedOnRespawn = !state.normalRespawn && state.form == Form.HUMAN;
         if (state.form == Form.HUMAN) {
             saveAbilities(player, state);
             Body body = store.bodies.get(state.body);
@@ -2908,14 +3018,30 @@ public final class BodyManager {
                 }
                 body.skinLayers.clear();
                 body.skinOrder.clear();
+                // 原版已经按 keepInventory 处理掉落，尸体只保留处理后剩下的物品
+                captureBody(body, player);
+                clearLatex(body);
                 locate(body, player);
                 body.occupant = state.normalRespawn ? player.getUUID() : null;
-                body.inventory.clear();
                 body.health = 20;
                 body.food = 20;
-                body.experienceProgress = 0;
-                body.experienceLevel = 0;
-                body.totalExperience = 0;
+                body.saturation = 5;
+                body.foodData = null;
+                body.effects = null;
+                body.absorption = 0;
+                body.air = 300;
+                body.fireTicks = 0;
+                body.frozenTicks = 0;
+                body.hurtTime = 0;
+                body.damageCooldownTime = 0;
+                body.takeXpDelay = 0;
+                body.fallDistance = 0;
+                body.itemCooldowns.clear();
+                if (!player.level().getGameRules().get(GameRules.KEEP_INVENTORY)) {
+                    body.experienceProgress = 0;
+                    body.experienceLevel = 0;
+                    body.totalExperience = 0;
+                }
                 if (!state.normalRespawn) {
                     spawnBody(body);
                 }
@@ -2926,10 +3052,19 @@ public final class BodyManager {
             state.body = null;
         }
         changed();
+        submitSave();
     }
 
     public void respawned(ServerPlayer player) {
         PlayerState state = state(player);
+        if (state.restoreDetachedOnRespawn) {
+            state.restoreDetachedOnRespawn = false;
+            if (state.detachedData == null) {
+                state.detachedData = BodyData.detached();
+            }
+            BodyDataStorage.restore(state.detachedData, player);
+            NeedsOfNatureTanks.restore(player, null);
+        }
         if (state.normalRespawn) {
             state.normalRespawn = false;
             Body body = state.form == Form.HUMAN ? store.bodies.get(state.body) : null;
@@ -2949,6 +3084,7 @@ public final class BodyManager {
             body.occupant = player.getUUID();
             restoreAbilities(player, state);
             locate(body, player);
+            captureBody(body, player);
         }
         if (state(player).form != Form.HUMAN && state(player).form != Form.OBSERVER) {
             restoreAbilities(player, state(player));
@@ -2959,6 +3095,7 @@ public final class BodyManager {
         }
         changed();
         pendingNatureRestores.add(player.getUUID());
+        submitSave();
     }
 
     public void recover(ServerPlayer player) {
@@ -3392,7 +3529,8 @@ public final class BodyManager {
         captureNatureBody(player);
         if (body != null && body.natureAppearance == null) {
             body.natureAppearance = new NatureAppearance();
-            Body original = store.bodies.get(body.owner);
+            PlayerState owner = store.players.get(body.owner);
+            Body original = store.bodies.get(owner == null || owner.homeBody == null ? body.owner : owner.homeBody);
             if (original != null && original.natureAppearance != null) {
                 body.natureAppearance.gender = original.natureAppearance.gender;
             }
@@ -3452,11 +3590,17 @@ public final class BodyManager {
             captureNatureBody(player);
             PlayerState state = state(player);
             Body body = store.bodies.get(state.body);
-            if (state.form == Form.HUMAN && body != null && player.getUUID().equals(body.occupant)) {
-                captureTank(body, player);
-                body.experienceProgress = player.experienceProgress;
-                body.experienceLevel = player.experienceLevel;
-                body.totalExperience = player.totalExperience;
+            // 死亡后到重生前的旧实体不能覆盖已重置的肉体档案
+            if (!player.isAlive() || state.normalRespawn) {
+                continue;
+            }
+            if (state.form == Form.HUMAN && local(body) && player.getUUID().equals(body.occupant)) {
+                captureBody(body, player);
+            } else if (state.form != Form.HUMAN) {
+                if (state.detachedData == null) {
+                    state.detachedData = BodyData.detached();
+                }
+                BodyDataStorage.capture(state.detachedData, player);
             }
         }
         Map<UUID, UUID> carriers = storageCarriers();
@@ -3545,6 +3689,15 @@ public final class BodyManager {
             for (TrinketsCompat.Slot slot : TrinketsCompat.slots(player)) {
                 Body body = carriedBody(slot.stack());
                 if (body != null) result.put(body.id, player.getUUID());
+            }
+            // 灵魂的独立背包在附身期间不在实体上，其中携带的肉体仍随账号迁移
+            if (state.detachedData != null) {
+                List<JsonElement> detachedItems = new ArrayList<>(state.detachedData.inventory);
+                detachedItems.addAll(state.detachedData.accessories.values());
+                for (JsonElement item : detachedItems) {
+                    Body body = carriedBody(decodeItem(item));
+                    if (body != null) result.put(body.id, player.getUUID());
+                }
             }
         }
         // 嵌套皮物及肉体中的打包物品随外层一起转移，队列避免环形引用。

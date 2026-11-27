@@ -2,15 +2,12 @@ package icu.tatyrealms.tatykefei.body;
 
 import icu.tatyrealms.tatykefei.compat.needsofnature.NatureAppearance;
 import icu.tatyrealms.tatykefei.compat.needsofnature.NatureSkin;
-import icu.tatyrealms.tatykefei.compat.needsofnature.NatureTank;
 import com.google.gson.JsonElement;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
-public final class Body {
+public final class Body extends BodyData {
     public String storageServer;
     public UUID storageCarrier;
     public UUID id;
@@ -43,19 +40,8 @@ public final class Body {
     public float displayRotationX;
     public float displayRotationY;
     public BodyRigPose rigPose;
-    public float health = 20;
-    public int food = 20;
-    public float saturation = 5;
-    // 肉体自身的经验值，附身期间由占用者的经验值写入
-    public float experienceProgress;
-    public int experienceLevel;
-    public int totalExperience;
-    public NatureTank natureTank;
     public NatureAppearance natureAppearance;
     public NatureSkin natureSkin;
-    public int selectedSlot;
-    public List<JsonElement> inventory = new ArrayList<>();
     public List<JsonElement> skinLayers = new ArrayList<>();
     public List<UUID> skinOrder = new ArrayList<>();
-    public Map<String, JsonElement> accessories = new HashMap<>();
 }

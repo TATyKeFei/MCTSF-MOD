@@ -1,12 +1,14 @@
 package icu.tatyrealms.tatykefei.state;
 
 import com.google.gson.JsonElement;
+import icu.tatyrealms.tatykefei.body.BodyData;
 import java.util.UUID;
 
 public final class PlayerState {
     public String storageServer;
     public Form form = Form.HUMAN;
     public boolean normalRespawn;
+    public boolean restoreDetachedOnRespawn;
     public UUID latexSource;
     public JsonElement latexProfile;
     public Integer slimeColor;
@@ -17,6 +19,8 @@ public final class PlayerState {
     public double slimeBottleZ;
     public UUID body;
     public UUID homeBody;
+    // 灵魂携带的物品和状态独立保存，不合并进附身的肉体
+    public BodyData detachedData;
     public UUID observedBody;
     public UUID observerFallback;
     public UUID spiritHost;
